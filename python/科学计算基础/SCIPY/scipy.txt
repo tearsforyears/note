@@ -1,0 +1,540 @@
+﻿scipy
+sclentific python
+matplotlib提供了类似matlab的画图工具
+numpy提供了向量化计算的方法
+scipy是第三方的科学计算的库
+pandas是处理时间序列数据的第三方库
+statsmodels是一个统计库注重统计模型
+scikits以numpy为基础提供机器学习和图像处理等高级用法
+
+//import numpy，scipy，matplotlib，pyplot
+scipy是进行科学计算的第三方库，以numpy为基础
+
+linalg, optimize //线性代数和求根优化
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+插值
+from scipy.interpolate import interp1d
+c=interp1d(xarray,yarray)
+c(3.9)
+//这个函数的意思是一维的插值通过给定x和y的坐标画出函数
+//画出拟合曲线之后下面就是调用c(3.9)这时候就会把点的值返回
+//c(list) //如果这种指定之后就返回一个array 分别对应
+//要注意的是xy的个数必须相等 否则会报错而且3.9不能在定义域外
+//不过我们可以指定非法值 bounds_error=False 不合法返回nan
+//fill_value= //可以指定返回的是多少而不是nan
+
+线性插值
+interp1d是线性插值法
+//所谓的线性插值就是在亮点之间构建直线按照直线函数插值
+可以通过修改kind参数来调节插值方法
+interp1d(listx,listy,kind="linear")//默认为linear 线性插值
+zero 0阶插值
+nearest 最近邻插值 //把变换后图像中的原像素点最近的灰度值赋给原来的像素
+>>>多项式插值<<<<<
+quadratic 二次插值
+cubic 三次插值
+4,5,6 更高阶的插值
+
+interp2d,interpnd 的用法和1维的类似
+
+径向基函数
+//一个取值仅仅依赖于原点的实值函数 radial basis function RBF
+常用的RBF函数
+1.高斯函数(正态分布)gaussian x,np.exp(-1*x**2) //e的-x**2次方
+2.Multiquadric函数 x,np.sqrt(1+x**2) //根号1+x的平方
+3.Inverse Multiquadric函数 x,1./np.sqrt(1+x**2)
+
+径向基函数插值
+from scipy.interpolate.rbf import Rbf
+cp_rbf = Rbf(data['TK'], data['Cp'], function = "gaussian")
+//通过Rbf这种方式进行调用
+
+统计学
+概率统计方法
+numpy，pandas，pyMC，statsmodels
+scipy.stats
+
+numpy中自带的统计学方法
+mean()
+min()
+max()
+std()//标准差 standard deviation
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+import scipy.stats.stats as st
+st.nanmedian() //这个是忽略nan值之后的中位数
+st.mode()//z众数和出现次数(array([num]),array([times]))
+//会返回一个元组
+st.skew()//偏度
+st.kurtosis()//峰度
+//峰度:峰态系数
+如果峰度大于三峰的形状比较尖，比正太分布峰要尖
+//偏度:偏态系数
+直观来看就是密度函数曲线尾部的相对长度
+正太分布的偏度为0，两侧尾部长度对称
+左偏态，负偏态，左边尾部长，峰偏向右边
+概率分布
+均匀分布
+正太分布
+gamma分布
+.....
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+导入正太分布
+import scipy.stats.norm
+norm.cdf //返回对应的累计分布函数值
+//返回概率密度函数的积分
+
+norm.pdf //返回对应的概率密度函数值
+//就是返回概率密度函数
+//正常情况下标准差是1，其他参数是0，就是标准正太分布
+//loc和scale用来调用这些参数
+
+norm.rvs //产生制定参数的随机变量
+//产生符合这个分布的点的array
+
+norm.fit //返回给定数据下，各参数下的最大似然估计MLE
+//就是返回正太分布的两个参数平均值和标准值
+x_norm=norm.rvs(sive=500)//返回符合正太分布的500个随机点
+h = hist(x_norm, normed=True, bins=20)
+//使用频率代替数值，把默认的10个区间变成20个区间
+x_mean, x_std = norm.fit(x_norm)
+这个可以获得平均值和标准值 //就是最大似然估计值的两个参数
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+导入积分，计算落在某个区间的概率大小
+from scipy.integrate import trapz
+trapz(y,x)
+//注意这里的x是一个linspace
+ //这里的y代表积分函数 对x进行整个函数定义域内的积分
+//这个方法的内部好像使用了泰勒公式进行取代所以在改变linspace的精度的时候函数的值会发生一定精度上的变化
+//所以说积分的原理大概是多项式求和
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+其他连续分布
+from scipy.stats import lognorm,t,dweibull
+对数正太分布,t分布，韦氏分布
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+离散分布
+form scipy.stats import binom,poisson,randint
+伯努利(二项分布)，泊松分布，均匀分布
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+自定义离散分布
+from scipy.stats import rv_discrete
+xk = [1, 2, 3, 4, 5, 6]
+pk = [.3, .35, .25, .05, .025, .025]
+一个色子的离散值和概率
+loaded=rv_discrete(values=(xk,pk))//定义了一个分布
+plt.stem() //杆状图plt.hist()//直方图
+离散均匀分布的概率质量函数(PMF)
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+假设校验
+from scipy.stats import ttest_ind, ttest_rel, ttest_1samp,t
+t_val,p=ttest_ind(n0,n1)//返回两个参数 p越接近1说明样本没有显著性差异 这个是进行独立样本t检验
+t_val,p=ttest_rel(n0,n1)
+//返回两个参数p的值的表征和上面的相同 这个是进行配对样本的检验
+至于这两个玩意有什么不同就要问统计学这本书了
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.
+
+>>>>>>>>>>>>>>>>>>>>
+loc此概率分布的均值
+scale此概率分布的标准差
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+>曲线拟合<
+
+import numpy as np
+import matplotlib as mpl
+import matplotliv.pyplot as plt
+多项式拟合(numpy.polyfit)//polyfit是多项式回归或者是曲线拟合
+np.polyfit(x,y,n)//对x，y进行n阶多项式拟合 //返回a0....这些作为多项式拟合的参数
+f=np.poly1d(list) //把list封装成一个多项式(1d)函数 比如y=kx+b
+通过x,f(x) 可以直接调动这个多项式计算函数，没有2d，3d那些
+1d就可以完成多项式函数的生成
+
+多项式拟合正弦函数
+np.polyfit(x,y,n) //求过已知点集的n阶多项式 曲线拟合
+
+最小二乘拟合
+from scipy.linalg import lstsq //线性代数的最小二乘法
+from scipy.stats import linregress //统计的线性回归
+
+X = np.hstack((x[:,np.newaxis], np.ones((x.shape[-1],1))))
+先扩充一个维度然后拼接两个数组//想一下那个矩阵
+
+C, resid, rank, s = lstsq(X, y)
+C就是最小二乘法拟合出来的参数向量集合
+resid误差序列
+rank 矩阵的rank
+s //singular 奇异矩阵？
+
+线性回归
+slope，intercept，r_value，p_value,stderr=linregress(x,y)
+拟合直线y=slope*x+intercept
+
+噪声
+曲线的波动过大不容易出现平滑的现象叫噪声
+//为了使得曲线的波动更大我们可以加入噪声
+y_noisy = y + 0.8 * norm.rvs(size=len(x)) 
+//通过正太分布加入噪声点，模拟噪声
+
+
+更高级的拟合(难度很大)
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<
+from scipy.optimize import leastsq //性能优化，最优解
+定义误差函数，将要优化的参数放在前面：
+def f_err(p, y, x):
+    return y - function(x, *p) //func就是原始曲线
+c, ret_val = leastsq(f_err, [1, 1, 1, 1], args=(y_noisy, x))
+//ret_val是1-4的时候表示成功找到了最小二乘解
+这个函数第一个是误差函数，第二个参数是初始值 
+第二个参数是初始参数，第三个是其他参数//两个加起来就是拟合曲线的所有参数
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>
+更高级的做法
+from scipy.optimize import curve_fit
+这个不需要定义误差函数
+p_est,err_est=curve_fir(function,x,y_noisy)
+function(x,*p_est)//就可以把拟合之后的参数传入函数中
+//从而画出修正之后的曲线
+第一个返回的是函数的参数，第二个返回的是一个协方差矩阵
+协方差：衡量两个变量的总体误差
+协方差对角线为各个参数的方差 err_est.diagonal()
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+线性规划最小值
+//这个是指在线性规划下函数的最优解
+minimize函数
+from scipy.optimize import minimize //最优化方法里面的最小化函数
+result=minimize(func,initvalue,args=())
+//函数接受三个参数
+//函数对象 初始值 参数列表
+//就是说如果func第一个参数在变动的情况下 使得函数整体最小
+//result.x 可以获得第一个参数在极限下的最小值
+//初始值随便输根据相差大小会有些许不同，可忽略的误差
+//在必要时候也可以指定第四个参数constraints
+//这个参数可以这么指定{'type':'eq','fun':lambda x:x**2}
+//意思就是说当等于x**2的时候才取值，就是一个限制条件
+//这个x是用来限制第一个参数的
+
+Rosenbrock
+Rosenbrock函数是一个用来测试优化效果的一个非凸函数
+from scipy.optimize import rosen
+
+z=rosen([x,y])//rosen是个用来判断误差的函数
+f(x)=
+for i=1 to 100:
+sum(100(x**2 down(i+1)-x down(i))**2+(1-x down(i))**2)
+//所以的话就是生成一条函数x，y就是用来比较的点集
+//比较的时候minmize(rosen.x0)
+
+优化方法
+
+BFGS算法(数学的时候需要去研究下)
+//拟牛顿法
+minimize函数默认根据函数有界或有无约束，使用BFGS L-BFGS-B SLSQP
+中的一种
+没有默认使用BFGS
+
+BFGS需要计算函数的Jacobian(雅克比)矩阵:
+from scipy.optimize import rosen_der
+result = minimize(rosen, x0, jac=rosen_der, callback=xi.append)
+//据说函数计算的开销大约减少了一半
+
+Nelder-Mead Simplex算法(单纯形算法)
+//改进线性规划
+result = minimize(rosen, x0, method="nelder-mead", callback = xi.append)
+//可以这么指定method="nelder-mead"
+
+Powell算法
+//离散数学 共轭
+//method="powell"
+//修正共轭方向的加速度法
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+积分
+
+符号运算:可以理解成是把变量抽象化，抽象代数的产生
+import sympy
+from sympy import symbols,integrate
+x,y=symbols('x y') //这句话定义了两个变量x，y
+z=sympy.sqrt(x**2+y**2) //这句话定义了z=根号x^2+y^2
+//注意此处打印出来的还是x，y 此时的x，y不当作变量来处理
+.subs(x,3).subs(y,4)//链式编程实现替换把参数变成实际运算的变量
+注意返回的不是浮点数，以实数的形式表示
+
+从sympy.abc 中导入现成符号变量
+from sympy.abc import theta
+y=sympy.sin(theta)**2 //类似这样的
+
+对符号变量的积分integration 积分
+Y=integrate(y)
+Y.subs(x,3)-Y.subs(x,2) //通过积分上下限就可以算出定积分的值
+integrate(y).evalf() //这个可以查看具体值而不是函数表达式
+integrate(y,(theta,0,np.pi))//tuple从右往左看 传入积分上下限和积分变量
+
+sympy.Integral(y) //返回积分对象 Integral(y,x) //x为积分变量
+//Integral 和 integrate 参数也可以一样指定
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+画一条积分函数曲线Y(p)=Integral(sin(x)**2),(x,0,p)
+import numpy as np
+import sympy
+import matplotlib.pyplot as plt
+from sympy import symbols,integrate
+x, y= symbols('x y')
+p=symbols('p')
+y=sympy.sin(x)**2
+Y_indef=sympy.Integral(y)
+Y_raw=lambda p:integrate(y,(x,0,p))
+Y=np.vectorize(Y_raw)//向量化 意思是可以传入一个list
+X=np.linspace(0,3)
+plt.plot(X,Y(X))
+plt.show()
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+数值积分
+lim(n->inf) 
+∑(i=0 to n-1) f(xi)(x down(i+1)-xi)
+=Integral(f(x)(x,x0,xn))
+
+from scipy.special import jv //导入贝塞尔函数
+一般使用函数jv(2.5,x)
+
+from scipy.integrate import quad //quadrature函数
+interval=[0,6.5] //区间
+value,max_err=quad(f,*interval)//返回一个积分值 误差组成的tuple
+//f代表被积分的函数//注意interval一定是*interval因为必须输入两个以上的参数
+
+反常积分
+interval[0.,np.inf]
+//如果反常积分不熟练的话通常是得不出结果的
+
+二重积分
+一种方法是调用两次quad函数
+因为一个变量以上的是没法用.vectorize向量化的
+所以使用@vectorize修饰符把函数向量化
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+from numpy import vectorize
+@vectorize
+def int_h_dx(t, n):
+    """Time integrand of h(x)."""
+    return quad(h, 0, np.inf, args=(t, n))[0]
+//tuple第一个值value
+@vectorize
+def I_n(n):
+    return quad(int_h_dx, 1, np.inf, args=(n))
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+调用dblquad函数
+from scipy.integrate import dblquad
+@vectorize
+def I(n):
+    """Same as I_n, but using the built-in dblquad"""
+    x_lower = 0
+    x_upper = np.inf
+    return dblquad(h,
+                   lambda t_lower: 1, lambda t_upper: np.inf,
+                   x_lower, x_upper, args=(n,))
+
+//这个是先从里面开始积分，注意参数位置
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+采样点积分
+from scipy.integrate import trapz,simps
+trapz(ylist，xlist) //踩点积分，线性拟合从而积分
+linspace好像最多不能过10个E,内存溢出程序崩溃
+//加大算法速度
+使用ufunc进行积分
+result_func = 
+np.add.accumulate(y) * (x[1] - x[0]) - (x[1] - x[0]) / 2
+//拉格朗日
+
+速度比较 numpy>quad>trapz>simps>sympy
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+微分方程
+//dy/dt=sin(t)
+def dy_dt(y, t):
+    return np.sin(t)	
+from scipy.integrate import odeint
+t = np.linspace(0, 2*pi, 100)
+result = odeint(dy_dt, 0, t)
+
+高阶微分方程(用的时候再去查吧狗日的)
+可以拆成两个一阶微分方程（还原元法）//把dx/dt换成y1
+然后就变成求两次 //反正得去复习那些求微分方程的方法了吧
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+以下内容有心脏病者不要强行看完
+
+稀疏矩阵
+//就是只矩阵的一种存储方式,对于大型矩阵来说，计算机存不下
+//所以把非0行的元素储存起来,然后只对非0行元素进行操作
+form scipy.sparse import *
+存储格式以及特点
+coo:构建矩阵的时候比较高效//row col data
+csc、csr:乘法计算时比较高效
+//crs:values (优先保存行) pointerB第一个非0元的位置,pointerE最后一个非0元的位置
+crc:对于列压缩
+其他梅介绍到的也就是其他一些压缩的方法
+bsr，coo，csc，csr，dia，dok，lil
+
+创建稀疏矩阵
+matrixA=coo_matrix((2,3)) 
+matrixA.tocsr() //转换压缩算法
+matrixA.todense()//转换为普通矩阵
+matrixA.dot(v)//向量乘法 v代表一个向量
+
+coo_matrix((data,(locr,locc)),shape=(row,col))//可以创建稀疏矩阵
+//其中data代表矩阵的值 row，col表示值的对应位置
+//详情见该矩阵的创建算法
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+I = np.array([0,3,1,0])
+J = np.array([0,3,1,2])
+V = np.array([4,5,7,9])
+A = coo_matrix((V,(I,J)),shape=(4,4))
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+转换格式的时候会把相同坐标的值合并
+
+################################################################
+回忆部分：花式索引
+//注意一个问题就是花式索引的是针对数组不是list!
+//花式索引A[0, :100]//对于多维数组这个参数是第一个先选维度，第二//个切片
+################################################################
+
+from scipy.sparse.linalg import spsolve //稀疏矩阵解方程
+A.tocsr() //关于矩阵方程Ax=b
+b=range(1000)
+x=spsolve(A,b)
+
+from numpy.linalg import solve //解方程
+x=solve(A.toarray(),b)
+
+sparse.find函数
+from scipy import sparse
+row,col,val=sparse.find(sparsemat) //返回一个三元组 非0元素位置
+
+sparse.issparse函数
+sparse.issparse(sparsemat) //判断是否是稀疏矩阵
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+linalg  //linear-algbra //线性代数
+
+import numpy.linalg
+import scipy.linalg //有两个模块 scipy比numpy更加强大
+
+两类matrix表示的异同与选择
+numpy.matrix和2D numpy.ndarray 两种方式操作矩阵
+numpy.matrix 是一个矩阵类 .I .T //表示矩阵的逆和转置
+np.mat([1,2:3,4])//支持和matlab相同的创建于法
+repr() //转化成字符串显示 并没有转换成字符串
+不同于array的相互乘法* matrix的*代表的是矩阵的乘法
+但因为有着二义性和操作难度 所以用numpy.ndarray对象去代替
+array的乘法A.dot(b) //.dot(b) 也可以用来表示向量的乘法
+
+基本操作
+import scipy.linalg 
+linalg.inv(A) //A.I
+
+求解线性方程组(克拉默法则之外还有矩阵的方法(行最简))
+//还有一种神奇的方法 求逆 因为Ax=B 同时左乘A.I 
+//赶紧重新学吧 学校里面太多东西没讲了(矩阵表征的东西)
+
+线性方程组
+import scipy.linalg.solve
+x=linalg.inv(A).dot(B) //可以用这个
+x=linalg.solve(A,B) //执行效果等同于上一行代码
+
+行列式
+linalg.det()
+
+'''
+矩阵或向量的模(数学的叫法是范数)
+矩阵的奇异值，与特征值有一定的关系
+
+范数(norm)://摸的意思
+1-norm:向量元素的绝对值的和
+2-norm:sqrt(∑x**2)
+∞-范数:向量元素的最大值
+-∞-范数:向量元素的最小值
+矩阵范数: ord=inf，1。。。。
+1-范数:列和范数,所有列向量绝对值之和的最大值
+2-范数：sqrt(最大特征值) -2最小
+∞-范数:行和范数
+F-范数:(ord=fro) 所有元素的和在开平方
+http://blog.csdn.net/u012380663/article/details/36629951
+
+可逆矩阵也被称为非奇异矩阵、满秩矩阵。
+可逆矩阵一定是方阵
+伪逆矩阵是逆矩阵定义的广义形式，非方阵不存在逆矩阵
+AXA=A,XAX=X.此时，称矩阵X为矩阵A的伪逆 A和X得是同形矩阵
+左逆矩阵和右逆矩阵 AA^L=E //这是右逆
+'''
+
+范数计算
+linalg.norm(A,'1')//计算A的第一范数
+
+最小二乘解和伪逆
+A^H //这个表示矩阵的共轭转置
+//(A^H*A)**(-1)A^H 在A^HA可逆时 称为A的伪逆矩阵
+
+//在给定y和A的情况下可以用linalg.lstsq求c
+###############################################################
+X = np.hstack((x[:,np.newaxis], np.ones((x.shape[-1],1))))
+//求那群ci的列向量值
+先扩充一个维度然后拼接两个数组//想一下那个矩阵
+C, resid, rank, sigama = lstsq(X, y)//lstsq方法中的那个X一定是个
+//最后一列全为1的那个矩阵，补充下最后那个参数是奇异值
+##############################################################
+在定A的情况下可以用linalg.pinv 或者linalg.pinv2 求A的伪逆
+区别在于前者使用最小二乘法求解，后者使用奇异值算法
+
+矩阵分解
+1.特征值和特征向量
+linalg.eig(A)//返回矩阵A的特征值和特征向量
+linalg.eigvals(A)//返回矩阵特征值
+linalg.eig(A,B) //求解Av=cBv 的问题
+
+奇异值分解
+A=U∑V^H 这个∑是对角线上元素不为0 UV都是正交矩阵
+//这就是A的奇异值分解(svd)
+
+U,s,Vh=linalg.svd(A) //奇异值分解
+s为其奇异值 对应上述∑ 以及两个矩阵
+Sig=linalg.diagsvd(s,M,N)//M N表示∑的行列数 返回的是∑矩阵
+
+LU分解
+A=PLU //P是M*N矩阵中的一个排列 L是下三角阵 U是上三角阵
+P,L,U=linalg.lu(A)//lu分解
+
+Cholesky分解
+//这是一种特殊的LU分解 A=U^H*U
+linalg.cholesky
+
+QR分解
+A=QR R是上三角矩阵 Q是正交矩阵
+linalg.qr
+
+Schur分解
+A=ZTZ^H //Z是正交矩阵 T是一个上三角矩阵
+T,Z=linalg.schur(A)
+
+矩阵函数
+指数和对数
+linalg.expm3(A)//用泰勒展开式去算e^A
+linalg.expm2(A)//算A的特征值然后分解利用正交阵的性质去算e^A
+但是最优化方法是用pade近似实现，比泰勒级数更精确(有理数化分数)
+linalg.expm(A)//用pade近似实现
+
+对于对数
+linalg.logm()//可以实现指数还原
+
+三角函数
+//实现原理:欧拉公式
+linalg.sinm
+linalg.cosm
+linalg.tanm 
+
+双曲三角函数
+linalg.sinhm
+linalg.coshm
+linalg.tanhm
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+稀疏矩阵的线性代数
+scipy.sparse.linalg.inv//稀疏矩阵求逆
+
+对于特别大的矩阵可能需要太大的内存，可以考虑用两个方法代替
+scipy.sparse.linalg.eigs//求特征值和特征向量
+scipy.sparse.linalg.svds//求奇异值和奇异向量

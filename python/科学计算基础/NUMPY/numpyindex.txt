@@ -1,0 +1,114 @@
+﻿matplotlib
+	scatter(x,y,size,color)
+	show()
+	plot(x,label="")
+	figure()
+	subplot(row,column,index)//分割图
+	legend([])
+        xlabel()
+	title()
+	grid() //显示网格
+	close()
+	hist() //直方图
+numpy
+	shape
+	size
+	nbytes
+	ndim //axis
+	fill
+	arange
+	mask索引
+	花式索引
+	where字句 返回tuple
+	数组类型
+	asarray
+	astype
+	view
+	sum
+	prod
+	min
+	max
+	argmin
+	argmax
+	mean
+	average
+	std  //标准差
+	clip //限制范围
+	ptp  //最大最小值之差
+	round(decimals=) //限制到几位小数
+	sort()
+	argsort()
+	linspace(from,to,N)
+	searchsorted(sorted_array,values) //返回插值位置
+	reshape
+	squeeze //出去长度为1的维度
+	transpose() // T矩阵转置
+	concatenate(tuple,axis=) //数组连接
+	flatten() //变成一维数组
+	flat	//attr
+	ravel()//返回迭代器
+	atleast_xd(x)
+	diagonal(offset=0)
+	tostring
+	tofile
+	fromstring
+	dumps()//返回二进制字符串
+>>>>>>>>>>>>>>
+	linspace
+	logspace
+	meshgrid//生成网格结构，返回两个参数
+	ogrid，mgrid //支持切片生成向量，切片生成向量时虚数被当		     //作列向量生成式
+	ones，zeros，empty
+	ones_liked,zeros_liked,empty_liked
+	indentity //单位矩阵
+>>>>>>>>>>>>>>>
+	mat
+	bmat //matlab
+	sin,cos,tan,sinh..
+	dot
+	inner
+	cross
+	vdot
+	outer
+	kron
+	tensordot
+	exp
+	log
+	sqrt
+	absolute
+	conjugate //求共轭
+	negative //取复数
+	ceil
+	floor
+	fabs //float abs
+	hypot //求模
+	fmod //mod
+	maxiumum
+	ninimun
+>>>>>>>>>>>>>>
+	np.inf
+	np.nan
+	向量化 vectorize @vectorize
+	add
+	subtract
+	multiply
+	divide
+	power
+	remainder //mod
+	高阶函数reduce,filter,sorted,map
+	accumulat
+	reduceat //分段求值
+	outer
+	choose(control,*args)
+	choose(booleanexp,list)//会从表达式先 生成个列表然后去				       //list中找值
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+BIN:binary OCT:octal 8进制
+HEX:hexadecimal 16进制
+DEC:decimal 十进制
+
+.dot() //矩阵乘法 不要用mat	
+	
+	
+	 
+	
+	

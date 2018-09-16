@@ -1,0 +1,759 @@
+﻿numpy  null pi
+//数学工具
+关于三维数组，因为其序列的空间性
+所以不能简单用xyz坐标去描述数据的位置
+用以下方法确定位置和增量[]
+按照括号内容索引为[0,0,0] 最右边的0代表在最内增量 也就是最内层括号index所以数据的构成应该由最开始输入的参数作为最底层的数据形成立方体数阵[矩阵]
+关于多维数阵的推论，
+维度按照数阵的各个维度进行切面进行叠加
+所以就是一个方阵，那么多维叠加可行，否则只能执行部分叠加
+关于index
+index可以输入任意维度低于全索引的参数值
+说白了a[0,0]完全等同于a[0][0] //这也间接说明了索引的原理
+
+
+matplotlib
+//画图工具
+import matplptlib.pyplot as plt
+plot(y)
+plot(x,y)
+plot(x,y,format_string)
+//format可以指定的参数和matlab基本相同
+-实线(deflaut)
+--双划线
+:虚线
+:.点划线
+--------------------------------
++加号符    s正方形    >
+o空心元    d菱形      p五角星    b blue(defluat)  k
+*星号      ^上三角形  h六边形    c                w
+.实心圆    v下三角形  r red      m
+x          <左三角形  g green    y
+----------------------------
+这个可以画单条数据线的图
+plot(x,sin(x),x,sin(2*x))
+//这个参数也是得传入list数组
+
+
+scatter散点图
+plt.scatter(x,y,size,color)
+这四个参数都是传入list数组
+//分别规定每个点的颜色大小位置
+np.linspace(from,to,space)的作用是在from到to的区间里面创造出等差的
+点的list一共space个点
+>>>>>> Demo
+import numpy as np
+import matplotlib.pyplot as plt
+x=np.linspace(0,2*np.pi,50) //给x传的是一个list数组
+print x
+plt.plot(np.sin(x))
+plt.show()
+>>>>>>>>> //画出一条三角函数曲线
+
+多图
+figure()命令产生新的图像
+plt.figure()
+plt.plot(x)
+plt.figure()
+plt.plot(y)
+//就是相当于show两次或者相当于打开两次
+subplot(row,column,index)//分割plot 占Hh几行几列序号是多少
+plt.subplot(1, 2, 1)
+plt.plot(x)
+plt.subplot(1, 2, 2)
+plt.plot(y)
+//相当于在同一幅图中有两幅小图
+plt.hold(False)//关掉原图保持也就是说他会被覆盖
+//默认为True 两条图线的形式显示出来
+
+标签
+plt.plot(x,label="sin") //以图例的形式显示出来
+plt.legend() //把这句代码写上才会有效果 图例的意思
+//或者直接在legend()中加入参数
+plt.legend(["sin","cos"]) //要以一个list的形式放进去
+
+坐标轴，标题，网格
+plt.xlabel("xlableName",fontsize="large")
+plt.title（"chartTest"）
+plt.grid() //显示网格
+
+清楚关闭图像
+clf() //清除已有的图像
+close() //关闭当前的图像
+close("all") //关闭所有图像
+
+直方图 //生成1000个点的高斯分布的直方图
+plt.hist(np.randn(1000))
+
+imshow 显示图片
+灰度图片可以看成是二维数组
+import scipy.misc.lena
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#coding=utf-8
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.misc as s
+img=s.face() //因为报错说了lena不能用
+plt.imshow(img,
+       # 设置坐标范围
+      #extent = [-25, 25, -25, 25],
+       # 设置colormap
+      cmap = plt.cm.bone)
+
+plt.colorbar() #这句话就是把调色的图例跳出来的
+plt.show()
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+def main():
+    pass
+if __name__=="__main__"
+    main()
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+import numpy as np
+//np底层是拿C写的
+
+简单数组
+a=np.array([1,2,3,4])
+b=a+1
+//进行了封装之后 这个list就可以进行加减乘除乘方运算
+//引用的方法还是和原来list一样
+//这种引用可以进行切片
+list.shape //查看数组形状
+list.shape=2,2 //修改数组形状
+list.size    //查看有几个元素
+list.nbytes //查看占用占的字节数
+list.ndim //查看维度数
+list.fill(8) //把列表所有元素拿8填充，如果类型不一样要进行数据转//换
+//支持切片和倒叙索引
+dist=list[1:]-list[:-1] //这种方式可以算出增量
+//本质上这些都是c的代码
+
+多维数组
+多维数组的索引list[1,3] //第2行第4列 有0存在
+多维数组的切片list[0, 3:5] //得到第一行第四个第五个元素
+切片的机制是引用python并没有为切片分配内存，只是多个变量指向同一段内存
+//这个机制的存在是因为对于很大的数组不好遍历
+//如果要生成复制要用copy()
+
+花式索引
+切片只能连续或者间隔的切片操作
+1.等差数组arange(from,to,step)//用法和list的range()一样
+2.list[0] //正常索引 list[[1,2,3]]//花式索引搜索第2，3，4个元素
+//如上可知就是给他传一个list进去 或者给他传一个array进去
+3.用boolean数组来花式索引
+boolean数组:
+mask=np.array([0,1,1,0],dtype='bool')//就这就是个bool数组
+a[mask]//指定了dtype='bool'之后就把true数组弄出来了
+--------------------------------------------------
+array=np.array([1,-1,2,-3])
+mask = array>=0 //有点像jQuery中的隐式遍历
+print array[mask] //把大于等于0的弄出来了
+
+--------------------------------------------------
+4.二维数组的花式索引
+两个参数组成的坐标为索引
+list[[0,1,2,3],[0,1,2,3]] //取出坐标为(0,0)(1,1)...的点
+同时支持切片索引和切片索引混着用
+
+不完全索引
+//参数不给全，就相当于把正行当元素处理就当成一维处理
+
+5.三维数组的索引和二维差不多
+总结下索引的4种
+1>切片 2>[index] 3>[列表位置支持倒叙,,,] 4>dtype=bool 0,1索引
+
+6.where语句
+a=array([0,1,2,3])
+conditionA=where(a>10)
+where返回一个符合条件的元组
+
+//这就tmd非常强大了//
+//complex 复数
+//多维数组的乘法仍然是按照分别相乘而不是矩阵乘法
+
+---------------------------------------------------
+数组类型
+intArray，boolArray，floatArray，complexArray
+对于复数数组可以查看它的实部和虚部
+a.real
+a.imag
+共轭复根 a.conj()
+复数定义 1.+1.j //以这种形式来代表一个复数
+这些方法可以用在浮点数组和intArray上
+虚部是只读的并不能修改他的值
+浮点数默认是双精度double(float64)
+单精度(float32)
+uint8//只使用一个字节的无符号整数
+>>>>>>>>>>>>>>>>>>>>>>>>读数据文件
+array.tofile('path')
+print np.frombuffer('path',dtype=array.dtype)
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+np.ord('f')//查看f的ASCII码的值
+			Numpy类型
+bool 1byte
+int8,16,32,64,128,int //最后这个int和Long一样大
+uint8,16,32,64,128,unit//最后这个和unsigned long一样大
+float16,32,64,float,longfloat 默认为双精度float64
+complex64,128,complex,longcomplex 默认为complex128
+//这个是实部 虚部都是双精度的意思
+string,unicode //dtype=S4表示一个4字节的字符串数组
+datetime64 timedelta64
+类型转换//指定dtype就行
+
+asarray(array ,dtype= )
+//这个函数返回一个新的对象 并不会改变原来数组的值
+//然后如果转换类型和原来数组一样不会产生新对象就是添加引用
+//主要作用就是为了保证这是一个数组，好处是不会产生新的对象
+
+array.astype(float64)
+//做类型转换并且返回一个新数组，也不会改变原来数组的值
+//即使转换的类型是相同的，这个也会返回一份新的数组
+
+view方法
+print array.view(np.int32) //view方法读的是内存然后把他用int32解析
+//这个方法是公用内存的 所以在改变最后结果的值的矢耦会改变原来的值
+
+数组方法
+两种形式的sum
+array.sum()
+sum(array)//求和
+lis[第0维度][第1维度][第2维度][第3维度]
+lis[y][x]
+sum(a,axis=0)//求和 沿着第0维度求和 //纵求和 y
+sum(a,axis=1)//求和 沿着第1维度求和 //横求和 x
+可见 axis是根据lis的维度去求和的
+keepdims=True 保持矩阵的二维特性
+第一维度指的是a[1-->2][][]这个方向叠加 依次跟进
+
+求和和求积都是有限度的，如果超过了这个限度就无法显示
+prod()
+prod(a,axis=0) //沿着第一维度求积 
+
+
+最大最小值
+min(a,axis=0)
+max
+
+最大最小值的位置
+argmin(a,axis=0) //这个是沿着第一维度来看最小的位置的index
+argmax
+
+平均值
+mean() //返回的是double(float 64)
+average(a,axis=0,weights=[1,2])//支持加权平均
+
+标准差
+std(a,axis=1)
+
+clip方法：限制数值范围的方法
+clip(3,5)//小于3的变成3，大于5的变成5
+
+ptp方法:最大值和最小值之差
+
+round方法
+round(decimals=1) //指定精确到1位小数
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+sort方法
+sort(list) //按照大小排序
+
+argsort方法
+argsort([1,3,2,4]) //这个返回一个indexarray//[0,2,1,3]
+//就是index的排序
+
+//然后就可以利用这个来进行高级索引了
+
+//需要注意的是sort方法会改变本来数组的值，argsort不会
+
+二维数组的排序
+sort默认对每一行进行排序
+可以改变轴对每一列进行排序
+sort(a,axis=0)
+
+//linspace(0,1,5)创建等差数组 源于matlab
+searchsorted函数
+searchsorted(sorted_array,values)
+
+第一个是已经排序的数组
+第二个是要插入的值，如果位于第一个数组的[0]~[1]区间之内
+就显示0在相应的位置上
+例如
+sorted_array = linspace(0,1,5)
+values = array([0.1, 0.8, 0.3, 0.12,0.5,0.25])
+//根据插入的位置返回[1,4,2,1,2,1,dtype=int64]
+
+//利用插入位置和切片 我们可以立刻把这两个插入值之间的所有元素都取出来
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 
+数组形状
+a.shape=2,3 //修改数组形状
+a.reshape=2,3 //修改数组形状 返回一个新的数组
+
+//但是都不能改变数组的总数
+
+np.newaxis增加数组的维度
+y=a[newaxis, newaxis, :]
+这个是增加了两个维度 什么都没填充 就相当于在最外层加括号
+
+squeeze方法去除长度等于1的维度
+a.squeeze()
+
+数组转置
+//交换行列,三维数组就是交换三条轴 多维同样
+a.transpose()
+a.T //相当于上面那种写法的简化版
+复数数组转置不反回共轭，单纯交换轴的位置
+
+数组连接
+np.concatenate((a0,a1,...aN),axis=0) 非常重要
+前面一个参数必须用元组包含起来
+x,y分别代表两个数组
+np.array(x,y)//也可以连成一个三维数组
+//还有vstack,hstack,dstack //练成的形状都不一样
+
+fatten数组
+a.flatten()//把数组变成一维的
+//返回的是复制
+
+flat属性
+b=a.falt //相当于返回了一个迭代器
+//改变b的值的时候相当于改变a的值
+
+ravel方法
+a.ravel()
+和flat属性一样返回一个迭代器
+
+atleast_xd函数
+//保证数组至少有x维
+np.atleast_xd(1) //保证数组至少有x维
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+对角线
+array.diagonal(offset=0)//制定偏移量 正数右 负数左移返回对角线数组
+也可以通过花式索引更新对角线的值
+利用花式索引修改对角线的值
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+数组和字符串的转换
+a.tostring()方法//谁读谁智障 str()手动滑稽
+a=np.fromstring(s,dtype=np.uint8) //读字符串需要指定类型
+
+对于文本文件用
+loadtxt
+genfromtxt
+savetxt
+对于二进制文件用
+save
+load
+savez
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+关于数组中一些没有写到的方法
+
+a.swapaxes(axis1,axis2) //交换两个维度的位置
+a.transpose(*axex) //交换所有维度的位置
+a.tolist()
+a.conjugate() //求共轭
+a.dump(file)//把a用二进制存入file
+s.dumps()//二进制数据变成字符串,注意方法名字中有个s
+a.nonzero() //返回非0元的索引
+
+a.var() //方差
+a.any() //只要有一个不为0 逻辑或
+a.all() //所有都不为0，逻辑与
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+生成数组的函数
+np.arange(from,to,step) //用浮点数会出问题
+linspace(from,to,N) //生成等差数列 N个等距 包括端点
+logspace(from,to,N) //生成N个等距分布以10为底的对数
+//np.logspace(0,5,6)  [1,10,100,1000,10000,100000]//
+这种生成包括两个端点
+
+meshgrid:
+在二维平面中生成一个网格
+这个相当于在定义了一个坐标系的网格
+这个网格对于描点画图用处很大
+利用demo的代码可以画出来三维的任何函数
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#coding=utf-8
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+
+
+def f(x, y):
+    # sinc 函数
+    r = np.sqrt(x ** 2 + y ** 2)
+    result = np.sin(r) / r
+    result[r == 0] = 1.0
+    return result    //三维函数的定义
+
+x_ticks = np.linspace(-10, 10, 51) //形成x在这个范围这个精度的
+y_ticks = np.linspace(-10, 10, 51) //的网格单线
+#x=x_ticks
+#y=y_ticks
+x, y = np.meshgrid(x_ticks, y_ticks) //形成网格矩阵
+//为什么我会感觉这步多余
+//通过调试程序我们可以看出来这两种写法应该是不同的
+//meshgrid函数把两个坐标变成一个坐标点的形式
+//这样程序就可以直接作用在点上
+z = f(x, y)
+fig = plt.figure()
+#分图命令
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_surface(x, y, z,
+                rstride=1, cstride=1,
+                cmap=cm.YlGnBu_r)
+#设置xyz的坐标名字
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_zlabel('z')
+plt.show()
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+np.meshgrid(x_ticks,y_ticks,sparse=True)
+如果设定了spaese=True的话就相当于让x，y变成了单一的行向量和列向量
+
+indexing='xy'//默认是笛卡尔坐标
+indexing='ij'//矩阵坐标
+
+ogrid,mgrid
+ogrid()//相当于meshgrid(indexing='ij',sparse=True)
+mgrid()//相当于meshgrid(indexing='ij',sparse=False)
+x, y = np.ogrid[-1:1:.5, -1:1:.5] //支持切片生成列向量
+//注意matlab是用start:step:end 
+//numpy是 start:end:step
+这种切片可以在step位置传入一个复数5j，表示需要5个数的数组
+
+r_,c_
+//这个可以产生行向量或者列向量
+np.r_[0:1:.1]
+np.c_[0:1:5j]
+
+ones,zeros
+//产生一个定制全0或者全1的数组
+np.zeros(shape)
+np.ones([2,3])*5 //产生一个全部是5的数组
+
+empty(shape,dtype=float64,order="C")
+np.empty(2)//产生一个内存未被初始化(值随机)的数组
+然后在用fill初始化
+
+全索引[:]
+
+empty_like,ones_like,zeros_like
+a=np.array(list)
+b=np.empty_like(a)
+//产生一个大小跟a一样的类型一样的空数组
+//empty ones zeros 产生空，1，0的数组
+
+identity(n,dtype=float64)
+//生成一个n*n的单位矩阵
+np.identity(3)
+	1 0 0
+	0 1 0
+	0 0 1
+单位矩阵:主对角线全是1的矩阵
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+矩阵
+np.mat(a) //转化为矩阵对象
+np.mat('1,2,4 : 2,5,3: 7,8,9')
+//matlab的语法用一个字符串生辰那个矩阵
+
+
+利用分块创造出新的矩阵
+a=np.mat()
+b=np.mat()
+np.bmat('a,b:b,a')
+
+这时候可以实现矩阵的乘法
+A.T //表示矩阵的转置
+A.I //表示矩阵的逆矩阵
+
+A*A.I //矩阵乘本身的逆
+A**4  //矩阵连乘
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+np的mathmatical函数
+sin,cos,tan,sinh,conh,tanh(双曲正切),arccos,arcsin,
+arctan2(x,y) //arctan(x/y) 返回相同的结果
+
+向量操作 
+dot(x,y) //点乘 //内积数量积 ∑xi*yi
+inner(x,y) //
+cross(x,y)
+vdot(x,y)
+outer(x,y)
+kron(x,y)
+tensordot(x,y[,axis])
+
+其他操作
+exp(x) //e**x
+log(x) //log e
+log10(x) //log 10
+sqrt(x)
+absolute(x)
+conjugate(x) //求共轭
+negative(x) //取复数
+ceil(x)
+floor(x)
+fabs(x)//float abs
+hypot(x,y) //求三角形的第三边，求膜，返回原点距离
+fmod(x) //求余数
+maximum(x,y)
+minimum(x,y) //比大小
+
+类型处理
+iscomplexobj
+.....
+
+正无穷
+np.inf
+isinf
+
+不是任意一个数(非法值)
+np.nan
+isnan
+
+向量化函数：vectorize
+列表型参数调用
+自定义的函数
+sinc(x) //关于sin的一个函数参数x是不能用列表形式进行调用的
+vsinc=np.vectorize(sinc) //这玩意叫向量型函数
+vsinc(x) //此时x就可以用array去进行调用
+//但是这样的效率并不高
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+二元运算
++ add
+- subtract //minus
+* multiply
+/ divide
+** power
+% remainder //mod
+
+逻辑运算
+对于数组上a==b是逐个比较的
+所以想要比较两个数组是否相等时候
+用if all(a==b): //不用a==b
+if allclose(a==b): //用于浮点数的比较
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ufunc对象
+universal function object
+//这个指的是能对数组进行处理的函数
+
+reduce方法
+//高阶函数
+reduce(func,range(1,11))
+//这里的func支持的是二元的运算过程
+np.add.reduce(a) //降维
+
+accumulate方法//积累 堆积
+//其执行过程和reduce方法差不多，
+//但是他会把每一步的结果都保存下来形成一个数组交给返回值
+
+
+reduceat方法
+______________________________________
+
+a = np.array([0, 10, 20, 30, 40, 50])
+indices = np.array([1,4])
+
+np.add.reduceat(a, indices)
+______________________________________ 
+reduceat就是在哪里解决的问题
+其返回值包含了2个数值
+第一个是从a[1]加到a[3]的结果 跟range函数一样 60
+第二个是从a[4]开始加到数组结束的结果  90
+
+outer方法
+//把b中每个元素取出来分别运用到a上
+根据顺序的不同有区别
+np.add.outer(a,b)
+把b中每个元素取出来分别加到a上
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+choose函数实现条件筛选
+choose(control,[list1,list2,list3])
+control是下标表不能查过后面一个参数list的范围
+查找的机制如下
+————————————————————————————
+i0 = np.array([[0,1,2],		//分析整个代码的查找过程
+               [3,4,5],		//首先i0，i2是list 10是元素
+               [6,7,8]])	//首先查看control下标表
+i2 = np.array([[20,21,22],	//很容易的所有1都是10 进行替换
+               [23,24,25],	//如果是0或者2就是列表元素了
+               [26,27,28]])	//这时候就得看位置了
+control = np.array([[1,0,1],	//比如1，0，1这行代码
+                    [2,1,0],	//去i0表找映射 对应第一行0,1,2
+                    [1,2,2]])	//中的1 所以就这样依次去对应位置	np.choose(control, [i0, 10, i2])//找
+array([[10,  1, 10],
+       [23, 10,  5],
+       [10, 27, 28]])
+
+——————————————————————————————
+np.choose(a<10,(a,10))
+//这句代码的工作原理是
+//把a<10的生成一个True，False的数组
+//也相当于一个全是0和1的数组
+//那么这时候false的就会变成a原本的 True的就会变成10
+
+//简化了where语句的查找
+where语句实现同等效果
+a[np.where(a>10)]
+//虽然写的不多但是逻辑都有不小差别
+//np.choose(a<b,[b,a])  a<b？a:b //这个机制倒是差不多
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+数组广播机制
+数组维度不匹配的话numpy会报错
+如果匹配但是形式不完全一样
+那么numpy会自动完成扩展然后进行运算
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+数组读写
+np.loadtxt(path,delimiter=',')//后面一个参数用于指定分隔符
+//不指定的话默认为空格，这是一个把文件变成list的方法
+//出了delimiter还有其他可选参数
+//skiprows=0 或者随便等于几 这个是忽略行数
+//usecols=(0,1,2,3) //用前4列数据
+//ndmin,unpack,usecols,converters......
+
+np.genfromtxt()
+//这个函数可指定的参数更多但是相应的效率会慢点，用法和loadtxt一样
+
+//converters={0:date_converter,1:float,2:float}
+
+读写各种格式的文件使用的包和函数
+txt	numpy	loadtxt，genfromtxt，fromfile，savetxt，tofile
+csv	csv		reader，writer
+Matlab	scipy.io	loadmat，savemat
+hdf	pytables,h5py	
+NetCDF	netCDF4,scipy.io.netcdf	n.Dataset,s.netcdf.netcdf_file
+wav	scipy.io.wavfile	音频文件
+jpeg,png PIL,scipy.misc.pilutil	图像文件
+fits	 pyfits			天文图像
+
+把数组写入文件
+savetxt('path',arrayname，fmt="%d" delimiter=',')
+//可把数组写入文件默认科学计数法形式保存
+//上面是指定了那整数保存
+//复数在输入的时候会默认输入个括号
+
+Numpy可以储存为二进制格式,
+单个数组保存为.npy
+多个数组保存为多个.npy格式组成的.npz格式
+二进制流中保存了文本没有的shape,dtype信息
+保存的方法:
+save(path,arr)
+savez(path,*args,**kwds)//保存多个数组 无压缩的.npz格式
+savez_compressed(path,*args,**kwds)//有压缩的.npz格式
+读取的方法:
+load(path,mmap_mode=None)//返回保存数组
+//mmap_mode=None中 mmap_mode是key None是value
+//对于.npy返回保存数组
+//对于.npz返回一个名称-数组组成的dict
+
+//np.savez('data.npz',a=a,b=b)//把a，b两个数组存起来
+二进制文件保存的时候是文本文件的三分之一左右
+
+//读文件时候要注意的事项
+data=np.load('data.npz')
+//获得keylist data.keys()
+//data['key'] //这种方法就可以读出数据了
+
+如果数据比较整齐的时候进行压缩，压缩效果会很好
+//压缩算法
+如果数据比较混乱时压缩效果不明显
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+结构化数组
+希望一个数组中有name,age等字段的值
+可以定义一个复数的数组
+根据复数的虚部可以解释出不同属性
+根据复数的实部可以解释出不同的值
+对于同一段内存来说可以解读的东西不一样
+array.view(dtype=np.complex64)
+
+//除此之外我们还可以用自定义类型去解决这个问题
+my_type=np.dtype([('mass','float32'),('vol','float32')])
+//自定义的类型在指定的时候就会把二元组或者二元列表根据位置解释
+my_data = np.array([(1,1), (1,2), (2,1), (1,3)], my_dtype
+my_data[0]['vol'] //这个时候就会得到第2个1
+my_data['mass'] //这个时候index到一个list
+
+//在自定义了类型之后就可以定义排序规则了
+my_data.sort(order=('vol','mass'))
+//仿照pojo类
+就可以按照数组的各个类型的定义，定义出各个量
+_____________________________________________
+
+person_dtype = 
+np.dtype([('name', 'S10'), ('age', 'int'), ('weight', 'float')])
+people = np.empty((3,4), person_dtype)
+people['name'] = [['Brad', 'Jane', 'John', 'Fred'],
+                  ['Henry', 'George', 'Brain', 'Amy'],
+                  ['Ron', 'Susan', 'Jennife', 'Jill']]
+
+people['age'] = [[33, 25, 47, 54],
+                 [29, 61, 32, 27],
+                 [19, 33, 18, 54]]
+_______________________________________________________________
+//可以用这种方式像pojo类那样把一堆数据存放到数组中
+loadtxt()在这中指定dtype然后就可以读文件了
+
+嵌套类型
+结构数组上有需要包含位置和质量这种信息的时候
+在定义type的时候也可以定义
+particle_dtype = np.dtype(
+[('position', [('x', 'float'), ('y', 'float')]),
+('mass', 'float')
+])
+在读文件的时候会依次读取 自动生成tuple
+可以通过['position']['x'] //这种方式去调用具体的值
+
+记录数组
+numpy.rec.fromrecords(list, dtype=my_type) //这就是记录数组
+//和结构数组有点像
+//不过这玩意运行效率比结构数组慢
+//可以把结构数组a.view(np.recarray)
+//以属性的方式查看
+a.view(np.recarray).mass 比结构数组多了这种查看方式
+a.view(np.recarray).names 这个可以查看属性的域
+
+内存映射
+Numpy对内存映射的支持
+主要函数
+memmap
+frombuffer
+narray constructor
+内存文件映射处理数据文件 可以不必对文件进行IO操作减少调度时间
+
+memmap(filename,
+       dtype=uint8,
+       mode='r+'
+       offset=0
+       shape=None
+       order=0)
+mode表示文件被打开的类型
+r只读
+c复制+写，不改变源文件
+r+ 读写，使用flush方法把更改的内容写入文件
+w+ 如果存在就会把数据覆盖
+
+
+
+
+
+
+
+
+>>>>>>>>>
+BIN:binary 二进制
+OCT:octal 8进制
+HEX:hexadecimal 16进制
+DEC:decimal 十进制
+x>>2 右移2位 /4
+x<<2 左移2位 *4  //二进制层面操作数据
+<<<<<<<<<<<<
+
+
+
+研究生考试只考数学分析和高等代数
+
+
+
+

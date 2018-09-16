@@ -1,0 +1,457 @@
+﻿python进阶
+import sys
+sys.args[0] //返回执行的文件名
+sys.exc_info() //返回一个(type,value,traceback)三元组
+
+输入输出流
+sys.stdin
+sys.stdout
+sys.stderr
+
+sys.exit() //退出python
+sys.path //python搜索模块的路径和查找顺序
+sys.platform //显示操作系统
+sys.getwindowsversion() 
+
+与操作系统进行交互
+import os
+os.remove(path)
+os.removedirs()
+os.chdir(path)//将当前工作目录变更为制定路径
+os.getcwd() //get current work dir
+os.curdir()
+os.rename(old,new)
+os.listdir() //cmd:dir terminal:lst
+os.mkdir()
+os.makedirs(name)
+
+########
+f=open("test.file","w") //打开文件
+########
+
+系统常量
+os.linesep //换行符
+os.sep	//路径分隔符
+os.pathsep //环境变量分隔符
+
+其他
+os.environ["USER"]
+//这是一个存储所有环境变量的字典
+
+import os.path as p
+p.isfile(path)
+p.isdir(path)
+p.exists(path)
+p.isabs(path)//是否是绝对路径
+p.dirname(path)//文件夹名
+p.basename(path)//文件名
+p.splitext(path)//分开扩展名
+
+p.split(path)//把一个路径拆分成 head,tail两部分
+p.join(a,*p) //使用系统分隔符把各个部分合成一个路径
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+csv文件和csv模块
+import csv
+fp=open("data.csv")
+r=csv.reader(fp) //把csv封装成一个reader对象
+for row in r:
+    print row //这种形式可以迭代出每行数据
+fp.close()
+
+写csv文件
+data=[('one',1,1.5),('two',2,8.0)]
+//data是一个[(),()]的形式
+
+with open('out.csv','wb') as fp: //write binary
+    w=csv.writer(fp,delimiter="|") //writer对象写文件
+    w.writerows(data)
+
+更换分隔符
+csv模块默认是由excel产生的，所以可能会遇到分隔符处理不好的问题
+所以可以用 w=csv.writer(fp,delimiter="|")
+
+numpy和panda提供可以读数值很多的csv的方法//loadtxt和read_csv
+import pandas
+df = pandas.read_csv('trades.csv', index_col=0)
+//把文件的第一行作为index 之后可以用df['Price']这样的形式去调用
+print df
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+python对regex的支持
+
+###########################################
+[]{}() //范围框 长度框 集合运算框
+
+关于长度框{m}出现m次，{m,n}出现在这个区间内，{m,}至少m次
+
+* 0次或者多次		\w 所有字母数字	\W 匹配所有非\w的字符
++ 1次或者多次		\d 匹配所有数字	同理\D \S
+. 任意字符		\s 匹配space空白
+? 一次或者零次 
+^ 字符串开始位置
+$ 字符串结束位置
+| 表示逻辑或
+###########################################
+import re
+re.match(pattren,string[,flags]) //匹配开头部分
+re.search(pattern,string[,flags])//匹配所有子串
+
+re.findall(pattern,string)//返回所有匹配对象
+re.finditer//返回迭代器
+
+re.split(pattern,string[,maxsplit])
+re.sub(pattern,repl,string[,count])//repl是表示替换的符号
+re.compile(pattern)//生成一个pattern对象
+
+match对象生成之后,可以用group查看匹配
+match.group(0) //0代表查看原始字符串 1代表各个匹配部分
+//如果规则的通用性足够强 可以用预编译功能
+match=re.compile(pattern)//生成match对象
+然后在调用match的方法
+
+numpy方法fromregex()
+fromregex('file.dat', pattern, dtype)
+//注意dtype中的内容要和pattern一一对应
+dt = [('num', 'int64'), ('key', 'S3')]
+//dt的意思是:第一个值叫num类型是int64，第二个值叫key类型是S3
+//这种方式方便后续字典的遍历
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+datetime datetime(year,month,day,hr,min,sec,us)
+import datetime as dt
+d1=dt.date(2007,10,10)//产生一个datetime对象 可以进行加减运算
+d1.strftime('%A, %m/%d/%y')//格式化输出d1 %A代表星期
+//两个日期相减，返回timedelta对象
+给当前日期加上30天
+d2=d1+dt.timedelta(30)
+dt.datetime.strptime('2-10-01','%m-%d-%y')//指定格式创建datetime
+
+time对象 time(hour,min,sec,us)
+strftime('%I:%M, %p')//改变格式 %H 24小时 %I 12小时制 %p am,pm
+格式化字符在此不赘述
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+sql数据库操作
+import sqlite3 as db //api有一堆，这个只是sqlite3的dbm
+connection=db.connect(username,password,host,post,'XE')
+cursor=connection.cursor() //cursor光标
+cursor.excute(sqlString,values)//支持参数化查询values是list
+connection.commit()
+
+//回滚事务
+try:
+    #operation
+except:
+    connection.rollback()
+else:
+    connection.commit()
+//cursor具有preparestatment和resultset的特性
+前者是指封装sql语句
+后者是指返回数据
+for row in cursor:
+    print row
+//这种方式可以遍历返回的数据
+cursor.fetchone()//返回下一条内容，相当于rs.next()
+cursor.fetchall()//返回所有查询到的内容组成的列表
+
+关闭资源(closequietly)
+cursor.close()
+connection.close()
+
+???????????????????????????????????????
+oracle数据库使用不同的方式
+cursor.excutemany(sqlstring,list)
+???????????????????????????????????????
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+object-relational-mapping pojo类
+对象关系映射
+
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column,Date,Float,Integer,String
+
+Base=declarative_base() //宣告，相当于建立ORM基础模型
+class Order(Base)://继承模型，Order是那张表的名字
+    __tablename__='tablename'
+
+    order_id=Column(String,primary_key=True)
+    price=Column(Float)//就这种形式指定类型就可以建立ORM映射
+    pass
+
+order1=Order(colname=value...)//创建类的对象
+sqlalchemy//sql炼金术，魔术
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmake
+engine=create_engine('sqlite://my_database.sqlite')//connection
+Session=sessionmaker(bind=engine)
+session=Session()
+session.add(order1)//往会话中添加对象
+session.commit()
+
+for row in engine.execute(sqlstring)://connection.excute
+    print row
+//正常查询
+for order in session.query(Order).filter(Order.symbol='value'):
+    print order.order_id,order.date,order.get_cost()
+//通过类查询 根据某一字段的value查询出剩下的关联字段的value然后
+//注入值 filter查询
+session.quert(Order).filter(Order,order_id='').first() //返回查询结果的第一个
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+函数进阶
+所有的函数都是ufunc对象
+我们可以保存在字典里面
+def square(x):
+    return x*x
+def cube(x):
+    return x*x*x
+funcs={'square':square,'cube':cube,} //注意下json两边都是字符串
+for func in sorted(funcs):
+    print funcs[func](2)
+sorted(funcs)//把funcs这个dict的key弄出来了
+也就是说sorted(funcs)等同于funcs.keys()//应该去复习了
+引用传递，在函数传递参数的时候，同时把引用进行传递了
+如果改变引用的局部的值那么会改变内存的值
+如果改变引用的对象那么在外部引用的时候就不会改变原引用
+def f(x=[])://这句话在每次调用的时候x=[]只申请到了唯一一块内存
+如果写在函数体里面的话就是局部变量重新在申请内存
+高阶函数
+map //列表生成式 filter sorted(range(10),func) ruduce二元操作
+匿名函数
+lambda x:x*x
+全局变量global x
+这个意思就是脱离局部变量去修改全局变量
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+迭代器enumerate
+迭代器对象
+x=[2,4,6]
+for n in x:
+    print n //其中x就是迭代器对象
+有些情况下希望获得index
+for n in enumerate(x)://enumerate生成一个对象
+    print i,n         //里面是一个(index,value)
+		      //但是却不能用[]这种方式遍历
+		      //说明这不是一个list对象
+迭代器对象必须实现__iter__()
+这个方法返回对象支持next方法
+就是说a=enumerate(x),a.next(),a.next()...能把所有元素遍历出来
+在dict中迭代器iterkeys,itervalues,iteritems 都返回迭代器
+自定义迭代器
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+class ReverseListIterator(object):
+    
+    def __init__(self, list):
+        self.list = list
+        self.index = len(list) //有点类似于链表的数据结构
+        
+    def __iter__(self):
+        return self   //迭代器就是本身对象
+    
+    def next(self):
+        self.index -= 1
+        if self.index >= 0:
+            return self.list[self.index]
+        else:
+            raise StopIteration
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+对于xxx猜想 根据返回值的不同我们可以用计算机实现出现错误就抛异常
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+生成器(本质上是个迭代器)
+迭代器(iterators)把所有值都存到了内存中，有大量数据性能就很低了
+生成器(generators)也是可以迭代的 而且可以只读一次值 用for迭代的时候 实时生成数据
+生成器会记录当前的状态，而迭代器需要手动操作去记住状态
+
+在遍历和使用中看起来两者没有什么不同，但在内存管理上有显著不同
+mygenerator=(x*x for x in range(3))
+
+yield关键字
+和return关键字很像，只是这个关键字返回生成器
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+>>> def createGenerator() :
+...    mylist = range(3)
+...    for i in mylist :
+...        yield i*i   //return
+...
+>>> mygenerator = createGenerator() # create a generator
+>>> print(mygenerator) # mygenerator is an object!
+<generator object createGenerator at 0xb7555c34>
+>>> for i in mygenerator:
+...     print(i)
+0
+1
+4
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+分析下上述代码
+yield如果换成return的时候就会返回值 但是是3个值又没有list存储
+所以结果就会返回0(第一个结果) 如果是yield就是返回生成器对象
+意思就是说不会去直接计算出list而是等待next调用
+当用for循环迭代的时候就回去调用得到返回值(for内部调用.next())
+所以换句话来说yield可以返回多个值根据next不同而有序产生值
+//从之前的观点来说这个和延迟计算有点相似
+//主要是理解yield是返回值多次的循环体变成了生成器
+//如果是内部的循环不是迭代的那种,那么会把返回值当成下一次的参数
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+def prod(n):		//分析下代码，首先prod返回值是多个
+    prod = 1		//使用yield关键字生成生成器，把中间变量
+    while n!=0:		//记录下来。然后yield会记住每次prod是多
+        prod=prod*n	//少，在下次调用程序的时候使用这个值
+        n=n-1		//而且可以肯定yield在一个循环内
+        yield prod	//因为生成器相当于在迭代的时候while True
+for i in prod(10):
+    print i
+------------------------------------------------------------
+def prod(n):
+    prod=1
+    while True:
+	if n>=0:
+	    prod=prod*n
+	    n=n-1
+            print prod //不利于代码调用 所以改成yield可以
+	return prod	//获得具体对象
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+工作原理:首先yield返回一个生成器 10为他的一个基本参数
+在for迭代的时候调用prod 算出来第一个i是10然后进行第二次调用
+for内部(.next())此时prod=10被生成器记录着(n的值也是)然后执行
+下一次 返回prod
+//需要注意的是函数体里面的所有数据都会被记录下来
+//参与第二次第三次循环的时候，直接跳到循环体里面了
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+with语句和上下文管理器
+with open('path','w') as f
+    f.write('line')
+---------------------------
+f=open('myfile','w')
+try:
+    data=f.write('line')
+finally:
+    f.close()
+----------------------------
+两者效果等同 所以可以认为with是免去了考虑close问题
+
+上下文管理器
+with <expression>:
+    <block>
+<expression>的结果返回了一个实现上下文管理的对象
+实现了__enter__,__exit__两个方法
+在block的代码块之前会调用expression __enter__方法
+在block的代码块之后会调用expression __exit__方法(finally 实现)
+
+with <expression> as return:
+expression的返回值会赋给return,对于file会返回对象本身
+
+错误处理
+def __exit__(self, exc_type, exc_value, traceback)://传入错误
+        <block>
+       	if exc_type is not None:
+            print "  Exception:", exc_value
+	    return True //相当于trownewruntimeexception
+可以通过这几个参数获得相应的错误信息
+
+对于数据库的transcation来说,在提交的时候我们可以根据是否异常
+决定是提交还是回滚
+
+contextlib模块
+很多上下文管理有相似的地方,为了复用这些重复的模式
+from contextlib import closing
+with closeing(open('path','r')) as f: 
+	f.read() //在执行这句话的后面会执行close
+
+from contextlib import contextmanger
+
+@contextmanager
+def my_contextmanager():
+    print "Enter"
+    yield
+    print "Exit"
+//这相当于反射调用invoke了,这种方法包括可以使用到try-except模块
+//raise 手动生成异常
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+修饰符(decorater)
+ufunc对象
+type(func)
+dir(func)
+
+__call__ ()//函数调用相当于直接调用了
+
+修饰器
+foo = dec(foo)
+@dec //这种标注相当于把foo()的函数对象当dec的参数给dec函数了
+//一般这个dec方法里面返回的是处理之后的新函数对象
+//也就是说你在用foo调的时候实际上就等于调这个新函数对象
+def foo(x):
+    pass
+
+修饰器可以重叠
+修饰器工厂
+多重函数嵌套，完成延迟计算(广义理解是修饰器作为参数)
+
+@classmethod 类方法:可以通过classname.method调用
+@property:属性(类属性字段) 支持getter和setter方法
+//可以用classname.fieldname来查看值
+//attribute属性(某个域或者标签特有的属性指定)
+@vectorize //向量化函数
+
+注册函数
+把一个函数存进类的一个字段中 当成字段的特有属性
+
+@wraps包裹
+import functools
+@functools.wraps(f) //封装该函数，把f的信息注入到他修饰的方法上
+
+几个实用的模块
+
+import operator as op //提供了各种操作符的函数版本
+op.add
+op.mul
+sorted(list,key=op.itemgetter(1))//使用第二个元素排序
+
+from functools import partial
+指定部分参数
+sum_=partial(reduce,op.add)//指定了第一个参数
+
+itertools模块
+这个模块里包含许多迭代器对象相关的工具
+
+from itertools import cycle,groupby,islice,permutations,combinations
+
+islice(cycle('abcd'),0,10)//islice返回一段 cycle返回重复
+>['a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b']
+
+groupby返回一个字典
+groupby(list,key=len)//根据长度分组(key,list)
+
+permutations('abc')//排列一共3!种
+combinations(range(1,4),r=2)//随机两个数自动组合
+
+toolz,fn和funcy模块 //方便函数式编程风格
+
+作用域
+python从命名空间中寻找变量的顺序如下
+local function scope
+enclosing scope
+global scope
+builtin scope
+
+函数内部local
+global 全文
+built-in 内置对象 比如len 这种可以直接调用的函数
+class中的scope 在类中调用var 优先调用上下文的 如果self.var调用类里的
+
+如果在函数里面没有找到变量会向上找
+
+动态编译
+python先转化成byte code
+eval(statment,glob,local) //eval可以执行代码并返回改行代码的值
+exec(statement,glob,local)//可以添加修改原有的变量
+执行exec之后变量会在local命名空间中
+
+动态编译的时候不要让不信任的用户输入，他们拥有全部权限
+
+complie(str,filename,mode)//生成byte code
+
+abstract stntax trees
+import ast
+ast.parse('a+2','','eval')//生成了一个抽象的树结构去表示代码
+ast.dump(tree)
+tree.body.right.n=3
+ast.literal_eval("[10.0,2,True,'foo']")//这个是线程安全方法
+
+
+

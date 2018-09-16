@@ -1,0 +1,59 @@
+﻿deeplearning
+from Stanford andrew NG
+Introduce
+CNN //卷积 Real Estate Online Advertising
+//Convolutional neural networks
+RNN //voice 时序
+RNNs //more nested Speech recognition,Machine translation
+
+
+[xi].T---->layer(i)---->output
+
+
+standard Nenral Network
+Convolutional Neural Network
+Recurrent Neural Network
+To train a big enough neural network(Big data)
+To put a lot data in the model
+those two function make and input mapping and output in[0,1]
+sigmoid //修正函数
+ReLU //修正线性函数,这个转换让梯度下降更快
+
+structured data
+数据库的结构化数据
+unstructured data
+audio text image//神经网络把这些东西的识别变成了现实
+--------------------------------------------------------------------------------
+forward past and backward past
+Logistic Regression 
+用于二分分类算法(binary classfication algorithm)
+feature vector 特征向量
+x-->y(0|1)
+
+
+
+
+Idea-->code-->Experiment-->Idea //time cost
+
+3--matrix RGB
+
+[          ]       |
+[          ]       |
+[x1,x2..xm ]//上标 |n-----一列代表一张图片
+[          ]       |
+[          ]       |
+<----m----->
+training example{x1y1 x2y2 ...xnyn}//上标 y表示output
+
+Logistic Regression
+
+output:y^=sigmoid(w.T*x+b) w是回归参数的矩阵 b是bais
+//b-->拦截器
+sigmoid(x)=1/(1+e**(-z))
+如果用方差去表示 因为非凸函数 梯度下降法无法得出最优解
+Lost function
+L(y^,y)=-(ylogy^+(1-y)log(1-y^)) //y=0 y=1
+//这是单个trainset
+Cost function
+J(w,b)=(1/m)∑L(y^,y)=(-1/m)∑[ylogy^+(1-y)log(1-y^)]
+

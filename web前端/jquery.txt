@@ -1,0 +1,141 @@
+jQuery 的功能概括
+1、html 的元素选取
+2、html的元素操作
+3、html dom遍历和修改
+4、js特效和动画效果
+5、css操作
+6、html事件操作
+7、ajax异步请求方式
+jQuery编程框架
+$(document).ready(function(){#document对象封装为jquery对象调用ready方法传入function
+});
+js框架对比
+window.onload=function(){
+}
+jquery对象对css选择器封装简化了for加快了查找
+普通对象封装成jquery对象包括document和function等
+$();
+0.常用方法合集
+.ready(function(){})
+text()
+html()
+var()
+.attr()
+.css()
+1.选择器
+$()#css选择器 .class #id tag
+2.方法封装
+
+3.事件封装/对象封装
+封装原型是$().event(callback)
+onload=function(){}.ready(function(){})
+function(){}#回调函数作为参数传入ready中
+所以事件名作为函数
+click
+dbclick
+mouseenter
+mouseleave
+mousedown
+mouseup
+hover(func1,func2)#鼠标悬停
+focus
+blur
+change
+scroll
+submit
+4.jquery特效
+hide(speed,callback)
+show(speed,callback)
+toggle(speed,callback)#两者结合
+fadeIn(speed,callback)
+fadeOut(speed,callback)
+fadeToggle(speed,callback)
+fadeTo(speed,opacity,callback)#opacity透明度
+slideDown()
+slideUp()
+slideToggle()
+----------------------------
+5.jquery简单动画
+默认情况下，所有的 HTML 元素有一个静态的位置，且是不可移动的。 
+如果需要改变为，我们需要将元素的 position 属性设置为 relative, fixed, 或 absolute!
+$("button").click(function(){
+  $("div").animate({#jquery对象的animate方法传入改变后属性的值没提到的属性保留
+    left:'250px',
+    opacity:'0.5',
+    height:'150px',
+    width:'150px'
+  });
+});
+动画队列
+$("button").click(function(){
+  var div=$("div");
+  div.animate({height:'300px',opacity:'0.4'},"slow");
+  div.animate({width:'300px',opacity:'0.8'},"slow");
+  div.animate({height:'100px',opacity:'0.4'},"slow");
+  div.animate({width:'100px',opacity:'0.8'},"slow");
+});
+stop()停止
+6.*****************DOM操作************************
+.attr("href")#带属性名字参数 prop也可以获取
+.attr("href","newurl")#改变属性值
+.attr({"href":"null","title":"None"})
+$("#runoob").attr("href", function(i,origValue){
+    return origValue + "/jquery"; 
+  });
+.text() - 设置或返回所选元素的文本内容
+.html() - 设置或返回所选元素的内容（包括 HTML 标记）
+.val() - 设置或返回表单字段的值
+.text("hello")#innerHTML 不过只改文本形式
+.html("<a>hhh</a>")#innerHTML
+.val("ads")#改value属性
+也可以用回调函数的形式 origText表示旧文本 
+$("#test1").text(function(i,origText){
+    return "旧文本: " + origText + " 新文本: Hello world! (index: " + i + ")"; 
+});
+*******************DOM操作************************
+7.添加元素
+.append()
+.prepend()
+.after()
+.before()
+before<p>prepend**append</p>after
+8.删除元素
+.remove()#删除本身并删除子元素
+.empty()#不删除本身，删除子元素
+可以进行过滤
+$("p").empty("#id")#删除p标签中id="id"的元素
+9.修改css
+addClass()
+removeClass()
+toggleClass()
+.css()#css的传参和attr()的方法类似
+$("p").css({"background-color":"yellow","font-size":"200%"});
+10.遍历dom树
+#可以传入css选择器参数过滤
+parent()
+parents()
+children()
+siblings()
+11.Ajax
+load方法
+.load(URL,data,callback);#data表示请求字符串的参数?i=5&j=3这种的键值对数据
+$("#div1").load("demo_test.txt",function(responseTxt,statusTxt,xhr){});
+responseTxt响应文本 statusTxt状态 XMLHttpRequest对象
+xhr.status xhr.statusText 响应状态和响应状态文本
+GET和POST方法
+$.get() $.post()
+$.get(URL,callback);
+$.post(URL,data,callback);
+$.get("demo_test.php",function(data,status){});
+Ajax
+$.ajax({
+	type:"post",
+	url:"...",
+	data:{}//发送到服务器的数据，就是拼接到url上
+	success:function(data,txtStatus){alert(data);},
+	error:function(){aletr("错误");}
+	async:false //同步请求
+	cache:false //不缓存
+	。。。。//具体用的时候在查询具体的方法
+});
+#这个和爬虫urllib requests库的发送请求很像

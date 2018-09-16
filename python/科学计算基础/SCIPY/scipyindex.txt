@@ -1,0 +1,80 @@
+scipy
+from scipy.interpolate import interp1d
+interp1d(x,y,kind='linear')//zero nearest quadratic cubic 4 5 6
+//插值
+
+from scipy.interpolate.rbf import Rbf //径向基函数
+Rbf(x,y,function="gaussian")//径向基函数插值
+
+import numpy
+mean() min() max() std()
+
+import scipy.stats.stats as st
+st.nanmedian() //中位数
+st.mode() //众数
+st.skew() st.kurtosis() //偏度和峰度
+
+import scipy.stats.norm
+norm.cdf//概率密度积分
+norm.pdf//概率密度
+norm.rvs(size=500)//随机变量
+x_mean,x_std=norm.fit(x_norm)//最大似然估计值
+
+from scipy.integrate import trapz
+trapz(y,x) //x是linspace y是积分函数
+
+from scipy.stats import lognorm,t,dweibull
+//对数正态分布，t分布，韦氏分布
+
+form scipy.stats import binom,poisson,randint
+//伯努利分布，泊松分布，均匀分布
+
+from scipy.stats import rv_discrete
+//自定义离散分布
+
+假设校验
+from scipy.stats import ttest_ind,ttest_ind, ttest_rel, ttest_1samp,t
+t_val,p=ttest_rel(n0,n1)
+//p越接近1说明样本没有显著性差异
+
+loc//mean
+scale//std
+
+多项式拟合
+list=np.polyfit(x,y,n)//n阶拟合
+np.poly1d(list)//封装成多项式函数
+
+最小二乘拟合
+from scipy.linalg import lstsq
+from scipy.stats import linregress //线性回归
+X = np.hstack((x[:,np.newaxis], np.ones((x.shape[-1],1))))
+//先扩充一个维度然后拼接两个数组//想一下那个矩阵
+C,resid,rank,s=lstsq(X,y)//拟合参数集合，误差序列，rank，奇异矩阵
+
+线性回归
+slope,intercept,r_value,p_value,stderr=linregress(x,y)
+拟合直线 y=slope*x+intercept //slope斜率 拦截，截距，p值
+
+高级拟合
+from scipy.optimize import leastsq
+c,ret_val=leastsq(func_instance,initargs,args=(*otherargs))
+ret_val 是1-4时表示找到了最小二乘解 func_instance是一个误差函数
+
+from scipy.optimize import curve_fit
+p_est,err_est=curve_fir(function,x,y_noisy)
+function(x,*p_est)
+//p_est 是函数的各个参数
+//第二个返回的是协方差矩阵 err_est.diagonal() //可以返回各个参数方差
+
+线性规划
+from scipy.optimize import minmize
+result=minimize(func,init,args=())
+func就是加权和的函数
+这个方法是在init的值变动的情况下使得函数整体最小，args为整体其他参数
+
+Rosenbrock //用来判断误差的函数
+
+优化方法
+BFGS算法 //拟牛顿法 minimize函数默认的算法
+Nelder-Mead Simplex算法(单纯形算法) 在minize中指定method="nelder-mead"
+Powell算法 //离散数学 共轭方向的加速度法

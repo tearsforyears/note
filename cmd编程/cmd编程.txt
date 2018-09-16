@@ -1,0 +1,213 @@
+#编程性质的操作
+*****随机数
+%random%
+**********变量设置和调用
+set /p var=输入..#接受用户输入
+echo %var% 调用
+set var=1
+*****************简单算术
+set /a var=3+3#整数运算
+*****************伪链
+echo 1 & echo 2
+**********函数段和函数操作
+goto fun1#调用函数
+:fun1#定义函数
+#函数代码
+goto end
+:end
+pause
+************参数传递实例
+@echo off
+echo hello world
+title test_title
+call:fun1 11 20
+goto end
+:fun1
+echo this is a plus function
+set /a c=%1+%2
+echo %c%
+goto end
+:end
+pause>nul
+******************call函数调用返回处理 exit /b 0 作为中断函数段
+@echo off
+echo hello world
+title test_title
+call:fun1 11 20
+echo "call function test"
+pause>nul
+
+:fun1
+echo this is a plus function
+set /a c=%1+%2
+echo %c%
+exit /b 0 #exit /?中写的是 /b是退出当前脚本而不是cmd.exe
+
+注释
+::
+-------------------------------------------if--------------------------------------------
+IF "%var%"=="" (SET var=1)#检查变量初始化
+
+
+------------------------------------入侵脚本基础------------------------------------------
+%0表示对自己的引用
+#隐藏cmd窗口
+@echo off 
+if "%1"=="h" goto begin 
+start mshta vbscript:createobject("wscript.shell").run("""%~nx0"" h",0)(window.close)&&exit 
+:begin
+::以下为正常批处理命令，不可含有pause set/p等交互命令
+pause
+
+pause#暂停bat
+
+@echo off#关闭路径显示 echo语句还是会顺利输出的放心
+#echo off也可以 但是echo off这句话就会被显示出来
+#以后.bat编程的时候都要用@echo off
+> >>  ^ 称为重定向符号或者管道符号
+echo用法
+echo str>file
+echo str>>file
+echo %date%
+echo %time%
+
+goto label
+:label#这种方法起标签
+多行注释
+goto label
+....
+:label
+
+call命令
+call 1.bat#标注路径
+调用另外批处理文件
+
+start 命令或者程序 可以当call用 不同在于打开第二个窗口
+参数
+/dpatch 指定启动目录。
+/min 启动新的最小化窗口。
+/max 启动新的最大化窗口。
+/low 以空闲优先级启动应用程序。
+/normal 以一般优先级启动应用程序。
+/high 以高优先级启动应用程序。
+/realtime 以实时优先级启动应用程序。
+/abovenormal 以超出常规优先级的方式启动应用程序。
+/belownormal 以低出常规优先级的方式启动应用程序。
+/wait 启动应用程序，并等待其结束。
+/b 启动应用程序时不必打开新的“命令提示符”窗口。除非应用程序启用 CTRL+C，否则将忽略 CTRL+C 操作。使用 CTRL+BREAK 中断应用程序。
+
+choice命令
+@echo off
+choice /c:dme defrag,mem,end # /c:参数 参数dme 提示用户输入d,m,e 后面跟程序段
+#这句话执行之后会返回 1 2 3 存在errorlevel中 
+if errorlevel 3 goto defrag （应先判断数值最高的错误码）
+if errorlevel 2 goto mem
+if errotlevel 1 goto end
+#也可以用 if %errorlevel%==1 echo a #这种格式的命令去判断
+:defrag
+c:\\dos\\defrag
+goto end
+:mem
+mem
+goto end
+:end
+echo good bye
+判断执行哪个程序段#补汇编快去!
+
+if命令
+1、if "参数" == "字符串" 　待执行的命令
+2.if exist 待执行的命令
+3、if errorlevel / if not errorlevel 数字 待执行的命令
+
+***********for命令************
+for /l %%i in (1,1,10) do @echo %%i#计数循环
+for /d %%i in (目录) do @echo %%i #遍历该目录
+for /r %%i in (目录) do @echo %%i #遍历该目录树
+
+FOR %variable IN (set) DO command [command-parameters]
+for %i in (1 2 3) do @echo %i #66666
+for %i in (1 2 3) do @nvidia-smi
+在bat中要用%%来处理变量
+应用:
+1.
+检测硬盘中有哪些分区
+@echo off
+set str=c d e f g h i j k l m n o p q r s t u v w x y z
+echo 当前硬盘的分区有：
+for %%i in (%str%) do if exist %%i: echo %%i:
+pause
+2.
+检测目录下的文件
+@echo off
+for %%i in (*.*) do echo "%%i"
+pause
+3.
+检测txt文件
+For %%i in (*.txt) do Echo %%i
+4.
+检测两个字的文件
+For %%i in (??.txt) do Echo %%i
+delims和token的用法
+for /f %%i in (cmd编程.txt) do echo %%i #默认遇到空格或者换行就条 所以显示不全
+for /f "delims="%%i in (cmd编程.txt) do echo %%i#分割字符串,显示全了
+for /f "delims=，token=3,5"%%i in (cmd编程.txt) do echo %%i %%j#取第三,五行 
+
+关于引号的应用
+1、for /f %%i in (文件名) do (……)
+2、for /f %%i in ('命令语句') do (……)
+3、for /f %%i in ("字符串") do (……)
+
+递归找目录
+for /r 目录 %%i in (元素集合) do 命令语句集合
+@echo off
+for /r d:\test %%i in (*.txt) do echo %%i
+pause
+结果:
+D:\test\test.txt
+D:\test\1\1.txt
+D:\test\1\2.txt
+D:\test\2\a.txt
+D:\test\2\b.txt
+D:\test\3\1.txt
+
+计数循环
+for /l %%i in (start,step,end) do (……)
+
+cmd高级
+ping.exe -n 2 127.0.0.1>nul #模拟sleep(2)
+------------------------------------管道命令-------------------------------------
+1.&
+Usage：第一条命令 & 第二条命令 [& 第三条命令...] 
+用这种方法可以同时执行多条命令，而不管命令是否执行成功
+
+2.&& 
+Usage：第一条命令 && 第二条命令 [&& 第三条命令...] 
+用这种方法可以同时执行多条命令，当碰到执行出错的命令后将不执行后面的命令，如果一直没有出错则
+一直执行完所有命令；
+ 
+3.||
+Usage：第一条命令 || 第二条命令 [|| 第三条命令...]
+用这种方法可以同时执行多条命令，当碰到执行正确的命令后将不执行后面的命令，如果没有出现正确的
+命令则一直执行完所有命令；
+ 
+1.| 命令 
+Usage：第一条命令 | 第二条命令 [| 第三条命令...] 
+将第一条命令的结果作为第二条命令的参数来使用，记得在unix中这种方式很常见。
+ 
+2.>,>>输出重定向命令 
+将一条命令或某个程序输出结果的重定向到特定文件中, > 与 >>的区别在于，>会清除调原有文件中的内
+容后写入指定文件，而>>只会追加内容到指定文件中，而不会改动其中的内容。
+ 
+3.< , >& , <& 
+< 从文件中而不是从键盘中读入命令输入。 
+>& 将一个句柄的输出写入到另一个句柄的输入中。 
+<& 从一个句柄读取输入并将其写入到另一个句柄输出中。
+ 
+使用命令重定向操作符可以使用重定向操作符将命令输入和输出数据流从默认位置重定向到其他位置。输入或输出数据流的位置称为句柄。
+ 
+下表将列出可用的句柄。
+句柄       句柄的数字代号描述 
+STDIN     0 键盘输入
+STDOUT    1 输出到命令提示符窗口
+STDERR    2 错误输出到命令提示符窗口
+UNDEFINED 3-9 句柄由应用程序单独定义，它们是各个工具特有的

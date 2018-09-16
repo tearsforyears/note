@@ -1,0 +1,135 @@
+﻿0.dict
+>>> d = {'a':1, 'b':0, 'c':1, 'd':0}
+>>> d.values()
+dict_values([1, 0, 1, 0])
+>>> d.keys()
+dict_keys(['a', 'b', 'c', 'd'])
+>>> d.items()
+dict_items([('a', 1), ('b', 0), ('c', 1), ('d', 0)])
+关于遍历方法
+for item in d:print(item)#a b c d
+1.*arg和**args
+Python解释器会把传入的一组参数组装成一个tuple传递给可变参数。
+def func(*args)
+注意 **arg 是封装成dict 键值对的数据
+lis=[1,2,3]
+print(lis)#[1,2,3]
+print(*lis)#1 2 3 相当于拆包了
+def f(*arg,**arg)#**arg把 place="china",time="10:00"封装成一个tuple以json形式存储
+tuple={"1":"2","3":"4"}
+print(tuple)#{"1":"2","3":"4"}
+print(**tuple)#本来是1 2 3 4 但实际上会报错
+print(*tuple)# 1 3 key值
+2.
+values() 方法实际上把一个 dict 转换成了包含 value 的list。
+itervalues() 相当于拿到迭代器 节省内存
+d={}
+for v in d.itervalues():print(v)
+3.函数内定义函数和延迟计算
+def calc_sum(lst):
+    def lazy_sum():
+        return sum(lst)
+    return lazy_sum
+>>> f = calc_sum([1, 2, 3, 4])
+>>> f
+<function lazy_sum at 0x1037bfaa0>
+>>> f()
+10
+3.闭包
+像这种内层函数引用了外层函数的变量（参数也算变量），然后返回内层函数的情况，称为闭包（Closure）。
+# 希望一次返回3个函数，分别计算1x1,2x2,3x3:
+def count():
+    fs = []
+    for i in range(1, 4):
+        def f():
+             return i*i
+        fs.append(f)
+    return fs
+
+f1, f2, f3 = count()
+调用结果都是9 因为调用的时候才去访问i此时i=3 涉及到变量的存储问题稍微注意
+闭包的作用在于，可以通过闭包，设计私有变量及方法。
+4.装饰器
+def f1(x):return x*2
+def new_fn(f):#高阶函数实现功能增加
+    def fn(x):
+        print("call"+f.__name__+"()")
+        return f(x)
+    return fn
+f1=new_fn(f1)
+装饰器简化了这段代码
+@new_fn
+def f1(x):return x*2
+一些常用的装饰器名称
+@log @performance @transaction @post('/register')
+5.关于装饰器的编写
+import time
+def performance(f):
+    def fn(*args, **kw):
+        t1 = time.time()
+        r = f(*args, **kw)#可以保存中间结果
+        t2 = time.time()
+        print 'call %s() in %fs' % (f.__name__, (t2 - t1))
+        return r
+    return fn#只有执行fn()的时候 内部的调用才会发生完全不用担心
+对函数的调用这一块本质上是没有发生改变
+def cube(f):return f
+@cube
+def svd(A):return np.linalg.svd(A)
+执行的原理就是把cube先执行cube的返回值封装成原来的方法名 f->svd
+而performance的就可以理解成为
+fn对f进行了修饰和加工(利用闭包)返回的fn封装成了svd
+故所谓的修饰器
+6.带参数的装饰器的编写 三框定义
+import time
+def performance(arg):#最外层接受参数
+    def performance1(f):
+        def fn(*args, **kw):
+            t1 = time.time()
+            r = f(*args, **kw)#可以保存中间结果
+            t2 = time.time()
+            print arg
+            return r
+        return fn#只有执行fn()的时候 内部的调用才会发生完全不用担心
+    return performancel
+7.functools
+@functools.wraps(f)#复制函数签名和内部名字等等东西
+def fn(*arg,**kw):
+int2 = functools.partial(int, base=2)#减少函数参数
+
+8.生成器generator 这玩意貌似是并发编程里面的一个大坑 在js也看到了
+Iterables和Generators所有值都存在内存中，另一个迭代一次值
+>>> mygenerator = [x*x for x in range(3)]迭代器
+>>> mygenerator = (x*x for x in range(3))生成器
+只是变了个机制
+yield作用是返回一个生成器
+http://www.360doc.com/content/16/1107/22/32879401_604740420.shtml
+这篇blog讲明白了yield原理
+生成器内部相当于有一个.next()函数
+每次执行.next()调用一下普通调用函数根本没有作用
+for in 循环的一个机制就是调用生成器或者迭代器里面的.next()方法
+yield相当于暂停.next()调用并且返回变量的值,返回之后继续调用函数
+
+.next()是在内部调用的,我想写下js这函数的机制
+.next()就是第(一)次yield的结果值
+.next(parm)意思就是parm作为上一次yield的结果
+js:script
+var foo = function *() { // 没错，尼玛还可以这样写
+  var x = 1;
+  var y =  yield (x + 1);
+  var z = yield (x + y);
+  return z;
+}() // 你必须先执行一下Generator函数，才能把遍历器返回给某个变量
+var a = foo.next(); // 第一次执行next()不可以传参
+var b = foo.next(3);
+var c = foo.next(4);
+console.log(a)
+结果 a=2 b=x+y=4(x=1,y=3(#因为yield值是3所以上一次 yield (x + 1);这个表达式值为3))
+再来可以得到c=4
+#yield list
+这种写法也是可以的,根据.next()机制的认知
+yield list操作等价于
+    yield list[0]
+    yield list[1]
+    ....
+因为yield调用的都是函数的.next()

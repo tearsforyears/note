@@ -1,0 +1,57 @@
+﻿chardet检测编码
+pip install chardet
+	chardet,detect("string")
+	{'encoding': 'ascii', 'confidence': 1.0, 'language': ''}
+	"string".encode("GB2312")#字符串api编码
+	"string".decode()#解码.
+序列化
+	pickling，在其他语言中也被称之为serialization，marshalling，flattening
+	序列化到字符串
+	>>> import pickle
+	>>> d = dict(name='Bob', age=20, score=88)
+	>>> pickle.dumps(d)
+	序列化到文件
+	>>> f = open('dump.txt', 'wb')
+	>>> pickle.dump(d, f)
+	>>> f.close()
+	json同理
+hashlib加密
+	import hashlib
+	md5 = hashlib.md5()#hashlib.sha1()
+
+	md5.update('how to use md5 in python hashlib?'.encode('utf-8'))
+	print(md5.hexdigest())
+Pillow
+from PIL import Image
+	#基本操作
+	im=Image.open('image.jpg')
+	print(im.size,im.format,im.mode)#image属性
+	im_arr=np.array(im)#解析成数组
+	im=Image.fromarray(im_arr)#从数组读
+	im = im.filter(ImageFilter.BLUR)#使用滤镜
+	im2=im2.convert('L')#转化为灰度图
+	im.show()
+	
+	基本核心api
+	Image.open()
+	Image.fromarray()
+	np.array()#直接解析
+	im.convert()#转换mode
+	im.resize((1920,1080))#传入tuple
+	im.rotate(degree)
+	img.getpixel((j, i)) #获得j,i这点的像素的值
+	ImageGrab.grab() #截屏
+
+	#参数有1，L，P，RGB，RGBA，CMYK，YCbCr，I，F
+	1 二值图 L 8位灰度图 P 8位色图 rgba 32位透明度图
+	CMYK 印刷色图 YCbCr 心理学色图 F 32位灰度图
+	
+	cmyk转换公式
+	C = 255 - R
+	M = 255 - G
+	Y = 255 - B
+	K = 0
+	Y= 0.257*R+0.504*G+0.098*B+16
+	Cb = -0.148*R-0.291*G+0.439*B+128
+	Cr = 0.439*R-0.368*G-0.071*B+128
+	

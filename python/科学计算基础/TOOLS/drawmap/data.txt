@@ -1,0 +1,3 @@
+﻿//pip install py-goldsberry
+
+ 球员的一个数据仓库

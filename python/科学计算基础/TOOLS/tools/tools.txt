@@ -1,0 +1,117 @@
+﻿tools in python
+ppring
+pprint.pprint(data)//可以让数据换行
+
+pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
+pickle不允许使用子类
+pickle 序列化Python对象
+string=pickle.dumps(data,1)
+//最后一个参数有3种 
+//0，1，2 ASCII编码 二进制编码 更有效的二进制编码
+经过pickle编码的字符串比一定可读
+但是用pickle.loads()可以恢复内容
+pickle写入文件 
+with open(path) as file:
+pickle.dump(obj,file,protocol=0)
+pickle.load(file)
+
+JSON
+import json
+obj=json.loads(json_string)
+json.dumps(obj)//把python对象变成json格式字符串
+支持pickle文件的方法
+json.dump(obj,file)
+json.load(file)
+
+glob
+glob.glob("*.ipynb")//返回一个dict包含这些文件名的
+
+**************shutil******************* 
+//高级文件操作
+import shutil 
+shutil.copy(src,dst)//把源文件复制到目标地址
+shutil.copytree(dir,dir2)//复制文件夹到文件夹
+shutil.rmtree(dir)//删除非空文件夹
+//os.remove os.removedirs 不能删除非空文件夹
+shutil.move()//整体移动文件夹
+shutil.make_archive(basename,format,root_dir)//产生压缩文件
+//生成压缩格式为format(zip,tar等)的压缩文件在跟目录下
+******************************************
+
+gzip,zipfile,tarfile模块处理压缩文件
+
+import zlib,gzip,bz2,zipfile,tarfile
+
+zlib.compress(string) //这个string也可以是文件里面的
+zlib.decompress(compressed_string)
+//zlib对字符串进行压缩
+
+gzip.open(path,'rb') //可以读.gz格式的文件
+with gzip.open(path,'rb') as f_in,open(path,'wb') as f_out:
+    shutil.copyfileobj(f_in,f_out)
+//利用复制的方法完成解压文件接收的操作
+bz2.compress(string)
+bz2.decompress(compressed_string)
+
+f=zipfile.ZipFile(filename,'w')
+f.write(string)//直接写入压缩文件
+f.namelist()//查看压缩文件中子文件夹的内容
+f.extract() extractall()//解压单个或者全部文件
+
+logging
+import logging
+可以写以下几个类型
+logging.critical(msg)
+logging.error(msg)
+logging.warning(msg)
+logging.info(msg)//不会显示
+logging.debug(msg)//不会显示
+
+string
+import string
+string.capwords(str)//每个单词首字母大写
+string.center(str,20)//文字居中
+
+collections
+from string import punctuation//引入标点符号
+import collections
+word_count=collections.Counter(
+sentence.translate(None,puctuation).lower().split())
+
+双端队列
+dq=collections.deque()
+dq.append()
+dq.pop()
+dq.appendleft()
+dq.popleft()
+//与列表相比,双端队列在队头操作更快
+
+有序字典
+collections.OrderedDict(dict_instance)
+//for k,v in dict_instace.items():
+
+pythonweb
+urllib2模块提供了大多数http功能但是api调用不是特别方便
+import requests
+r = requests.get("http://httpbin.org/get")
+r = requests.post('http://httpbin.org/post', data = {'key':'value'})
+r = requests.put("http://httpbin.org/put")
+r = requests.delete("http://httpbin.org/delete")
+r = requests.head("http://httpbin.org/get")
+r = requests.options("http://httpbin.org/get")
+//随意调用
+读取响应内容
+payload={'':''...}//json
+r=request.get(url,params=payload)
+r.text//相应内容存在这
+r.encoding
+r.json()//内置json处理器，如果返回文本不是json异常
+r.headers['Content-Type']//获得相应头的内用
+r.status_code
+
+
+
