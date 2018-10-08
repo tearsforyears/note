@@ -1,0 +1,80 @@
+关于matplotlib的一些细节
+import matplotlib.pyplot as plt
+plt.plot(x,y)
+plt.savefig('myPlot.png')# save as a png file
+plt.show()
+
+plt.scatter(x,y)#画的是散点图 但是点会变大更好
+
+#子图
+fig=plt.figure()
+sub1=fig.add_subplot(121) #把原来的图按(1,2)matrix划分 划分的第一张图那个一
+sub1.plot(x,y)
+sub2=fig.add_subplot(122)
+sub2.plot(x,y)
+plt.show()
+
+#这种实现方式是面向对象的 下面用交互命令实现
+
+plt.subplot(121)
+plt.plot(x,y)
+plt.subplot(122)
+plt.plot(x,y)
+plt.show()
+
+#直方图hist
+plt.hist(x,bins=)#bins表示分段
+#高斯函数 loc均值 scale标准差 size 数据形式
+np.random.normal(loc=0.0, scale=1.0, size=None)
+#矩阵可视化简单
+plt.imshow(200*np.random.rand(800,800),plt.cm.gray)
+
+3D图形
+from mpl_toolkits.mplot3d import Axes3D     
+import matplotlib,pyplot as plt
+
+#散点图
+x=np.random.normal(0,1,100)
+y=np.random.normal(0,1,100)
+z=np.random.normal(0,1,100)
+fig=plt.figure('test')
+pic3d=Axes3D(fig)
+pic3d.scatter(x,y,z)
+pic3d.plot(x,y,z,'r')
+plt.show()
+
+#3d图像
+fig = plt.figure()
+ax = Axes3D(fig)
+
+X = np.arange(-2, 2, 0.1)
+Y = np.arange(-2, 2, 0.1)
+
+X, Y = np.meshgrid(X, Y)
+#网格的主要作用是提供z的计算数据
+Z = np.sqrt(X ** 2 + Y ** 2)
+
+# 绘制曲面图，并使用 cmap 着色
+ax.plot_surface(X, Y, Z, cmap=plt.cm.cool)
+
+plt.show()
+
+#等高线图
+def draw_contour():
+    fig=plt.figure('test2')
+    x=np.linspace(-1,1,20)
+    y=np.linspace(-1,1,20)
+    a,b=np.meshgrid(x,y)
+    res=1-a**2-b**2
+    #加透明度0.75 加等高线
+    plt.contourf(a,b,res,40,alpha=0.75,cmap=plt.cm.hot)#等高线屌炸了
+    C=plt.contour(a,b,res,10,colors='black')
+    #使用contour绘制等高线
+    plt.clabel(C,inline=True,fontsize=10)
+    plt.show()
+
+numpy
+np.meshgrid(x,y)#x y范围的网格
+np.outer(x,y)#x*y叠加效应
+print(np.outer(u,v)==u.reshape(-1,1)@v.reshape(1,-1))
+#结果发现全等

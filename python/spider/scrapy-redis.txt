@@ -1,0 +1,157 @@
+﻿https://github.com/rmax/scrapy-redis#项目地址
+更改setting文件
+SCHEDULER = "scrapy_redis.scheduler.Scheduler"
+DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
+REDIS_URL = ""
+#数据最后会返回redis 可以不开
+ITEM_PIPELINES = {
+    'scrapy_redis.pipelines.RedisPipeline': 300
+}
+
+#REDIS_URL = 'redis://user:pass@hostname:9001/db_name'
+REDIS_URL = 'redis://user:pass@127.0.0.1:6379'#因为没有讲没有密码怎么设置网上也找不到
+#下面两个只能处理没有密码的情况
+REDIS_HOST='127.0.0.1'
+REDIS_PORT=6379
+SCHEDULER_PERSIST = True #爬取完之后清空队列
+FLUSH_ON_START = False
+
+#输入开始url
+C:\Users\hasse>redis-cli -h 127.0.0.1 -p 6379
+127.0.0.1:6379> lpush examplespider:start_urls https://www.xxbiquge.com/xbqgph.html
+(integer) 1
+127.0.0.1:6379>
+spider代码
+from scrapy_redis.spiders import RedisSpider
+
+Scrapy一些注意的点
+1.参数传递#这个可以解决一些数据结构的问题 那啥的话方便写scrapy-redis
+	def parse_page1(self, response):
+	    item = MyItem()
+	    item['main_url'] = response.url
+	    request = scrapy.Request("http://www.example.com/some_page.html",
+	                             callback=self.parse_page2)
+	    request.meta['item'] = item
+	    return request
+
+	def parse_page2(self, response):
+	    item = response.meta['item']
+	    item['other_url'] = response.url
+	    return item
+2.中间件的编写和启用
+	import requests as req
+	from requests.exceptions import ConnectionError
+	import logging
+	import random
+	class RadomUserAgent(object):
+	    logger = logging.getLogger(__name__)
+	    random_ualist=[
+	        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1",
+	        "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11",
+	        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6",
+	        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6",
+	        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1",
+	        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5",
+	        "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5",
+	        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
+	        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
+	        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3",
+	        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
+	        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
+	    ]
+	    def get_random_Agent(self):
+	        return random.choice(self.random_ualist)
+	    def process_request(self, request, spider):
+	        self.logger.debug("use random user-agent,")
+	        request.headers['User-Agent'] = self.get_random_Agent()
+	class DoubanDownloaderMiddleware(object):
+	    logger=logging.getLogger(__name__)
+	    def get_proxy(self):
+	        try:
+	            resp=req.get('http://127.0.0.1:5010/get/')
+	            return 'http://'+resp.text
+	        except ConnectionError:
+	            self.logger.debug("use proxy faild")
+	            raise ConnectionError
+	    def process_request(self, request, spider):
+	        proxy=self.get_proxy()
+	        self.logger.debug("use proxy "+str(proxy))
+	        request.meta['proxy'] = proxy
+	        return None
+3.断点爬取
+	scrapy crawl somespider -s JOBDIR=crawls/somespider-1
+	scrapy crawl movie -s JOBDIR=crawls/movie-1
+
+配置文件内容
+	# Enables scheduling storing requests queue in redis.
+	SCHEDULER = "scrapy_redis.scheduler.Scheduler"
+
+	# Ensure all spiders share same duplicates filter through redis.
+	DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
+
+	# Default requests serializer is pickle, but it can be changed to any module
+	# with loads and dumps functions. Note that pickle is not compatible between
+	# python versions.
+	# Caveat: In python 3.x, the serializer must return strings keys and support
+	# bytes as values. Because of this reason the json or msgpack module will not
+	# work by default. In python 2.x there is no such issue and you can use
+	# 'json' or 'msgpack' as serializers.
+	#SCHEDULER_SERIALIZER = "scrapy_redis.picklecompat"
+
+	# Don't cleanup redis queues, allows to pause/resume crawls.
+	#SCHEDULER_PERSIST = True
+
+	# Schedule requests using a priority queue. (default)
+	#SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.PriorityQueue'
+
+	# Alternative queues.
+	#SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.FifoQueue'
+	#SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.LifoQueue'
+
+	# Max idle time to prevent the spider from being closed when distributed crawling.
+	# This only works if queue class is SpiderQueue or SpiderStack,
+	# and may also block the same time when your spider start at the first time (because the queue is empty).
+	#SCHEDULER_IDLE_BEFORE_CLOSE = 10
+
+	# Store scraped item in redis for post-processing.
+	ITEM_PIPELINES = {
+	    'scrapy_redis.pipelines.RedisPipeline': 300
+	}
+
+	# The item pipeline serializes and stores the items in this redis key.
+	#REDIS_ITEMS_KEY = '%(spider)s:items'
+
+	# The items serializer is by default ScrapyJSONEncoder. You can use any
+	# importable path to a callable object.
+	#REDIS_ITEMS_SERIALIZER = 'json.dumps'
+
+	# Specify the host and port to use when connecting to Redis (optional).
+	#REDIS_HOST = 'localhost'
+	#REDIS_PORT = 6379
+
+	# Specify the full Redis URL for connecting (optional).
+	# If set, this takes precedence over the REDIS_HOST and REDIS_PORT settings.
+	#REDIS_URL = 'redis://user:pass@hostname:9001'
+
+	# Custom redis client parameters (i.e.: socket timeout, etc.)
+	#REDIS_PARAMS  = {}
+	# Use custom redis client class.
+	#REDIS_PARAMS['redis_cls'] = 'myproject.RedisClient'
+
+	# If True, it uses redis' ``SPOP`` operation. You have to use the ``SADD``
+	# command to add URLs to the redis queue. This could be useful if you
+	# want to avoid duplicates in your start urls list and the order of
+	# processing does not matter.
+	#REDIS_START_URLS_AS_SET = False
+
+	# Default start urls key for RedisSpider and RedisCrawlSpider.
+	#REDIS_START_URLS_KEY = '%(name)s:start_urls'
+
+	# Use other encoding than utf-8 for redis.
+	#REDIS_ENCODING = 'latin1'

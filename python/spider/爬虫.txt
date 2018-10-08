@@ -1,0 +1,85 @@
+﻿Python培训 第九部分：爬虫技术
+Python培训 第六部分：Linux
+Linux基础：Linux安装配置；常规命令；Shell编程；
+Linux管理：：系统管理；用户管理；磁盘管理；软件包管理；进程管理；网络配置管理；
+应用服务管理：：FTP服务器；SSH服务器；MySQL服务器；Web服务器；Nginx服务器；
+pythonweb
+框架：Flask框架；Django框架；
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+抓股票多线程
+import urllib2
+import threading
+def displat_info(code):
+    url='http://hq.sinajs.cn/list='+code
+    response=urllib2.urlopen(url)
+    javascript_info=response.read()
+    print(javascript_info)
+
+def single_thread(codes):
+    for code in codes:
+        code=code.strip()
+	displat_info(code)
+
+def multi_thread(tasks):
+    threads=[threading.Thread(target=single_thread,
+    args=(codes,)) for codes in tasks]
+    for t in threads:
+	t.start()
+    for t in threads:
+	t.join()
+
+
+if __name__=='__main__':
+    codes=['600001','600002','600003','600004','600005']
+    thread_len=int(len(codes)/4)//每个线程要处理多少股票
+    t1=codes[0:thread_len]
+    t2=codes[thread_len:thread_len*2]...
+
+    multi_thread([t1,t2,t3,t4])
+requests
+r=requests.get(url)
+r.status_codes
+r.text
+r.context
+r.encoding
+r=request.get(url,params) //http://httpbin.org/get 测试
+
+二进制数据
+from PIL import Image
+from io import BytesIO //效率效率效率
+r=request.get('')//比如图片
+image =Image.open(BytesIO(r.content)) 
+//content是二进制 text是已经转化成文本的数据
+image.save('.jpg')
+
+JSON
+r=requests.get()
+r.text
+
+原始数据处理wb+
+文件IO处理
+
+提交表单
+import json
+form={'username':'user','password':'pass'}
+r= request.post('url',data=form)//放在表单
+r= request.post('url',data=json.dumps(form))//放在文本
+
+cookie	//任何请求都带上  session jseesion ID
+r=requests.get(url)
+cookies=r.cookies
+for k,v in cookies.get_dict().items():
+    print k,v
+r=requests.get('url',cookie=cookie)
+print r.text
+
+重定向
+r.history //重定向历史
+
+代理VPN更底层 proxies在转发
+proxies={'http':'','https':''}
+r = requests.get('')
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+
