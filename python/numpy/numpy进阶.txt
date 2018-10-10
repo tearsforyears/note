@@ -1,0 +1,51 @@
+﻿numpy 进阶方法
+#合并数组
+concatenate(tuple,axis=?)
+	#example
+	import numpy as np
+	A=np.arange(1,7).reshape(2,3)
+	np.concatenate((A,A,A),axis=0)
+	>>>
+	array([[1, 2, 3],
+	       [4, 5, 6],
+	       [1, 2, 3],
+	       [4, 5, 6],
+	       [1, 2, 3],
+	       [4, 5, 6]])
+	np.concatenate((A,A,A),axis=1)
+	>>> 
+	array([[1, 2, 3, 1, 2, 3, 1, 2, 3],
+	       [4, 5, 6, 4, 5, 6, 4, 5, 6]])
+	#这个方法可以避免hstack那些乱七八糟的api名字直接完成矩阵合并
+#mask
+	A[A>3] #返回的是一维数组可以用boolean值去做一些事情
+	>>>
+	array([4, 5, 6])
+#逻辑运算api
+	(A>3) and True
+	#上面代码会报错
+	Traceback (most recent call last):
+	File "<stdin>", line 1, in <module>
+	ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+	
+	.any()和.all()封装了 or 和 and 运算的数组广播机制
+	np.all((A>3)==True) # (A>3) and True
+	np.any((A>3)==True) # (A>3) or True
+	#按照语义理解其api可读性非常好
+
+	#python里的any和all
+	all([1,1]) #True
+	all([0,0]) #False
+	all([1,0]) #False 
+	#是不是很不好理解 现在换成 and和or
+	#函数里面就是一个可迭代的对象实现的就是 A and B and C...
+	#同理可以得到or
+
+	再来说numpy 里面有些array
+	a.any() # 这个原理和迭代any 一样
+	
+	#总结下
+	.all() # 都为True 返回True 其他False
+	.any() # 有一个为True 返回True 全为False 返回 False
+
+#
