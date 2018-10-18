@@ -75,5 +75,9 @@
 	非null的处理:
 	舍弃PassengerId,Name,Ticket
 	对Sex 进行编码
-
-	
+3.tensorflow one-hot encoding:
+	实现思想:用单位矩阵的引用去生成
+	>>> import numpy as np
+	>>> I=np.eye(result_size)
+	>>> I[np.array([1,2,3,2,1])] # 引用 [1,2,3,2,1] 行
+	显然可以预知one-hot encoding 只要在来个转置就可以了
