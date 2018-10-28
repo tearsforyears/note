@@ -1,0 +1,71 @@
+图像处理基础
+# 基础
+	cv2.imread()
+	cv2.resize()
+	cv2.imshow()
+	cv2.waitKey()
+	cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) #灰度转换
+
+	### opencv中基本的颜色空间是BGR而不是RGB
+	b,g,r = cv2.split(mat)
+	mat = cv2.merge([b,g,r])
+	分解调整颜色空间在matplotlib和opencv中的显示
+# 滤波器(filter,kernel,window,template)
+	所谓的滤波器和卷积核类似,但进行的不是卷积的特征提取
+	而是类似一种插值法由周围点决定滤波器中心的输出值,直接对图像操作
+	cv2.medianBlur()
+	cv2.GaussianBlur()
+	中值滤波器 Median Filter
+		对于一个filter来讲:
+			init:med=(max+min)/2
+			A :
+			A1 = Zmed−Zmin
+			A2 = Zmed−Zmax
+			如果A1 > 0 且 A2 < 0，跳转到 B；
+			否则，增大窗口的尺寸
+			如果增大后窗口的尺寸 ≤Smax，则重复A过程。
+			否则，输出Zmed
+			B:
+			B1 = Zxy−Zmin
+			B2 = Zxy−Zmax
+			如果B1 > 0 且 B2 < 0，则输出Zxy
+			否则输出Zmed
+		将上述算法进行修改变成自适应滤波器:
+			A1 = Zmed−Zmin
+			A2 = Zmed−Zmax
+			如果A1 > 0 且 A2 < 0 , 则判定为正常点,不用修改
+			否则判定为噪音,进行中值计算
+	均值滤波器 Mean Filter:
+		算数平均
+		几何平均
+		谐波平均(调和平均)
+		逆谐波平均
+	高斯滤波器 高斯模糊:
+		利用二维高斯函数归一化之后进行滤波
+		h(x,y) = 1/(2*pi*sigmo)*exp(-(x**2+y**2)/(2*sigmo**2)
+		# 以滤波器的核心作为 0,0 进行坐标变换
+		此处归一化系数为 1/np.sum(filter)
+		卷积器变大的时候图像变模糊
+		cv2.GaussianBlur(image, (135, 135), 0)
+	锐化空间滤波器:
+# 仿射变换
+	M=
+	[[1.6,0,-150]
+	 [0,1.6,-240]]
+	cv2.warpAffine(image,M,(400,600)) # resize(400,600)
+# 基本绘图
+	点的坐标都是用tuple封装
+	cv2.line(image,pt1,pt2,color,thickness)
+	cv2.circle(image,heart,r,color,thickness)
+	cv2.rectangle(image,pt1,pt2,color,thickness) # 用于人脸识别
+	cv2.fillPoly(image,top,color) # 绘制多边形 top表示顶点
+	cv2.polylines(image,top,True,color) # True意味着封闭 否则就依次连接
+
+	pt1,pt2分别代表起点和终点 直线的起点和终点 长方形的两个顶点
+	img = cv2.line(img, (10, 10), (110, 110), (225, 0, 0), 3)
+	img = cv2.circle(img, (200, 300), 75, (0, 0, 255), 5)
+
+	cv2.putText() # 照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
+
+# 视频处理
+	

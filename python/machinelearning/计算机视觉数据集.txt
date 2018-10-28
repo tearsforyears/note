@@ -1,0 +1,30 @@
+图像识别\计算机视觉领域的数据集分类介绍:
+Image Classification：分类
+分类需要二进制的标签来确定目标是否在图像中。 
+- MNIST手写数据库;顾名思义,手写数字,位于空白背景下的单一目标 
+- CIFAR-10/100:在32*32影像上分别提供10和100类的图片中物品的分类信息.网址https://www.cs.toronto.edu/~kriz/cifar.html 
+- ImageNet，22,000类，每类500-1000影像。
+
+Object Detection：物体检测
+经典的情况下通过bounding box确定目标位置，期初主要用于人脸检测与行人检测，数据集如 
+- Caltech Pedestrian Dataset数据集,包含350,000个bounding box标签。 
+- PASCAL VOC数据集, 包括20个目标超过11,000图像，超过27,000目标bounding box。其数据集图像质量好，标注完备，非常适合用来测试算法性能.网址:http://host.robots.ox.ac.uk/pascal/VOC/
+
+ImageNet数据下的detection数据集，200类，400,000张图像，350,000个bounding box。 
+由于一些目标之间有着强烈的关系而非独立存在，在特定场景下检测某种目标是是否有意义的，因此精确的位置信息比bounding box更加重要。也就是下面所述的图像分割.
+Semantic scene labeling：图像分割
+这类问题需要像素级别的标签，其中个别目标很难定义，如街道和草地。数据集主要包括室内场景和室外场景的，一些数据集包括深度信息。 
+- SUN dataset包括908个场景类，3,819个常规目标类(person, chair, car)和语义场景类(wall, sky, floor)，每类的数目具有较大的差别（这点COCO数据进行改进，保证每一类数据足够）。
+
+other
+Middlebury datasets，包含立体相对，多视角立体像对和光流.
+KITTI由德国卡尔斯鲁厄理工学院(Karlsruhe Institute of Technology)和丰田芝加哥技术研究院(Toyota Technological Institute at Chicago)于2012年联合创办，是目前国际上最大的自动驾驶场景下的计算机视觉算法评测数据集。网址:http://www.cvlibs.net/datasets/kitti
+
+Cityscapes,也是自动驾驶相关方面的数据集，重点关注于像素级的场景分割和实例标注。网址:https://www.cityscapes-dataset.com/
+
+人脸识别数据集LFW（Labeled Faces in the Wild）,网址:http://vis-www.cs.umass.edu/lfw/
+--------------------- 
+作者：lxy_Alex 
+来源：CSDN 
+原文：https://blog.csdn.net/happyhorizion/article/details/77894205 
+版权声明：本文为博主原创文章，转载请附上博文链接！
