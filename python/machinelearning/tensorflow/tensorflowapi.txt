@@ -1,7 +1,7 @@
 ﻿tensorflow api
 tf.Session() # 创建会话
 sess.run() # 进行计算返回运行结果
-tf.global_variables_initializer() # 初始化所有变量
+tf.global_variables_initializer().run() # 初始化所有变量
 
 #基本操作
 	计算api
@@ -13,9 +13,10 @@ tf.global_variables_initializer() # 初始化所有变量
 	tf.placeholder(tf.float32,[4,None])# None可以填充任意长度 用于训练集数目m
 	tf.get_variable(name,shape,initializer=tf.random_normal_initializer())
 	# initializer 不应该传入一个实数 应该传入一个初始化生成器
-
-
-
+# ndarray和tensor的转换
+	tf.convert_to_tensor() # 转化为tensor
+	ndarray=tensor.eval() # 在有session的前提下可以转换 同时记得初始化变量
+	ndarray=sess.run(tensor) # 和上面效果相同
 
 #杂项tf.fft() tf.reduce_mean() tf.log() ......
 	tf.clip_by_value(data,min,max)
@@ -29,7 +30,31 @@ tf.global_variables_initializer() # 初始化所有变量
 		lr = tf.train.exponential_decay(0.01,\
 		global_step=global_step, decay_steps=10000, decay_rate=0.95, staircase=False)
 # cnn
-	
+	tf.nn.conv2d()
+# rcnn
+    tf.slice(input,begin,size)
+# 基本控制
+	#变量定义
+		tf.get_variable(name,shape,initializer=tf.random_normal_initializer())
+		tf.Variable(init_value,name=)
+	#命名空间
+		tf.name_scope("scope_name") # 对于操作的命名空间
+		tf.variable_scope("scope_name",reuse=True)# 对于变量的命名空间
+		variable_scope 用来实现共享变量
+		name_scope 用来实现图的可视性结构化
+	#图的控制
+		g = tf.Graph()
+		g.as_default()
+		g.device('/gpu:0') # 指定gpu使用
+		tf.get_default_graph() # 得到默认图
+# collection
+	collection 提供了全局存储变量的机制 并不受命名空间的影响
+	tf.Graph.add_to_collection(name, value) # 存入数据
+	tf.add_to_collection(name, value) # 给默认图使用
+	# 同一个name添加时可添加多个值
+	tf.Graph.get_collection(name, scope=None)# 获得数据
+	tf.GraphKeys # 包含图中所有集合
+	tensorflow 自身维护一些集合
 # 持久化模型
 	ckpt模型
 	saver = tf.train.Saver(max_to_keep=1)#保留最后一代的模型
@@ -40,7 +65,8 @@ tf.global_variables_initializer() # 初始化所有变量
 
 	pb模型(用作迁移学习用,一个模型,相当好用)
 	from tensorflow.python.framework import graph_util
-	constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph_def, ['names'])
+	constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph_def, ['output'])
+	# 最后这个list存变量的名字 只是用于迁移学习的话可以存output
   	with tf.gfile.FastGFile(pb_file_path, mode='wb') as f:
     	f.write(constant_graph.SerializeToString())
 # 恢复模型 (涉及计算图的一些操作)
@@ -51,6 +77,7 @@ tf.global_variables_initializer() # 初始化所有变量
 	#加载完了图和计算的变量
 
 	pb模型
+	from tensorflow.python.platform import gfile
 	with gfile.FastGFile(pb_file_path, 'rb') as f:
 	    graph_def = tf.GraphDef()
 	    graph_def.ParseFromString(f.read())# graph_def 是一个类json结构 保存图的信息
@@ -60,4 +87,93 @@ tf.global_variables_initializer() # 初始化所有变量
 	    input = sess.graph.get_tensor_by_name("input:0")
         output = sess.graph.get_tensor_by_name("output:0")
         sess.run(output, feed_dict={input:x}) # 为输入的数据 这样可以做迁移学习
+# 进阶操作
+	数据增强(Data Augmentation)
+	tf.image.random_flip_left_left_right
+	tf.image.random_contrast
+	tf.image.per_image_whitening
+	
+
+# 迁移学习:
+	一般利用pb模型进行迁移学习
+	tf.get_default_graph().as_graph_def().node 可以得到所有节点的名字
+# Tensorboard
+	Tensorboard可以记录与展示以下数据形式： 
+		（1）标量Scalars 
+		（2）图片Images 
+		（3）音频Audio 
+		（4）计算图Graph 
+		（5）数据分布Distribution 
+		（6）直方图Histograms 
+		（7）嵌入向量Embeddings
+	启动tensorboard 默认启动在6006端口 可以通过命令行修改端口
+		tensorboard --logdir log/ #
+	个人感觉训练时间长了好多
+	基本操作:
+		tf.summary.scalar(name,variable)
+		tf.summary.image
+		tf.summary.scalar
+		tf.audio
+		tf.FileWriter(PATH,)
+	训练时数据:
+		train_writer = tf.summary.FileWriter(path,sess.graph)
+		summary =  sess.run(tf.summary.merge_all())
+		train_writer.add_summary(summary, i) # 实测感觉很耗费时
+
+	对于需要统计分析的数据:
+		def variable_summaries(var):
+		    with tf.name_scope('summaries'):
+		        mean = tf.reduce_mean(var)
+		        tf.summary.scalar('mean', mean)
+		        with tf.name_scope('stddev'):
+		            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+		        tf.summary.scalar('stddev', stddev)
+		        tf.summary.scalar('max', tf.reduce_max(var))
+		        tf.summary.scalar('min', tf.reduce_min(var))
+		        tf.summary.histogram('histogram', var)
+
+	加载pb模型进tensorboard进行分析
+		graph = tf.get_default_graph()
+	    graph_def = graph.as_graph_def()
+	    graph_def.ParseFromString(tf.gfile.FastGFile(MODEL_PATH, 'rb').read())
+	    tf.import_graph_def(graph_def, name='graph')
+	    writer = tf.summary.FileWriter(SUMMARY_DATA_PATH, graph)
+	    # 其中最后一句话可以加载图文件进入tensorboard 
+	    # SUMMARY_DATA_PATH 生成tensorboard文件的路径
+		# tf.FileWriter()进行IO把图写进文件
+# 多设备部署加速计算
+	基本知识:
+		/cpu:0 /gpu:0 /gpu:n # 默认cpu不做区别
+		# 获取可用的gpu设备
+		def get_available_gpus():
+		    from tensorflow.python.client import device_lib as _device_lib
+		    local_device_protos = _device_lib.list_local_devices()
+		    return [x.name for x in local_device_protos if x.device_type == 'GPU']
+		tf.device('/gpu:0') # 指定gpu运行、
+		with tf.device('/gpu:0'):
+			a=tf.constant([1.0,2.0,3.0])
+			b=tf.constant([1.0,2.0,3.0])
+		with tf.device('/gpu:1'):
+			c=a+b
+		默认都在gpu:0上运行
+	日志输出:
+		tf.Session(config=tf.ConfigProto(log_device_placement=True))
+	同步和异步计算:
+		同步计算指的是同时开始,同时结束(一次梯度下降)把结果进行平均更新参数
+		异步计算是不同时读取,不同时更新参数
+
+		因为深度学习算法主要优化器是SGD,就近似而言异步计算也是一种近似,
+		而同步计算则更接近最优解,两者在工业界都有广泛应用
+
+	关于一些计算的细节:
+		# 单gpu梯度下降的写法
+		opt=tf.train.GradientDescentOptimizer(learning_rate)
+		train_op=opt.minimize(loss_function)
+		# gradient=opt.compte_gradients(loss) 可以计算梯度
+		# opt.apply_gradients(graidents,global_step) 把梯度应用到最小化
+		# 多gpu梯度下降 利用上述api完成
+
+				
+
+
 

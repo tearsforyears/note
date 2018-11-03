@@ -12,6 +12,7 @@ tkernel tensorflow disrtibute execution engine
 tensorflow包括变量和常量的两种定义
 变量定义tf.Variable(0,name="counter")
 常量定义tf.constant(1)
+tf.zeros()和constant的类型一样都是tensor
 -------------------------------------------------------------------
 state = tf.Variable(0, name="counter")
 one = tf.constant(1)
@@ -364,6 +365,14 @@ def rebuild(x):
         print("z6",sess.run(z6))
         print("perdict_item",np.where(np.abs(sess.run(z6))==np.max(np.abs(sess.run(z6))))[0][0])
 
-
-
-
+# 其他一些api
+    tf.slice(input,begin,size)
+    A=np.array([[1,2,3],[4,5,6]])
+    tf.slice(A,begin=[0,1],size=[2,2])
+    [[1,2,3],
+     [4,5,6]]
+    A[0,1]=2 #从这一点开始 取2,2矩阵
+    结果:
+    [[2,3],
+     [5,6]]
+    # slide window?
