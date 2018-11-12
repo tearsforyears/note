@@ -1,0 +1,24 @@
+机器学习及其分类
+# 按算法
+	监督学习 supervise learning
+	非监督学习 unsupervise learning
+	半监督学习 semi-supervise learning
+	强化学习 Reinforcement learning
+	遗传算法 Evolutionary Algorithms
+
+# 按实现架构
+	传统机器学习 ->集成机器学习
+	深度学习 
+
+# 研究领域
+	计算机视觉
+	语音识别
+	自然语言处理
+	数据分析
+	金融分析
+
+# 实现基础
+	pass
+
+# 强化学习
+	从0学习,尝试得到东西
