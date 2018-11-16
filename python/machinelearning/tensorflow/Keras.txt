@@ -110,6 +110,9 @@
 				batch_input_shape=(BATCH_SIZE,TIME_STEPS,INPUT_SIZE),
 				output_dim=CELL_SIZE,
 			)
+		# 上面这个定义太麻烦了,可以简化
+		LSTM(units,input_shape=(....)) # units 决定输出和状态的维度 input_shape
+		# 表征时间步和向量长
 		# output layer
 			model.add(Dense(10))
 			model.add(Activation("softmax"))
@@ -132,7 +135,36 @@
 			return_sequences=True, # 默认为False
 			stateful=True, # 使用状态
 		))
+		# return_sequences 为True的话返回整个序列
+		# False 返回最后一个预测
 		model.add(TimeDistributed(Dense(output_size))) # 需要实时预测数据的shape
+		# 上一层过来的输入是一个序列 
+		# 那么利用 Dense 自动获得上层输入和TimeDistributed解析第一个为时间片
+		# 那么就是相当于解析整个输出序列 结果就是predict出来的东西
+	# 实例
+		#  processing
+		(x, y), (x_test, y_test) = mnist.load_data()
+		x = x.reshape(60000, 28, 28) / 255
+		x_test = x_test.reshape(10000, 28, 28) / 255
+		# one hot encoding
+		y = np.eye(10)[y]
+		y_test = np.eye(10)[y_test]
+
+		# model define
+		model = Sequential([
+		    LSTM(50, input_shape=(28, 28)),
+		    Activation('relu'),
+		    Dense(10),
+		    Activation('softmax'),
+		])
+
+		# optimizer
+		adam = Adam(lr=0.001)
+
+		model.compile(adam, loss='categorical_crossentropy', metrics=['accuracy'])
+		model.fit(x, y, epochs=5, batch_size=64)
+		loss, accuracy = model.evaluate(x_test, y_test)
+		print(loss, accuracy)
 # auto encoder
 	from keras.models import Model
 	from keras.layers import Dense,Input

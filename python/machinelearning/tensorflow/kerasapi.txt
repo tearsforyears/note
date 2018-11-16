@@ -1,0 +1,198 @@
+Keras tutorial
+# 原生代码编写
+	from keras import backend as K
+	# 变量
+	K.placeholder(shape=(2,4,5)) # ndim = 3
+	K.variable
+	K.int_shape # 直接用 K.shape 返回的是tensor
+	K.dtype
+	K.eval
+
+	# 矩阵和数学常用数学函数
+	K.ones
+	K.zeros
+	K.dot
+	K.batch_dot # [batch_size,:] 这种形式的数据批量乘法
+	K.sum
+	...
+
+	# 设置
+	K.set_epsilon
+	K.set_floatx('float64') # 设置浮点数
+	
+	# 编码 神经网络相关
+	K.one-hot
+	K.softmax
+	K.gradients(loss,variables) # 返回变量列表的梯度
+	K.l2_normalize
+	K.dropout
+	K.conv1d
+	K.conv2d
+	K.deconv2d
+	K.conv3d
+	K.pool2d
+# TimeDistributed 
+	from keras.layers import TimeDistributed
+	input_sequences = Input(shape=(20, 784)) # 处理20个时间步
+	processed_sequences = TimeDistributed(model)(input_sequences)
+	# model 是已经训练好的模型,可以用函数式编程直接处理不同的输入
+	# 对于序列模型 TimeDistributed 就是个大杀器 直接用model封装训练processed_sequences
+	# 另外TimeDistributed(model)中model是参数共享的
+	# rnn实例
+		x_test = np.zeros(shape=(512, 10, 16))
+		ip = Input(shape=(10, 16))
+		op = CuDNNLSTM(32, input_shape=(10, 16), return_sequences=True)(ip)
+		op = TimeDistributed(Dense(4))(op)
+		model = Model(input=ip, output=op)
+		y = model.predict(x_test)
+		# 因为 return_sequences=True rnn 输出的shape是 samples,time_steps,hidden_units
+		# TimeDistributed()的输入是 上行所述的shape 对上述的shape拆分成samples,inputs
+		# 512个sample被分别投入同一个Dense进行训练,然后吧time_steps当成dense的sample
+# 自定义损失函数和训练器:
+	from keras.optimizer import Adam
+	def mean_squared_error(y_true, y_pred):
+    	return K.mean(K.square(y_pred - y_true), axis=-1)
+    opt = Adam(0.001)
+    model.complie(loss=mean_squared_error,optimizer=opt)
+# layers:
+	apis:
+		Dense,Activation,Convolution2D,MaxPooling2D,Flatten,SimpleRNN,GRU,LSTM..
+	Dense:
+		Dense(input_shape=,units) # units means output
+# 迁移学习
+	# 冻结网络层
+	trainable = False
+	# 利用pre-train model 去完成迁移学习 
+	from keras.applications.vgg16 import VGG16
+	from keras.applications.vgg19 import VGG19
+	from keras.applications.resnet50 import ResNet50
+	from keras.applications.inception_v3 import InceptionV3
+
+	model = VGG16(weights='imagenet', include_top=True)
+	model.pop() # 去掉最后一层
+	# 实例 来自官方文档的修改
+		import numpy as np
+		from keras import applications
+	    # build the VGG16 network
+	    model = applications.VGG16(include_top=False, weights='imagenet')
+	    bottleneck_features_train = model.predict()
+	    np.save(open('bottleneck_features_train.npy', 'w'),
+	            bottleneck_features_train)
+	    # np.save(file,mat) 用来缓存变量,然后用这些变量当成测试数据去训练
+	    # 缓存机制对迁移学习非常重要 np.save(就很不错)
+	    # train_data = np.load(open('bottleneck_features_train.npy'))    
+# 关于RNN层
+		1.基础解释
+			LSTM(32, input_shape=(10, 16), batch_size=32, stateful=True)
+			# 32 表示本层具有神经元个数 
+			# input_shape=(10,16)时间步和向量长,在NLP中就是 一次输入的单词长,词典长度
+			# 时间步就是序列的长度,对mnist来讲,把一行像素当成一个向量,28个时间步
+			# 换句话说LMSTCell的个数就是28, 第一个32代表了神经元个数,决定了最终输出向量
+			# 也决定了状态的维度
+			# batch_size 自然是batch的大小
+			# RNN 中 参数共享包括细胞内和实时预测的Dense层
+		2.stateful RNN
+			这个真的是噩梦,附上原文地址
+			https://www.imooc.com/article/44094
+			stateful = True时,我们要在fit中手动使得shuffle = False.
+			# 在源代码中看到默认设置是False了
+			stateful = True时,我们需要告诉batchsize。
+			简单点来讲 stateful RNN 就是把句子之间的记忆(batch内) 给生成了
+			论文中的各种门,表示的是句子之内的记忆
+			stateful 比 stateless 多的就是这种batch内的记忆
+			实现的机制是
+			stateless 针对 一个句子进行一次参数清零 .reset_states()
+			而 stateful 针对 一个batch 进行一次参数清零
+		3.return_sequences/return_state
+			return_sequences 返回的是 samples,time_steps,units
+			return_state 返回几个参数
+			1.预测结果
+			2.state 
+				# SimpleRNN 1个状态 LSTM 2个状态 gru 两个状态
+				# 根据门的不同 返回的个数不同 shape为samples,units
+		4.数据流通测试
+			x_test = np.zeros(shape=(512, 10, 16))
+			ip = Input(shape=(10, 16))
+			op = CuDNNLSTM(32, input_shape=(10, 16), return_sequences=True)(ip)
+			op = TimeDistributed(Dense(4))(op)
+			model = Model(input=ip, output=op)
+			y = model.predict(x_test)
+
+			# 正常output samples,units 这是最后一层的output 512,32
+			# stateful return 512,32 需要注意的是 训练集必须能被batch整除
+			# return sequences=True shape=(512, 10, 32) 时间步全在第二维度上了
+			# 加了一层TimeDistributed(Dense(units))(op) shape=(512,10,units)
+			# TimeDistributed(model) 接受samples,inputs
+			# 这种类型的数据 然后对每一个sample 用inputs作为model的input
+			# 对于这层Dense来讲 input_shape = (10,32)
+			# 10看做samples 投入Dense 进行训练 这是完整版本的 rnn
+			# LSTM GRU 等也是同理的 
+# 特殊层
+	# 多任务模型
+		多任务模型的特点就是多输入多输出
+		# 定义模型
+		model = Model(inputs=[main_input, auxiliary_input], outputs=[main_output, auxiliary_output])
+		# 编译模型
+		model.compile(optimizer='rmsprop', loss='binary_crossentropy',
+              loss_weights=[1., 0.2])
+        loss_weight 决定了输出之间的权重比
+        # 另一种编译
+        model.compile(optimizer='rmsprop',
+              loss={'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
+              loss_weights={'main_output': 1., 'aux_output': 0.2})
+        # 其实main_output是被标记了name属性的ouput
+
+		# And trained it via:
+		model.fit({'main_input': headline_data, 'aux_input': additional_data},
+		          {'main_output': labels, 'aux_output': labels},
+		          epochs=50, batch_size=32)
+	# 共享层:
+		多次输入就可以了
+		shared_lstm = LSTM(64)
+		encoded_a = shared_lstm(tweet_a)
+		encoded_b = shared_lstm(tweet_b)
+		merged_vector = keras.layers.concatenate([encoded_a, encoded_b], axis=-1)
+	# 残差层(跳连接)
+		from keras.layers import Conv2D, Input
+
+		# input tensor for a 3-channel 256x256 image
+		x = Input(shape=(256, 256, 3))
+		# 3x3 conv with 3 output channels (same as input channels)
+		y = Conv2D(3, (3, 3), padding='same')(x)
+		# this returns x + y.
+		z = keras.layers.add([x, y])
+	# 栈式LSTM(多层LSTM):
+		model = Sequential()
+		model.add(LSTM(32, return_sequences=True,input_shape=(timesteps, data_dim)))  
+		model.add(LSTM(32, return_sequences=True))		
+		model.add(LSTM(32))
+		model.add(Dense(10, activation='softmax'))
+# 并行计算
+	# 数据并行
+		from keras.utils import multi_gpu_model
+		# Replicates `model` on 8 GPUs.
+		# This assumes that your machine has 8 available GPUs.
+		# 最多允许数据在8个GPU片上运行
+		parallel_model = multi_gpu_model(model, gpus=8)
+		parallel_model.compile(loss='categorical_crossentropy',
+		                       optimizer='adam')
+		parallel_model.fit(x, y, epochs=20, batch_size=256)
+	# 设备并行
+		# Model where a shared LSTM is used to encode two different sequences in parallel
+		input_a = keras.Input(shape=(140, 256))
+		input_b = keras.Input(shape=(140, 256))
+
+		shared_lstm = keras.layers.LSTM(64)
+
+		# Process the first sequence on one GPU
+		with tf.device_scope('/gpu:0'):
+		    encoded_a = shared_lstm(tweet_a)
+		# Process the next sequence on another GPU
+		with tf.device_scope('/gpu:1'):
+		    encoded_b = shared_lstm(tweet_b)
+
+		# Concatenate results on CPU
+		with tf.device_scope('/cpu:0'):
+		    merged_vector = keras.layers.concatenate(
+		    	[encoded_a, encoded_b],axis=-1
+		    )

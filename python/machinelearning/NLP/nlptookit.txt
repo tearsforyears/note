@@ -62,3 +62,15 @@
 			nltk.text.Text():
 				txt.common_context(['better','than']]) # 查看同义词习惯
 				txt.dispersion_plot(['better', 'guess']) # 画关联词距离 plt
+# genism(word2vec模型)
+	# 因为需要借助别人pre-train的模型,所以该库的使用方法仅仅是模型导入和预测
+	# 模型导入
+		bin模式(不可训练):model = gensim.models.KeyedVectors.load_word2vec_format(model_path, binary=True)
+		# model模式：model = gensim.models.Word2Vec.load(model_path)
+	# 模型预测:
+		model['computer'] # 直接获得computer单词的词向量 np ndarray
+# 自然语言的特征工程
+	我们需要先对原始的文本进行分词、去除停用词(利用停词表),去除出现单次的词
+
+# 关于机器学习的部分:
+	NLP在小采集的文本分析情况下完全可以使用Native Bayes作为分类器
