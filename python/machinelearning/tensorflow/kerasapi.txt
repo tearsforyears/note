@@ -1,86 +1,106 @@
 Keras tutorial
-# 原生代码编写
-	from keras import backend as K
-	# 变量
-	K.placeholder(shape=(2,4,5)) # ndim = 3
-	K.variable
-	K.int_shape # 直接用 K.shape 返回的是tensor
-	K.dtype
-	K.eval
+	model
+# keras结构信息
+	# 模型输入输出 本质上是tensorflow的tensor
+	model.input
+	model.output
+	# 层的结构信息
+	model.summary()
+	# 获取层的对象
+	for layer in model.layers:print(layer) # layer可以调用层的方法
+	model.get_layer('pool5') # 另一种获得layer的方法
+# 自定义model,layer
+	# layers.core.Lambda 可以实现简单的层,但对于可训练定制参数的层应使用以下方式
+	# 自定义layer(继承keras.engine.topology.Layer):
+		from keras import backend as K
+		from keras.engine.topology import Layer
+		import numpy as np
 
-	# 矩阵和数学常用数学函数
-	K.ones
-	K.zeros
-	K.dot
-	K.batch_dot # [batch_size,:] 这种形式的数据批量乘法
-	K.sum
-	...
+		class MyLayer(Layer):
 
-	# 设置
-	K.set_epsilon
-	K.set_floatx('float64') # 设置浮点数
-	
-	# 编码 神经网络相关
-	K.one-hot
-	K.softmax
-	K.gradients(loss,variables) # 返回变量列表的梯度
-	K.l2_normalize
-	K.dropout
-	K.conv1d
-	K.conv2d
-	K.deconv2d
-	K.conv3d
-	K.pool2d
-# TimeDistributed 
-	from keras.layers import TimeDistributed
-	input_sequences = Input(shape=(20, 784)) # 处理20个时间步
-	processed_sequences = TimeDistributed(model)(input_sequences)
-	# model 是已经训练好的模型,可以用函数式编程直接处理不同的输入
-	# 对于序列模型 TimeDistributed 就是个大杀器 直接用model封装训练processed_sequences
-	# 另外TimeDistributed(model)中model是参数共享的
-	# rnn实例
-		x_test = np.zeros(shape=(512, 10, 16))
-		ip = Input(shape=(10, 16))
-		op = CuDNNLSTM(32, input_shape=(10, 16), return_sequences=True)(ip)
-		op = TimeDistributed(Dense(4))(op)
-		model = Model(input=ip, output=op)
-		y = model.predict(x_test)
-		# 因为 return_sequences=True rnn 输出的shape是 samples,time_steps,hidden_units
-		# TimeDistributed()的输入是 上行所述的shape 对上述的shape拆分成samples,inputs
-		# 512个sample被分别投入同一个Dense进行训练,然后吧time_steps当成dense的sample
-# 自定义损失函数和训练器:
-	from keras.optimizer import Adam
-	def mean_squared_error(y_true, y_pred):
-    	return K.mean(K.square(y_pred - y_true), axis=-1)
-    opt = Adam(0.001)
-    model.complie(loss=mean_squared_error,optimizer=opt)
-# layers:
+		    def __init__(self, output_dim, **kwargs):
+		        self.output_dim = output_dim
+		        # or compute the output_dim
+		        super(MyLayer, self).__init__(**kwargs)
+
+		    def build(self, input_shape):
+		        # Create a trainable weight variable for this layer.
+		        self.kernel = self.add_weight(name='kernel', 
+		                                      shape=(input_shape[1], self.output_dim),
+		                                      initializer='uniform',
+		                                      trainable=True)
+		        super(MyLayer, self).build(input_shape) 
+		        # Be sure to call this somewhere!
+		        # 调用super保证 built = True 就是成功创建层
+		    def call(self, x):
+		        return K.dot(x, self.kernel)
+		        # 正向传播过程,所有计算逻辑在里面实现
+		    def compute_output_shape(self, input_shape):
+		        return (input_shape[0], self.output_dim)
+		        # 计算下一层输出形状
+		# 定制层需要实现几个方法
+		# __init__() 初始化units等一些成员变量参数
+		# build() 初始化权重,修改built super(MyLayer, self).build(input_shape) 
+		# call() 实现forward_prop
+		# compute_output_shape() 计算下一层的输出形状
+	# 自定义model,继承keras.Model类 实现call方法完成forwardprop
+		import keras
+		class SimpleMLP(keras.Model):
+		    def __init__(self, use_bn=False, use_dp=False, num_classes=10):
+		        super(SimpleMLP, self).__init__(name='mlp')
+		        self.use_bn = use_bn
+		        self.use_dp = use_dp
+		        self.num_classes = num_classes
+
+		        self.dense1 = keras.layers.Dense(32, activation='relu')
+		        self.dense2 = keras.layers.Dense(num_classes, activation='softmax')
+		        if self.use_dp:
+		            self.dp = keras.layers.Dropout(0.5)
+		        if self.use_bn:
+		            self.bn = keras.layers.BatchNormalization(axis=-1)
+		    def call(self, inputs):
+		        x = self.dense1(inputs)
+		        if self.use_dp:
+		            x = self.dp(x)
+		        if self.use_bn:
+		            x = self.bn(x)
+		        return self.dense2(x)
+		model = SimpleMLP()
+		model.compile(...)
+		model.fit(...)
+		# 其实这种写法和model = Model(input=input,output=output) 区别不大
+		# 但是可以实现很多细节操作,相当于直接从layer开始编码
+		# 但此结构不能被序列化,只是原生的python而不是静态图
+# 原生layers:
+	# keras的一个设计理念是不把batch的东西包括进去
 	apis:
 		Dense,Activation,Convolution2D,MaxPooling2D,Flatten,SimpleRNN,GRU,LSTM..
-	Dense:
+	核心层:
 		Dense(input_shape=,units) # units means output
-# 迁移学习
-	# 冻结网络层
-	trainable = False
-	# 利用pre-train model 去完成迁移学习 
-	from keras.applications.vgg16 import VGG16
-	from keras.applications.vgg19 import VGG19
-	from keras.applications.resnet50 import ResNet50
-	from keras.applications.inception_v3 import InceptionV3
-
-	model = VGG16(weights='imagenet', include_top=True)
-	model.pop() # 去掉最后一层
-	# 实例 来自官方文档的修改
-		import numpy as np
-		from keras import applications
-	    # build the VGG16 network
-	    model = applications.VGG16(include_top=False, weights='imagenet')
-	    bottleneck_features_train = model.predict()
-	    np.save(open('bottleneck_features_train.npy', 'w'),
-	            bottleneck_features_train)
-	    # np.save(file,mat) 用来缓存变量,然后用这些变量当成测试数据去训练
-	    # 缓存机制对迁移学习非常重要 np.save(就很不错)
-	    # train_data = np.load(open('bottleneck_features_train.npy'))    
+		Activation(activation='relu') 
+		Droupout(rate=rate,noise_shape,seed) 
+			# noise_shape是dropout引入噪声的shape,默认为None
+			# 引入的噪声做类似mask的操作
+		Flatten() # 展开平整
+		Input(shape=)
+		Reshape(target_shape=)
+		Permute(dims) # 改变维度 与tf.transpose(A,dims) 效果大致等同
+		RepeatVector(n) # 重复n次输入的向量
+		Lambda(lamdba x:x**2) # 封装简单层 
+		ActivityRegularization() # 用层进行参数正则
+		Masking(mask_value=0.0) # 掩盖层,忽略值mask_value进行计算,
+		SpatialDropout1D,SpatialDropout2D,SpatialDropout3D
+			# 空间dropout 不会单个值dropout
+# keras和tensorflow协作编码:
+	# pass
+# 断点学习:
+	和tensorflow差不多,本质上的idea是检查断点载入权重继续训练
+	只不过tensorflow以训练轮数为单位,keras选择用epoch为单位
+	if os.path.exists(model_file_path):
+		model.load_weights(model_file_path)
+	model.fit(....callback=[modelCheckpoint(path)]) 
+	# modelCheckpoint(path) 具体参数见 callback
+	# 这种做法 需要额外保留epoch(一般存在文件名上) 或者索性不保留了,直接训练到饱和
 # 关于RNN层
 		1.基础解释
 			LSTM(32, input_shape=(10, 16), batch_size=32, stateful=True)
@@ -127,6 +147,23 @@ Keras tutorial
 			# 对于这层Dense来讲 input_shape = (10,32)
 			# 10看做samples 投入Dense 进行训练 这是完整版本的 rnn
 			# LSTM GRU 等也是同理的 
+# TimeDistributed 
+	from keras.layers import TimeDistributed
+	input_sequences = Input(shape=(20, 784)) # 处理20个时间步
+	processed_sequences = TimeDistributed(model)(input_sequences)
+	# model 是已经训练好的模型,可以用函数式编程直接处理不同的输入
+	# 对于序列模型 TimeDistributed 就是个大杀器 直接用model封装训练processed_sequences
+	# 另外TimeDistributed(model)中model是参数共享的
+	# rnn实例
+		x_test = np.zeros(shape=(512, 10, 16))
+		ip = Input(shape=(10, 16))
+		op = CuDNNLSTM(32, input_shape=(10, 16), return_sequences=True)(ip)
+		op = TimeDistributed(Dense(4))(op)
+		model = Model(input=ip, output=op)
+		y = model.predict(x_test)
+		# 因为 return_sequences=True rnn 输出的shape是 samples,time_steps,hidden_units
+		# TimeDistributed()的输入是 上行所述的shape 对上述的shape拆分成samples,inputs
+		# 512个sample被分别投入同一个Dense进行训练,然后吧time_steps当成dense的sample
 # 特殊层
 	# 多任务模型
 		多任务模型的特点就是多输入多输出
@@ -167,6 +204,248 @@ Keras tutorial
 		model.add(LSTM(32, return_sequences=True))		
 		model.add(LSTM(32))
 		model.add(Dense(10, activation='softmax'))
+# backend原生代码编写
+	from keras import backend as K
+	# 变量
+	K.placeholder(shape=(2,4,5)) # ndim = 3
+	K.variable
+	K.int_shape # 直接用 K.shape 返回的是tensor
+	K.dtype
+	K.eval
+
+	# 矩阵和数学常用数学函数
+	K.ones
+	K.zeros
+	K.dot
+	K.batch_dot # [batch_size,:] 这种形式的数据批量乘法
+	K.sum
+	...
+
+	# 设置
+	K.set_epsilon
+	K.set_floatx('float64') # 设置浮点数
+	
+	# 编码 神经网络相关
+	K.one-hot
+	K.softmax
+	K.gradients(loss,variables) # 返回变量列表的梯度
+	K.l2_normalize
+	K.dropout
+	K.conv1d
+	K.conv2d
+	K.deconv2d
+	K.conv3d
+	K.pool2d
+	training
+# 自定义损失函数和训练器:
+	from keras.optimizer import Adam
+	def mean_squared_error(y_true, y_pred):
+    	return K.mean(K.square(y_pred - y_true), axis=-1)
+    opt = Adam(0.001)
+    model.complie(loss=mean_squared_error,optimizer=opt)
+# initializers:
+	from keras.initializers import 初始器
+	kernel_initializer
+	bias_initializer
+	一般用于指定这两个关键字
+	Zeros
+	Ones
+	Constant
+	RandomNormal # 正态分布
+	RandomUniform # 均匀分布
+	TruncatedNormal # 截断正态分布
+	Orthogonal 随机正交矩阵 正交矩阵 A^H=A^-1 实矩阵时 A^H = A^T
+	Identity 单位矩阵
+	# 自定义初始化
+		from keras import backend as K
+
+		def my_init(shape, dtype=None):
+		    return K.random_normal(shape, dtype=dtype)
+
+		model.add(Dense(64, kernel_initializer=my_init))
+# Optimizers:
+	公共参数
+		clipnorm # 让其L2范数最大为 clipnorm
+		clipvalue # 让最大梯度在 ± clipvalue 内
+		# 实例
+			所有参数梯度将被裁剪，让其l2范数最大为1：g * 1 / max(1, l2_norm)
+			sgd = optimizers.SGD(lr=0.01, clipnorm=1.)	
+	SGD:
+		keras.optimizers.SGD(lr=0.01, momentum=0.0, decay=0.0, nesterov=False)
+		nesterov 是否使用Nesterov动量
+	RMSprop:
+		keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
+	Adagrad:
+		keras.optimizers.Adagrad(lr=0.01, epsilon=None, decay=0.0)
+	Adadelta:
+		keras.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0)
+	Adam:
+		keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+	Adamax:
+		keras.optimizers.Adamax(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0)
+	Nadam:
+		keras.optimizers.Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004)
+	TFOptimizer:
+		keras.optimizers.TFOptimizer(optimizer)
+		# 包装tensorflow的oprimizer
+	# 本人认识的优化器不多 SGD RMSprop Adam 有机会在去深究其他优化器
+# 迁移学习
+	# 可用于进行迁移学习的模型(Application):
+		Xception
+		VGG16
+		VGG19
+		ResNet50
+		InceptionV3
+		InceptionResNetV2
+		MobileNet
+		DenseNet
+		NASNet
+	#模型概览:
+		模型					大小		Top-1 	Top-5 	参数数量		深度
+		Xception			88 MB	0.790	0.945	22,910,480	126
+		VGG16				528 MB	0.715	0.901	138,357,544	23
+		VGG19				549 MB	0.727	0.910	143,667,240	26
+		ResNet50			99 MB	0.759	0.929	25,636,712	168
+		InceptionV3			92 MB	0.788	0.944	23,851,784	159
+		InceptionResNetV2	215 MB	0.804	0.953	55,873,736	572
+		MobileNet			17 MB	0.665	0.871	4,253,864	88
+		DenseNet121			33 MB	0.745	0.918	8,062,504	121
+		DenseNet169			57 MB	0.759	0.928	14,307,880	169
+		DenseNet201			80 MB	0.770	0.933	20,242,984	201
+	# 利用模型进行直接预测
+		from keras.applications.resnet50 import ResNet50
+		from keras.preprocessing import image # cv2记得换通道
+		from keras.applications.resnet50 import preprocess_input, decode_predictions
+		import numpy as np
+		img_path = 'elephant.jpg'
+		img = image.load_img(img_path, target_size=(224, 224))
+		x = image.img_to_array(img)
+		x = np.expand_dims(x, axis=0)
+		x = preprocess_input(x)
+
+		model = ResNet50(weights='imagenet')
+		preds = model.predict(x)
+	# 提取特征
+		model = ResNet50(weights='imagenet',include_top=False)
+	# 冻结网络层
+		trainable = False
+		# 利用pre-train model 去完成迁移学习 
+		from keras.applications.vgg16 import VGG16
+		from keras.applications.vgg19 import VGG19
+		from keras.applications.resnet50 import ResNet50
+		from keras.applications.inception_v3 import InceptionV3
+
+		model = VGG16(weights='imagenet', include_top=True)
+		model.pop() # 去掉最后一层
+	# 实例 来自官方文档的修改
+		import numpy as np
+		from keras import applications
+	    # build the VGG16 network
+	    model = applications.VGG16(include_top=False, weights='imagenet')
+	    bottleneck_features_train = model.predict()
+	    np.save(open('bottleneck_features_train.npy', 'w'),
+	            bottleneck_features_train)
+	    # np.save(file,mat) 用来缓存变量,然后用这些变量当成测试数据去训练
+	    # 缓存机制对迁移学习非常重要 np.save(就很不错)
+	    # train_data = np.load(open('bottleneck_features_train.npy'))    
+# callback:
+	# 简介
+		回调函数是一个函数的合集，会在训练的阶段中所使用。
+		.fit() 中的callback关键字可以实现这种回调
+	# 节选
+		keras.callbacks.BaseLogger()
+			自动应用到每个model上用来记录日志信息
+		keras.callbacks.History()
+			hist = model.fit() # 每个model.fit()会返回一个history对象
+			hist.histroy() # 根据每个epoch 返回loss的值等
+		keras.callbacks.ModelCheckpoint()
+			keras.callbacks.ModelCheckpoint(
+				filepath, # filepath = weights.{epoch:02d}-{val_loss:.2f}.hdf5 可以用迭代轮数去命名文件
+				monitor='val_loss', # 被监测的数据
+				verbose=0, # 详细模式
+				save_best_only=False, # save_best_only=True 被监测的最佳数据不会被覆盖
+				save_weights_only=False,
+				mode='auto', # max min 根据监测的值自动判断auto
+				period=1 # 每个检查点之间的间隔(训练轮数)
+			)	
+		keras.callbacks.EarlyStopping()
+			keras.callbacks.EarlyStopping(
+				monitor='val_loss', 
+				min_delta=0, # 最小提升
+				patience=0, # 没有进步的训练轮数
+				verbose=0, 
+				mode='auto'
+			)
+			# 提早停下模型
+		keras.callbacks.TensorBoard()
+			keras.callbacks.TensorBoard(
+				log_dir='./logs', 
+				histogram_freq=0, # 画直方图的频率 单位是epoch
+				batch_size=32, 
+				write_graph=True, # 是否可视化图像,如果选定文件会变很大
+				write_grads=False, # 是否画梯度
+				write_images=False, # 是否在 TensorBoard 中将模型权重以图片可视化。
+				embeddings_freq=0, 
+				embeddings_layer_names=None, 
+				embeddings_metadata=None
+			)
+		# 使用实例
+			from keras.callbacks import ModelCheckpoint
+
+			model = Sequential()
+			model.add(Dense(10, input_dim=784, kernel_initializer='uniform'))
+			model.add(Activation('softmax'))
+			model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+
+			'''
+			如果验证损失下降， 那么在每个训练轮之后保存模型。
+			'''
+			checkpointer = ModelCheckpoint(filepath='/tmp/weights.hdf5', verbose=1, save_best_only=True)
+			model.fit(x_train, y_train, batch_size=128, epochs=20, verbose=0, validation_data=(X_test, Y_test), callbacks=[checkpointer])
+# metrics:
+	# metrics可选项:
+		mse = MSE = mean_squared_error
+		mae = MAE = mean_absolute_error
+		mape = MAPE = mean_absolute_percentage_error
+		msle = MSLE = mean_squared_logarithmic_error
+		cosine = cosine_proximity
+		model.compile(
+			loss='mean_squared_error',
+	        optimizer='sgd',
+	       	metrics=['mae', 'acc']
+	    )
+	    # 除此之外还有acc,loss等complie具有的参数
+	# metrics可选评价函数:
+		binary_accuracy
+		categorical_accuracy
+		sparse_categorical_accuracy
+		top_k_categorical_accuracy
+		sparse_top_k_categorical_accuracy
+	# 自定义评价函数
+		import keras.backend as K
+
+		def mean_pred(y_true, y_pred):
+		    return K.mean(y_pred)
+
+		model.compile(optimizer='rmsprop',
+		              loss='binary_crossentropy',
+		              metrics=['accuracy', mean_pred])
+# 正则化:
+	kernel_regularizer,bias_regularizer,activity_regularizer
+	# 这三个参数是指定正则项函数的参数,分别加在kernel,bias,activity上的参数
+	# 均为keras.regularizer.Regularizer对象 或者是自定义的正则项函数
+	# 实例
+		1.预定义
+		from keras import regularizers
+		model.add(Dense(64, input_dim=64,
+		                kernel_regularizer=regularizers.l2(0.01),
+		                activity_regularizer=regularizers.l1(0.01)))
+		2.自定义
+		from keras import backend as K
+		def l1_reg(weight_matrix):
+		    return 0.01 * K.sum(K.abs(weight_matrix))
+		model.add(Dense(64, input_dim=64,
+		                kernel_regularizer=l1_reg)
 # 并行计算
 	# 数据并行
 		from keras.utils import multi_gpu_model
@@ -196,3 +475,141 @@ Keras tutorial
 		    merged_vector = keras.layers.concatenate(
 		    	[encoded_a, encoded_b],axis=-1
 		    )
+	源码阅读
+# keras层的源码实现(部分):
+	# core.py
+		from keras.engine.topology import Layer
+		....
+		# class Activation(Layer):
+		    def __init__(self, activation, **kwargs):
+		        super(Activation, self).__init__(**kwargs)
+		        self.supports_masking = True
+		        self.activation = activations.get(activation)
+
+		    def call(self, inputs):
+		        return self.activation(inputs)
+
+		    def get_config(self):
+		        config = {'activation': activations.serialize(self.activation)}
+		        base_config = super(Activation, self).get_config()
+		        return dict(list(base_config.items()) + list(config.items()))
+		    # call 实现了核心代码,此层没有权重
+		    # get_config 构建配置信息 json 格式
+		# class Dropout(Layer):
+		    @interfaces.legacy_dropout_support # 兼容版本
+		    def __init__(self, rate, noise_shape=None, seed=None, **kwargs):
+		        super(Dropout, self).__init__(**kwargs)
+		        self.rate = min(1., max(0., rate)) # 非法值过滤比如-1,100
+		        self.noise_shape = noise_shape # 噪音的形状
+		        self.seed = seed # 随机数的种子
+		        self.supports_masking = True
+
+		    def _get_noise_shape(self, inputs):
+		        if self.noise_shape is None:
+		            return self.noise_shape
+
+		        symbolic_shape = K.shape(inputs)
+		        noise_shape = [symbolic_shape[axis] if shape is None else shape
+		                       for axis, shape in enumerate(self.noise_shape)]
+		        return tuple(noise_shape)
+
+		    def call(self, inputs, training=None):
+		        if 0. < self.rate < 1.:
+		            noise_shape = self._get_noise_shape(inputs)
+
+		            def dropped_inputs():
+		                return K.dropout(inputs, self.rate, noise_shape,
+		                                 seed=self.seed)
+		            return K.in_train_phase(dropped_inputs, inputs,
+		                                    training=training)
+		        return inputs
+
+		    def get_config(self):
+		        config = {'rate': self.rate,
+		                  'noise_shape': self.noise_shape,
+		                  'seed': self.seed}
+		        base_config = super(Dropout, self).get_config()
+		        return dict(list(base_config.items()) + list(config.items()))
+		# class Dense(Layer):
+		    @interfaces.legacy_dense_support
+		    def __init__(self, units,
+		                 activation=None,
+		                 use_bias=True,
+		                 kernel_initializer='glorot_uniform',
+		                 bias_initializer='zeros',
+		                 kernel_regularizer=None,
+		                 bias_regularizer=None,
+		                 activity_regularizer=None,
+		                 kernel_constraint=None,
+		                 bias_constraint=None,
+		                 **kwargs):
+		        if 'input_shape' not in kwargs and 'input_dim' in kwargs:
+		            kwargs['input_shape'] = (kwargs.pop('input_dim'),)
+		        super(Dense, self).__init__(**kwargs)
+		        self.units = units
+		        self.activation = activations.get(activation)
+		        self.use_bias = use_bias
+		        self.kernel_initializer = initializers.get(kernel_initializer)
+		        self.bias_initializer = initializers.get(bias_initializer)
+		        self.kernel_regularizer = regularizers.get(kernel_regularizer)
+		        self.bias_regularizer = regularizers.get(bias_regularizer)
+		        self.activity_regularizer = regularizers.get(activity_regularizer)
+		        self.kernel_constraint = constraints.get(kernel_constraint)
+		        self.bias_constraint = constraints.get(bias_constraint)
+		        self.input_spec = InputSpec(min_ndim=2)
+		        self.supports_masking = True
+
+		    def build(self, input_shape):
+		        assert len(input_shape) >= 2
+		        input_dim = input_shape[-1]
+
+		        self.kernel = self.add_weight(shape=(input_dim, self.units),
+		                                      initializer=self.kernel_initializer,
+		                                      name='kernel',
+		                                      regularizer=self.kernel_regularizer,
+		                                      constraint=self.kernel_constraint)
+		        if self.use_bias:
+		            self.bias = self.add_weight(shape=(self.units,),
+		                                        initializer=self.bias_initializer,
+		                                        name='bias',
+		                                        regularizer=self.bias_regularizer,
+		                                        constraint=self.bias_constraint)
+		        else:
+		            self.bias = None
+		        self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim})
+		        self.built = True
+
+		    def call(self, inputs):
+		        output = K.dot(inputs, self.kernel)
+		        if self.use_bias:
+		            output = K.bias_add(output, self.bias)
+		        if self.activation is not None:
+		            output = self.activation(output)
+		        return output
+
+		    def compute_output_shape(self, input_shape):
+		        assert input_shape and len(input_shape) >= 2
+		        assert input_shape[-1]
+		        output_shape = list(input_shape)
+		        output_shape[-1] = self.units
+		        return tuple(output_shape)
+
+		    def get_config(self):
+		        config = {
+		            'units': self.units,
+		            'activation': activations.serialize(self.activation),
+		            'use_bias': self.use_bias,
+		            'kernel_initializer': initializers.serialize(self.kernel_initializer),
+		            'bias_initializer': initializers.serialize(self.bias_initializer),
+		            'kernel_regularizer': regularizers.serialize(self.kernel_regularizer),
+		            'bias_regularizer': regularizers.serialize(self.bias_regularizer),
+		            'activity_regularizer': regularizers.serialize(self.activity_regularizer),
+		            'kernel_constraint': constraints.serialize(self.kernel_constraint),
+		            'bias_constraint': constraints.serialize(self.bias_constraint)
+		        }
+		        base_config = super(Dense, self).get_config()
+		        return dict(list(base_config.items()) + list(config.items()))
+		# 有了这三层之后,对keras如何实现层的抽象结构有了大致的了解
+
+	#
+	 
