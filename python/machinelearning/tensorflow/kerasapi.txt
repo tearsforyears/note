@@ -1,5 +1,5 @@
-Keras tutorial
-	model
+Keras
+https://keras.io/zh/
 # keras结构信息
 	# 模型输入输出 本质上是tensorflow的tensor
 	model.input
@@ -89,19 +89,121 @@ Keras tutorial
 		Lambda(lamdba x:x**2) # 封装简单层 
 		ActivityRegularization() # 用层进行参数正则
 		Masking(mask_value=0.0) # 掩盖层,忽略值mask_value进行计算,
-		SpatialDropout1D,SpatialDropout2D,SpatialDropout3D
-			# 空间dropout 不会单个值dropout
-# keras和tensorflow协作编码:
-	# pass
-# 断点学习:
-	和tensorflow差不多,本质上的idea是检查断点载入权重继续训练
-	只不过tensorflow以训练轮数为单位,keras选择用epoch为单位
-	if os.path.exists(model_file_path):
-		model.load_weights(model_file_path)
-	model.fit(....callback=[modelCheckpoint(path)]) 
-	# modelCheckpoint(path) 具体参数见 callback
-	# 这种做法 需要额外保留epoch(一般存在文件名上) 或者索性不保留了,直接训练到饱和
-# 关于RNN层
+		SpatialDropout1D,SpatialDropout2D,SpatialDropout3D # 空间dropout 不会单个值dropout
+	卷积层:
+		# 主要讲解图片的卷积
+		Conv1D,Conv2D (时域卷积和空域卷积):
+			keras.layers.Conv2D(
+				filters, # channels
+				kernel_size, 
+				strides=(1, 1), 
+				padding='valid', # valid和same可选,一般卷积用same,pool用valid
+				data_format=None, 
+				dilation_rate=(1, 1), 
+				activation=None, 
+				use_bias=True, 
+				kernel_initializer='glorot_uniform', 
+				bias_initializer='zeros', 
+				kernel_regularizer=None, 
+				bias_regularizer=None, 
+				activity_regularizer=None, 
+				kernel_constraint=None, 
+				bias_constraint=None
+			)
+		SeparableConv1D,SeparableConv2D:
+			可分离的卷积核,inception-v3论文中改进的卷积核
+			可分离的卷积的操作包括，首先执行深度方向的空间卷积 (分别作用于每个输入通道),
+			紧接一个将所得输出通道,混合在一起的逐点卷积。
+			depth_multiplier 参数控 制深度步骤中每个输入通道生成多少个输出通道。
+			用法和上述Conv2D完全一样,只是实现计算的过程不一样了,应该可以替换成两个Conv2d(3*1&1*3)
+		Conv2DTranspose
+			转置卷积或者称反卷积,但注意的一点是,这不是卷积的逆
+			# 关于反卷积的测试:
+				ipt = Input(shape=(2, 2, 1))
+				opt = Conv2DTranspose(filters=1, kernel_size=(3, 3), padding='valid')(ipt)
+				model = Model(input=ipt, output=opt)
+				res = model.predict(np.random.rand(1, 2, 2, 1))
+				# padding='same' res.shape = 1,2,2,1
+				# padding='valid' res.shape = 1,4,4,1
+				valid padding
+					2. 3. 3. 2.|
+					3. 5. 5. 3.| 
+					3. 5. 5. 3.| 
+					2. 3. 3. 2.|
+				same padding
+					5. 5.| 
+					5. 5.|
+			# 反卷积的工作原理
+				是从卷积核和特征图有相交开始进行反卷积,
+				另一种理解是先扩张(0 padding)特征图,然后进行卷积
+			# same padding和valid padding的理解:
+				可以看成padding不一样
+				可以看成经过裁剪
+		Conv3D(空间卷积):
+			用法和1D,2D一样只是输入的数据维度发生了变化
+			一般用于视频数据,其实也可以用TimeDistributed去实现相同功能
+		Cropping1D,Cropping2D,Cropping3D(裁剪层):
+			keras.layers.Cropping1D(cropping=(1, 1))
+			keras.layers.Cropping2D(cropping=((0, 0), (0, 0)), data_format=None)
+			cropping 为整数,或者(int,int) 或者上述
+			整数 则宽度和高度沿着相同的对称裁剪
+			如果是两个整数的元组 height和width两个方向裁剪
+			如果是两个整数的两个元组,解释如下
+			((top_crop, bottom_crop), (left_crop, right_crop))
+			从头剪俩个,从宽剪两个,想想js的div模型,那个padding和这个差不多
+			# 例子
+				model = Sequential()
+				model.add(Cropping2D(cropping=((2, 2), (4, 4)),
+				                     input_shape=(28, 28, 3)))
+				# 现在 model.output_shape == (None, 24, 20, 3)
+				model.add(Conv2D(64, (3, 3), padding='same'))
+				model.add(Cropping2D(cropping=((2, 2), (2, 2))))
+				# 现在 model.output_shape == (None, 20, 16. 64)
+		UpSampling1D,UpSampling2D,UpSampling3D(上采样)
+			keras.layers.UpSampling1D(size=2)
+			keras.layers.UpSampling2D(size=(2, 2), data_format=None)
+			# 类似于unpooling的一种情况
+			UpSampling2d after same padding
+			5. 5. 5. 5. 
+			5. 5. 5. 5. 
+			5. 5. 5. 5. 
+			5. 5. 5. 5.
+		ZeroPadding1D,ZeroPadding2D,ZeroPadding3D
+			keras.layers.ZeroPadding2D(padding=(1, 1), data_format=None)
+			padding代表边缘距离
+	池化层:
+		MaxPooling1D,2D,3D,AveragePooling1D,2D,3D,Global
+			keras.layers.MaxPooling2D(pool_size=(2, 2), strides=None, padding='valid', data_format=None)
+			# strides 默认是None 如果是None 默认设置为pool_size
+			Global就是全局最大值
+	局部连接层:
+		实现和Conv2d等差不多
+		因为比较少用不做介绍,详见文档
+	RNN层:
+		keras.layers.SimpleRNN(),LSMT,GRU,CuDNNGRU,CuDNNLSTM
+			keras.layers.SimpleRNN(
+				units, 
+				activation='tanh', 
+				use_bias=True, 
+				kernel_initializer='glorot_uniform', 
+				recurrent_initializer='orthogonal', 
+				bias_initializer='zeros', 
+				kernel_regularizer=None, 
+				recurrent_regularizer=None, 
+				bias_regularizer=None, 
+				activity_regularizer=None, 
+				kernel_constraint=None, 
+				recurrent_constraint=None, 
+				bias_constraint=None, 
+				dropout=0.0, 
+				recurrent_dropout=0.0, 
+				return_sequences=False, 
+				return_state=False, 
+				go_backwards=False, 
+				stateful=False, 
+				unroll=False
+			)
+	关于RNN层
 		1.基础解释
 			LSTM(32, input_shape=(10, 16), batch_size=32, stateful=True)
 			# 32 表示本层具有神经元个数 
@@ -147,6 +249,90 @@ Keras tutorial
 			# 对于这层Dense来讲 input_shape = (10,32)
 			# 10看做samples 投入Dense 进行训练 这是完整版本的 rnn
 			# LSTM GRU 等也是同理的 
+	Embedding层:
+		Embedding在计算机视觉又称作Encoding
+		Embedding在NLP叫词嵌入层,为了表示出向量
+		keras.layers.Embedding()
+			keras.layers.Embedding(
+				input_dim, # 词汇表大小 这个在输入这层的时候 用0,input_dim-1之内的整数去输入
+				output_dim, # 词向量的维度
+				embeddings_initializer='uniform', 
+				embeddings_regularizer=None, 
+				activity_regularizer=None, 
+				embeddings_constraint=None, 
+				mask_zero=False, 
+				input_length=None
+			)
+			# 其输入为 (batch,sequence_length)
+			# 其输出为 (batch_size, sequence_length, output_dim)
+			# 实例
+				model = Sequential()
+				model.add(Embedding(1000, 64, input_length=10))
+				# 模型将输入一个大小为 (batch, input_length) 的整数矩阵。
+				# 输入中最大的整数（即词索引）不应该大于 999 （词汇表大小）
+				# 现在 model.output_shape == (None, 10, 64)，其中 None 是 batch 的维度。
+
+				input_array = np.random.randint(1000, size=(32, 10))
+
+				model.compile('rmsprop', 'mse')
+				output_array = model.predict(input_array)
+				assert output_array.shape == (32, 10, 64)
+	Merge层:
+		泛指有融合能力的层
+		keras.layers.Add,Subtract,Multiply,Average,Maximum,Concatenate,Dot等
+		例子:
+			import keras
+
+			input1 = keras.layers.Input(shape=(16,))
+			x1 = keras.layers.Dense(8, activation='relu')(input1)
+			input2 = keras.layers.Input(shape=(32,))
+			x2 = keras.layers.Dense(8, activation='relu')(input2)
+			added = keras.layers.Add()([x1, x2])  # 相当于 added = keras.layers.add([x1, x2])
+
+
+			out = keras.layers.Dense(4)(added)
+			model = keras.models.Model(inputs=[input1, input2], outputs=out)
+	Bidirectional封装器:
+		keras.layers.Bidirectional(layer, merge_mode='concat', weights=None)
+		merge_mode = 'sum', 'mul', 'concat', 'ave', None # 表示对结果的处理
+		例子:
+			model = Sequential()
+			model.add(Bidirectional(LSTM(10, return_sequences=True),
+			                        input_shape=(5, 10)))
+			model.add(Bidirectional(LSTM(10)))
+			model.add(Dense(5))
+			model.add(Activation('softmax'))
+			model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+	其它层:
+		keras.layers.BatchNormalization(
+			axis=-1, 
+			momentum=0.99, 
+			epsilon=0.001, 
+			center=True, 
+			scale=True, 
+			beta_initializer='zeros', 
+			gamma_initializer='ones', 
+			moving_mean_initializer='zeros', 
+			moving_variance_initializer='ones', 
+			beta_regularizer=None, 
+			gamma_regularizer=None, 
+			beta_constraint=None, 
+			gamma_constraint=None
+		)
+		keras.layers.GaussianNoise(stddev)
+		keras.layers.GaussianDropout(rate)
+		keras.layers.AlphaDropout(rate, noise_shape=None, seed=None)
+# keras和tensorflow协作编码:
+	# 以tensorflow为主
+	# 以keras为主
+# 断点:
+	和tensorflow差不多,本质上的idea是检查断点载入权重继续训练
+	只不过tensorflow以训练轮数为单位,keras选择用epoch为单位
+	if os.path.exists(model_file_path):
+		model.load_weights(model_file_path)
+	model.fit(....callback=[modelCheckpoint(path)]) 
+	# modelCheckpoint(path) 具体参数见 callback
+	# 这种做法 需要额外保留epoch(一般存在文件名上) 或者索性不保留了,直接训练到饱和
 # TimeDistributed 
 	from keras.layers import TimeDistributed
 	input_sequences = Input(shape=(20, 784)) # 处理20个时间步
@@ -236,7 +422,7 @@ Keras tutorial
 	K.deconv2d
 	K.conv3d
 	K.pool2d
-	training
+training
 # 自定义损失函数和训练器:
 	from keras.optimizer import Adam
 	def mean_squared_error(y_true, y_pred):
@@ -475,7 +661,7 @@ Keras tutorial
 		    merged_vector = keras.layers.concatenate(
 		    	[encoded_a, encoded_b],axis=-1
 		    )
-	源码阅读
+源码阅读
 # keras层的源码实现(部分):
 	# core.py
 		from keras.engine.topology import Layer
@@ -612,4 +798,4 @@ Keras tutorial
 		# 有了这三层之后,对keras如何实现层的抽象结构有了大致的了解
 
 	#
-	 
+致谢
