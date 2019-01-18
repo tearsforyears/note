@@ -1,0 +1,50 @@
+tuple
+iterable
+拆包 name,*others = (name,height,weight)
+比list好的地方
+	immutable # 不可变
+	在编译时会确定部分常量值,加速
+	线程安全
+	hashable # 可作为dict的key
+	拆包
+namedtuple
+	可命名的tuple
+	可生成一个类
+	from collections import namedtuple
+	User = nametuple("User",["name","age","height"])
+	user = User("jeremy",21,172)
+	# user.age user.name
+	初始化方法很多
+	user = User(**dict)
+	user = User(*tuple)
+	._make() # 通过make生成
+	.asdict() # 返回orderlist 
+defaultdict
+	底层用c实现,高效
+	dict原生方法
+	dict.setdefault([],0) # 设置默认值,不存在才设置
+	from collections import defaultdict
+	dict=defaultdict(list) # 注明类型,因为是c实现的
+	如果callable对象不满足需求可以通过函数实现
+	defaultdict(lambda:{"name":"","nums":0})
+deque
+	GIL线程安全,list线程不安全
+	用c去实现的
+	from collecions import deque
+	# python的queue模块是用deque完成的
+Counter
+	纯粹是为了统计,统计结果用dict去呈现,当dict用就行
+	from collecions import Counter
+	Counter("asdjios sidakam").update("dsadsasda") # 传更多对象
+	Counter实现topn的问题 .most_comment(n)
+OrderDict
+	from collections import OrderDict
+	# python2默认dict无序 python3默认有序
+	OrderDict是dict的子类除了具有dict的功能之外,还具有一定的list的功能
+	move_to_end()
+ChainMap
+	from collections import ChainMap
+	# chainmap的主要功能是把dict连接起来
+# 工业数据结构的实现和使用
+	实现 map(dict) hashable的快速index
+	实现 堆和优先队列

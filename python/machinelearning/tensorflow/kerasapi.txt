@@ -249,6 +249,10 @@ https://keras.io/zh/
 			# 对于这层Dense来讲 input_shape = (10,32)
 			# 10看做samples 投入Dense 进行训练 这是完整版本的 rnn
 			# LSTM GRU 等也是同理的 
+	Masking层:
+		# 用于忽略mask_value 在自然语言处理时遇到没有数据的时间步,在RNN的入口前加入这层
+		# 也就是说masking层只是对变长序列进行处理
+		keras.layers.core.Masking(mask_value=0.0) #
 	Embedding层:
 		Embedding在计算机视觉又称作Encoding
 		Embedding在NLP叫词嵌入层,为了表示出向量
