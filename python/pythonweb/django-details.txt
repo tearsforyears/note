@@ -1,0 +1,142 @@
+# django
+# 开发流程
+	models开发:确定表的结构字段,进行迁移
+	views开发:控制器的逻辑编写,返回template或者html文本(cgi),配置url
+	template:类python语法的html开发,配置template (加载和渲染)
+	CMS后台使用:创建超级管理员登陆就可以对数据进行操作
+# 特性
+	默认的关系型数据库使用sqlite3 相对简单
+	如果选择其他数据库则需要在settings.py中添加其他一些设置
+	USER PASSWORD HOST等
+	数据库迁移三个命令
+	makemigrations app # 检测数据迁移
+	migrate app # 数据迁移
+	sqlmigrate app migration # 生成sql语句
+# template/views语法
+	# url() 和 path_re()可以匹配正则相关路由 path只匹配字符串路由
+	# 基础语法
+		{%for i in range(3)%} # 原生类python代码
+		{% endfor %}
+		{% if %}
+		{% else %}
+		{% endif %}
+		{% url 'detail'%} # 在python里面给url命名name='detail'
+		{{object}} # 获取值首先对其进行字典查找,失败了进行列表查找 .get() .index()
+	# error_message 全局变量保存错误信息
+	# forloop.counter for计数器
+	# 命名空间和占位符
+		app_name = 'polls'
+		urlpatterns = [
+		    path('<int:question_id>/', views.detail, name='detail'),
+		] # <int:question_id> 这种占位符可以在定义path路由的时候进行定义
+		{% url 'polls:detail' question.id %} # 引用命名空间对值进行调用
+	# 获取表单数据
+		request.POST['field_name']
+	# 增删改都需要与服务器进行通信才能完成
+		所以使用的是表单的技术进行http通信
+		POST含义是具有修改数据所以可以不要用GET方法
+
+	# 通用views
+		# 官方文档例子
+		urls.py
+		app_name = 'polls'
+		urlpatterns = [
+		    path('', views.IndexView.as_view(), name='index'),
+		    path('<int:pk>/', views.DetailView.as_view(), name='detail'),
+		    path('<int:pk>/results/', views.ResultsView.as_view(), name='results'),
+		    path('<int:question_id>/vote/', views.vote, name='vote'),
+		]
+		views.py
+		from django.views import generic
+		class IndexView(generic.ListView): # 通用列表视图
+		    template_name = 'polls/index.html'
+		    context_object_name = 'latest_question_list'
+		    def get_queryset(self):# 实现get_queryset方法
+		        return Question.objects.order_by('-pub_date')[:5] 
+		
+		class DetailView(generic.DetailView): # 通用细节视图
+		    model = Question
+		    template_name = 'polls/detail.html'
+		# 通用视图和.as_view()方法
+			前端请求->url()定位到view类或方法上->参数处理,dispatch()->自己处理方法
+			class ClassName(View):
+			    # 继承View自动判断请求方法
+			    def post(self,request): # 用作登陆请求的时候这种复用很吃香
+			        return render(request, 'login.html', {})
+			    def get(self,request):
+			        return render(request, 'login.html', {})
+			    def other(self,request):
+			        pass
+			#调用方法
+			url(url, ClassName.as_view(), name)
+			# as_view()方法则是把一个普通的类变成可处理的响应动作
+			# 通用视图则是实现了一部分的方法get等 只要指定部分参数就可以使用的模版
+			模版在django.views.generic中
+# 自动化测试
+	python manage.py test app_name
+	test.py
+	from django.test import TestCase
+	class QuestionModelTests(TestCase): # 继承TestCase
+	    def test_was_published_recently_with_future_question(self):
+	        time = timezone.now() + datetime.timedelta(days=30)
+	        future_question = Question(pub_date=time)
+	        self.assertIs(future_question.was_published_recently(), False) # 断言
+	# 测试过程
+		python manage.py test polls 将会寻找 polls 应用里的测试代码
+		它找到了 django.test.TestCase 的一个子类
+		它创建一个特殊的数据库供测试使用
+		它在类中寻找测试方法——以 test 开头的方法。		
+# ORM相关语法
+	# 操作数据
+		from .models import tablename
+		tablename.objects.all() # 查询所有对象 返回对象列表
+		tablename.filter(id=1)
+		tablename.get(id=1)
+		tablename.field_set.all() # 查询field字段的所有值 _set是默认参数
+		tablename.field_set.create() # 往set中添加值
+		tablename.objects.order_by()
+# 加载静态资源
+	新建一个static目录(类似于templates)
+	template:
+		{% load static %}
+	    <link rel="stylesheet" type="text/css" href="{% static 'test_app/1.css' %}" />	
+    settings.py:
+	    STATIC_URL = '/static/'
+		STATICFILES_DIRS = (
+		    os.path.join(BASE_DIR, 'static'),
+		)
+# 后台开发
+	# 简单使用
+		python manage.py createsuperuser
+		http://127.0.0.1:8080/admin/ 可以进入管理页面
+		在admin.py里面注册
+		from django.contrib import admin
+		from models import *
+		admin.site.register()
+	1.管理字段
+		from django.contrib import admin
+		from .models import Question
+		class QuestionAdmin(admin.ModelAdmin):
+		    fields = ['pub_date', 'question_text'] # 要修改的字段
+		    list_display = ['pk','...'] # 这里可以写字段也可以写方法 显示字段 
+		admin.site.register(Question, QuestionAdmin)
+		# 更加细节的管理 
+			from django.contrib import admin
+			from .models import Question
+			class QuestionAdmin(admin.ModelAdmin):
+			    fieldsets = [
+			    	(None,               {'fields': ['question_text']}),
+	        		('Date information', {'fields': ['pub_date']}),
+			    ] # 标题和字段内容
+			admin.site.register(Question, QuestionAdmin)
+	2.关联对象
+		class ChoiceInline(admin.StackedInline):
+		    model = Choice
+		    extra = 3
+		class QuestionAdmin(admin.ModelAdmin):
+		    fieldsets = [
+		        (None,               {'fields': ['question_text']}),
+		        ('Date information', {'fields': ['pub_date'], 'classes': ['collapse']}),
+		    ]
+		    inlines = [ChoiceInline] # 限制关联对象名字的类
+		admin.site.register(Question, QuestionAdmin)

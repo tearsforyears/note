@@ -1,0 +1,380 @@
+﻿Scrapy库
+https://scrapy-chs.readthedocs.io 中文官方文档
+#架构
+	Scrapy Engine
+	引擎负责控制数据流在系统中所有组件中流动，并在相应动作发生时触发事件。 详细内容查看下面的数据流(Data Flow)部分。
+
+	调度器(Scheduler)
+	调度器从引擎接受request并将他们入队，以便之后引擎请求他们时提供给引擎。
+
+	下载器(Downloader)
+	下载器负责获取页面数据并提供给引擎，而后提供给spider。
+
+	Spiders
+	Spider是Scrapy用户编写用于分析response并提取item(即获取到的item)或额外跟进的URL的类。 每个spider负责处理一个特定(或一些)网站。 更多内容请看 Spiders 。
+
+	Item Pipeline
+	Item Pipeline负责处理被spider提取出来的item。典型的处理有清理、 验证及持久化(例如存取到数据库中)。 更多内容查看 Item Pipeline 。
+
+	下载器中间件(Downloader middlewares)
+	下载器中间件是在引擎及下载器之间的特定钩子(specific hook)，处理Downloader传递给引擎的response。 其提供了一个简便的机制，通过插入自定义代码来扩展Scrapy功能。更多内容请看 下载器中间件(Downloader Middleware) 。
+
+	Spider中间件(Spider middlewares)
+	Spider中间件是在引擎及Spider之间的特定钩子(specific hook)，处理spider的输入(response)和输出(items及requests)。 其提供了一个简便的机制，通过插入自定义代码来扩展Scrapy功能。更多内容请看 Spider中间件(Middleware) 。
+#cmd
+	scrapy startproject projectname
+	会创建一个cmdpath/projectname的文件夹以及其目录下projectname.cfg
+	scrapy genspider projectname orgin_url#创建爬虫文件 注意切换到spider文件夹底下
+	#scrapy startproject projectname和scrapy genspider spidername start_url都是创建py项目或者py爬虫的指令
+	#手动创建也行,不过就是麻烦
+	目录结构
+	./projectname/spidername,scrapy.cfg
+	./projectname/spidername/spiders，__pycache,init.py,items.py,middlewares.py,pipelines.py,settings.py
+	./projectname/spidername/spiders/spidername.py#这个文件是核心
+	items保存数据结构，middlewares处理request等pipelines项目管道
+	在./projectname/spidername/spiders/下,各个文件的内容和路径会在下面放出
+
+	#命令行执行爬取
+	scrapy crawl spidersname
+	#run.py文件执行爬取
+	run.py文件内容
+	    import os
+	    os.system("scrapy crawl spidersname")
+	#或者用scrapy的api
+	    from scrapy import cmdline
+	    cmdline.execute(['scrapy','crawl','train'])
+#编程逻辑
+	scrapy project(scrapy start project projectname scrapy genspider spidername)
+	scrapy engine(scrapy crawl spider)->
+	Middleware(about requests)
+	spider(start_url->start_requests())->
+	Middleware(about spiders)
+	Items(return from spider)->
+	Pipeline(To mongodb to parse time)->
+	result(to the cmd or mongodb)
+
+基本项目文件框架
+./spider/spidername.py
+	# -*- coding: utf-8 -*-
+	import scrapy
+	class TrainSpider(scrapy.Spider):
+	    name = 'train'
+	    allowed_domains = ['www.12306.cn']#允许该域名
+	    start_urls = ['http://www.12306.cn/']#开始时候的url
+	    def parse(self, response):
+	        pass
+./items.py#用来存放数据的
+	# -*- coding: utf-8 -*-
+	# Define here the models for your scraped items
+	#
+	# See documentation in:
+	# https://doc.scrapy.org/en/latest/topics/items.html
+	import scrapy
+	class TrainItem(scrapy.Item):
+	    # define the fields for your item here like:
+	    # name = scrapy.Field()
+	    pass
+./middlewares.py#中间件,request请求,代理等
+	#当然也可以通过全局配置去实现一些简单的操作
+	#因为中间件比较多文件具体内容就不写了下面详细讲
+./pipelines.py#管道,爬后数据处理
+	# -*- coding: utf-8 -*-
+	# Define your item pipelines here
+	# Don't forget to add your pipeline to the ITEM_PIPELINES setting
+	# See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
+	class TrainPipeline(object):
+	    def process_item(self, item, spider):
+	        return item
+./settings.py#存储设置,全局变量和配置等
+#命令爬取保存
+scrapy crawl -o name.json#name.jl name.csv name.xml .marshal .pickle
+###简单示例
+	2018年9月1日 00:44:28 做的一个爬笔趣阁的一个小爬虫
+	# -*- coding: utf-8 -*-
+	from scrapy import Spider,Request
+	from biquge.items import rankItem
+
+	class BqgspiderSpider(Spider):
+	    name = 'bqgspider'
+	    allowed_domains = ['xxbiquge.com']
+	    start_urls = [] #['https://www.xxbiquge.com/xbqgph.html']
+	    base_url='https://www.xxbiquge.com{url}'
+	    items = rankItem()
+	    def start_requests(self):
+	        yield Request('https://www.xxbiquge.com/xbqgph.html',callback=self.parse_book_url)
+	    def parse_book_url(self, response):
+	        book_urls=response.css("span.s2 a::attr(href)").extract()
+	        # last_page = response.css("span.s3::text").extract() #这方法返回的是一个unicode字符串列表
+	        # autor = response.css("span.s4::text").extract()
+	        # last_time = response.css("span.s5::text").extract()
+	        # statu = response.css("span.s6::text").extract()
+	        for url in book_urls: #解析一本书的url
+	            yield Request(url=self.base_url.format(url=url),callback=self.parse_index_url)
+	    def parse_index_url(self,response):#爬取小说主页的url
+	        book_name=response.css("div#info h1::text").extract_first()
+	        autor=response.css("div#info p::text").extract_first()
+	        #page_names=response.css("dl dd a::text").extract()#小说的章节名字下面有爬取重复
+	        page_urls = response.css("dl dd a::attr(href)").extract()
+	        self.items['book_name']=book_name
+	        self.items['autor']=autor
+	        for url in page_urls:
+	            yield Request(url=self.base_url.format(url=url),callback=self.parse_page_url)#这里需要高并发
+	    def parse_page_url(self,response):
+	        book_urls = response.css("div.lm a::attr(href)").extract()#推荐链接用于爬取整站
+	        chapter_name = response.css("div.bookname h1::text").extract_first()
+	        content = response.css("div#content").extract_first()
+	        self.items['chapter_name'] = chapter_name
+	        self.items['content'] = content
+	        yield self.items
+	        for url in book_urls:
+	            yield Request(url=self.base_url.format(url=url),callback=self.parse_index_url)
+	./items.py
+	import scrapy
+		class TrainItem(scrapy.Item):
+		    # define the fields for your item here like:
+		    # name = scrapy.Field()
+		    item1 = scrapy.Field()
+		    ....
+	./pipelines.py#保存到数据库等后续数据处理
+		# -*- coding: utf-8 -*-
+		# Define your item pipelines here
+		# Don't forget to add your pipeline to the ITEM_PIPELINES setting
+		# See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
+		class TextPipeline(object):#text的管道
+			def __init__(self):
+				self.limit = 50
+		    def process_item(self, item, spider):#标准函数名字
+		        if item['text']:
+		        	if len(iem['text'])>self.limit:
+		        		item['text']=item['text'][0:self.limit]+'...'#截断
+		        else:return DropItem('Missing Text')
+		       	#process_item只允许返回DropItem或者item
+	#需要在settings指定pipeline,多个pipeline按照先调用小的在调用大的依次给各个pipeline处理
+Scrapy Shell
+	Global commands:
+	startproject
+	genspider
+	settings#
+	runspider
+	shell#scrapy交互
+	fetch#返回源代码 --headers --nocofig #可加命令行参数
+	view#获取预览
+	version
+	Project_only commands:
+	crawl
+	check#检查代码错误
+	list#所有项目
+	edit#默认vim,基本不用
+	parse #调用parse -c
+	bench #测试性能
+#备注
+	SPIDER_MODULES = ['demo1.spiders']  
+	#Scrapy搜索spider的模块列表 默认: [xxx.spiders]  
+	NEWSPIDER_MODULE = 'demo1.spiders'  
+	#使用 genspider 命令创建新spider的模块。默认: 'xxx.spiders'  
+	#这两个好像没啥用目测,老子吃了屎用命令行去调你
+#api
+爬取流程
+	1.spiders启动#scrapy crawl spidername
+	2.spiders根据start_url封装start_requests
+	3.运行start_requests生成Request(),并且回调parse
+	#Request对象交给Scheduler处理(中间经过Middlewares)
+	4.parse函数生成items或者Request()
+	5.1.item对象交给ItemPipeline处理,#后续数据的保存等
+	5.2.Request对象交给Scheduler处理(中间经过Middlewares)#重新生成响应
+	6.(5.1.)执行后数据就持久化等了,(5.2.)相当于返回了4,直到Request.url=None
+	7.等待队列的url为空之后引擎关闭
+	备注:(5.)的操作要在parse用yield完成#yield Request(...)或yield dict
+Spiders
+	./spider/spidername.py
+	备注:
+		1.parse方法必须返回item或者Request()
+	1.元素选择器 parse
+	response.css()#response.selector.css()#直接抓取
+	.xpath()#不会用
+	.css()#这个获取值加了个封装::text ::attr(href)
+	.re()#正则匹配稍微牺牲性能
+
+	2.
+	./spider/TrainSpider.py
+	def start_requests(self):#返回值一定是个生成器
+	def make_requests_from_url(self, url):#封装url对象成Request对象
+
+	spider工作原理:(关于Spider类源码)
+	1.从TrainSpider的start_url中写入urls
+	2.start_request遍历start_url把url当成参数传给make_requests_from_url
+	3.make_requests_from_url把url封装成requests
+	自己改写的时候注意start_requests要写回调函数parse等,不改的话默认调用self.parse
+	##并且start_requests必须返回一个迭代器
+	如果改写了make_requests_from_url,可能会出现调用出错,而且该方法不建议被使用
+	class TrainSpider(scrapy.Spider):#继承语法
+	    name = 'train'#唯一标识爬虫
+	    allowed_domains = ['www.12306.cn']
+	    start_urls = ['http://www.12306.cn/']
+	    def start_requests(self):
+	    	yield scrapy.Request(url='https://www.baidu.com')
+	    	yield scrapy.Request(url='https://www.google.com')
+	    	yield list#或者用这种形式
+	    def parse(self, response):
+	        pass
+	parse必须返回一个item类封装的类字典数据结构的生成器,或者Request对象,交给管道处理
+	*Spider参数
+		在运行 crawl 时添加 -a 可以传递Spider参数:
+		scrapy crawl myspider -a category=electronics
+		#获取传入参数的方法
+			import scrapy
+				class MySpider(Spider):
+				name = 'myspider'
+				def __init__(self, category=None, *args, **kwargs):
+				    super(MySpider, self).__init__(*args, **kwargs)
+				    self.start_urls = ['http://www.example.com/categories/%s' % category]
+				    # ...
+	*记录日志
+		self,logger,info()
+Item_Pipeline
+	#数据后续处理
+	./pipelines.py
+	#实现下面方法可以对数据进行后续处理,通过配置实现先后优先级
+	def process_item(self,item,spider):#返回item或者DropItem()
+	#以下可以不实现
+	def open_spider(self,spider):
+	def close_spider(self,spider):
+	@classmethod
+	def from_crawler(cls,crawler):#cls指的是本类,from_crawler获取项目参数
+		return cls(
+			mongo_uri=crawler.settings.get("MONGO_URI")
+			mongo_db=crawler.settings.get("MONGO_DB")
+		)
+	./items.py#就是定义数据结构而已
+		class TrainItem(scrapy.Item):
+		    # define the fields for your item here like:
+		    name = scrapy.Field()
+		    text = scrapy.Field()
+		    .....
+	./pipelines.py
+		import pymongo as pm
+		from scrapy.exceptions import DropItem
+		#实现存到数据库
+		class MongoPipeline(object):
+		    def __init__(self):
+		        self.cli=None
+		        self.db=None
+		    def open_spider(self,spider):
+		        self.cli = pm.MongoClient('localhost')
+		        self.db = self.cli['train']#这个名字可以通过from_crawler注入
+		    def process_item(self, item, spider):
+		        name=item.__class__.__name__
+		        self.db[name].insert(dict(item))
+		        return item
+		    def close_spider(self, spider):
+		        self.cli.close()
+		#实现截断操作
+		class TrainPipeline(object):
+		    def process_item(self, item, spider):
+		        if item['text']:
+		            if len(item['text'])>50:#长度大于50截断
+		                item['text']=item['text'][0:50]
+		        else:
+		            raise DropItem("missing text")
+		        return item#定义数据库操作数据后续清洗等
+	./settings.py
+		ITEM_PIPELINES = {
+		   'train.pipelines.TrainPipeline': 300,#这个数字可以0到1000
+		   'train.pipelines.MongoPipeline': 400,#先执行Train返回item在给Mongo执行
+		}#定义pipelines的处理优先级
+Downloader Middleware
+	def process_request(request,spider):#request调用时
+		process_request() 必须返回其中之一: 返回 None 、返回一个 Response 对象、返回一个
+		Request 对象或raise IgnoreRequest
+		None:不处理
+		Response对象:直接返回这个Response对象
+		Request对象:重新调度该Request对象执行后再返回调用链
+	def process_response(request, response, spider):#reponse返回时
+		process_request() 必须返回以下之一: 返回一个 Response 对象、 返回一个 Request
+		对象或raise一个 IgnoreRequest 异常
+		Response:覆盖原来的Response给其他中间件调用
+		Request:调用Request然后继续调用链
+	def process_exception(request, exception, spider)：#出现异常时
+		process_exception() 应该返回以下之一: 返回 None 、 一个 Response 对象、或者一个 Request 对象。
+		None:什么都不做
+		Response对象:返回一个Response对象
+		Request对象:停下来调用Request和上面一样
+#调试信息
+	...
+	2018-08-19 23:26:36 [scrapy.middleware] INFO: Enabled extensions:
+	['scrapy.extensions.corestats.CoreStats',
+	 'scrapy.extensions.telnet.TelnetConsole',
+	 'scrapy.extensions.logstats.LogStats']
+	#下面这些是调用各种中间件的顺序关于大的中间件调用是downloader->spider->..
+	#一般的调用顺序是靠近引擎->靠近下载器
+	2018-08-19 23:26:36 [scrapy.middleware] INFO: Enabled downloader middlewares:
+	['scrapy.downloadermiddlewares.httpauth.HttpAuthMiddleware',
+	 'scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware',
+	 'scrapy.downloadermiddlewares.defaultheaders.DefaultHeadersMiddleware',
+	 'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware',
+	 'scrapy.downloadermiddlewares.retry.RetryMiddleware',
+	 'scrapy.downloadermiddlewares.redirect.MetaRefreshMiddleware',
+	 'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware',
+	 'scrapy.downloadermiddlewares.redirect.RedirectMiddleware',
+	 'scrapy.downloadermiddlewares.cookies.CookiesMiddleware',
+	 'scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware',
+	 'scrapy.downloadermiddlewares.stats.DownloaderStats']
+	2018-08-19 23:26:36 [scrapy.middleware] INFO: Enabled spider middlewares:
+	['scrapy.spidermiddlewares.httperror.HttpErrorMiddleware',
+	 'scrapy.spidermiddlewares.offsite.OffsiteMiddleware',
+	 'scrapy.spidermiddlewares.referer.RefererMiddleware',
+	 'scrapy.spidermiddlewares.urllength.UrlLengthMiddleware',
+	 'scrapy.spidermiddlewares.depth.DepthMiddleware']
+	 #上面是调用信息,下面是运行状况
+	2018-08-19 23:26:36 [scrapy.middleware] INFO: Enabled item pipelines:
+	['train.pipelines.TrainPipeline', 'train.pipelines.MongoPipeline']
+	2018-08-19 23:26:36 [scrapy.core.engine] INFO: Spider opened
+	2018-08-19 23:26:36 [scrapy.extensions.logstats] INFO: Crawled 0 pages (at 0 pages/min), scraped 0 items (at 0 items/min)
+	2018-08-19 23:26:36 [scrapy.extensions.telnet] DEBUG: Telnet console listening on 127.0.0.1:6023
+	2018-08-19 23:26:36 [scrapy.core.engine] DEBUG: Crawled (200) <GET https://www.baidu.com> (referer: None)
+	2018-08-19 23:26:36 [scrapy.core.engine] INFO: Closing spider (finished)
+	2018-08-19 23:26:36 [scrapy.statscollectors] INFO: Dumping Scrapy stats:
+	{'downloader/request_bytes': 198,
+	 'downloader/request_count': 1,
+	 'downloader/request_method_count/GET': 1,
+	 'downloader/response_bytes': 34093,
+	 'downloader/response_count': 1,
+	 'downloader/response_status_count/200': 1,
+	 'finish_reason': 'finished',
+	 'finish_time': datetime.datetime(2018, 8, 19, 15, 26, 36, 878981),
+	 'log_count/DEBUG': 2,
+	 'log_count/INFO': 7,
+	 'response_received_count': 1,
+	 'scheduler/dequeued': 1,
+	 'scheduler/dequeued/memory': 1,
+	 'scheduler/enqueued': 1,
+	 'scheduler/enqueued/memory': 1,
+	 'start_time': datetime.datetime(2018, 8, 19, 15, 26, 36, 644930)}
+	2018-08-19 23:26:36 [scrapy.core.engine] INFO: Spider closed (finished)
+Request类和Response类
+	Request类的属性源码
+    def __init__(self, url, callback=None, method='GET', headers=None, body=None,
+                 cookies=None, meta=None, encoding='utf-8', priority=0,
+                 dont_filter=False, errback=None, flags=None):
+	Request.meta的特殊关键字是一个{}
+	Request.meta可以包含任意的数据，但Scrapy和内置扩展提供了一些特殊的关键字
+	dont_redirect             
+	dont_retry
+	handle_httpstatus_list
+	handle_httpstatus_all
+	dont_merge_cookies (see cookies parameter of Request constructor)
+	cookiejar
+	dont_cache
+	redirect_urls
+	bindaddress
+	dont_obey_robotstxt
+	download_timeout(下载超时)
+	download_maxsize
+	download_latency(下载延时)
+	proxy#可以通过这个来实现代理访问
+	Response类源码没找到
+	Response(url,status=200,headers,body,flag)#在中间件可以处理body在给它构造回去
+	**FormRequest(url,[formdata])
+	**使用FormRequest.from_response()方法模拟用户登录.
+以上便是scrapy的基础用法,至于细节用法会补充
+
