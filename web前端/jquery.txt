@@ -1,141 +1,201 @@
-jQuery µÄ¹¦ÄÜ¸ÅÀ¨
-1¡¢html µÄÔªËØÑ¡È¡
-2¡¢htmlµÄÔªËØ²Ù×÷
-3¡¢html dom±éÀúºÍĞŞ¸Ä
-4¡¢jsÌØĞ§ºÍ¶¯»­Ğ§¹û
-5¡¢css²Ù×÷
-6¡¢htmlÊÂ¼ş²Ù×÷
-7¡¢ajaxÒì²½ÇëÇó·½Ê½
-jQuery±à³Ì¿ò¼Ü
-$(document).ready(function(){#document¶ÔÏó·â×°Îªjquery¶ÔÏóµ÷ÓÃready·½·¨´«Èëfunction
-});
-js¿ò¼Ü¶Ô±È
-window.onload=function(){
-}
-jquery¶ÔÏó¶ÔcssÑ¡ÔñÆ÷·â×°¼ò»¯ÁËfor¼Ó¿ìÁË²éÕÒ
-ÆÕÍ¨¶ÔÏó·â×°³Éjquery¶ÔÏó°üÀ¨documentºÍfunctionµÈ
-$();
-0.³£ÓÃ·½·¨ºÏ¼¯
-.ready(function(){})
-text()
-html()
-var()
-.attr()
-.css()
-1.Ñ¡ÔñÆ÷
-$()#cssÑ¡ÔñÆ÷ .class #id tag
-2.·½·¨·â×°
+ï»¿jQuery çš„åŠŸèƒ½æ¦‚æ‹¬
+	0ã€å¸¸ç”¨æ–¹æ³•ç®€ä»‹
+	1ã€html çš„å…ƒç´ é€‰å–
+	2ã€htmlçš„å…ƒç´ æ“ä½œ
+	3ã€html doméå†å’Œä¿®æ”¹
+	4ã€jsç‰¹æ•ˆå’ŒåŠ¨ç”»æ•ˆæœ
+	5ã€cssæ“ä½œ
+	6ã€htmläº‹ä»¶æ“ä½œ
+	7ã€ajaxå¼‚æ­¥è¯·æ±‚æ–¹å¼
 
-3.ÊÂ¼ş·â×°/¶ÔÏó·â×°
-·â×°Ô­ĞÍÊÇ$().event(callback)
-onload=function(){}.ready(function(){})
-function(){}#»Øµ÷º¯Êı×÷Îª²ÎÊı´«ÈëreadyÖĞ
-ËùÒÔÊÂ¼şÃû×÷Îªº¯Êı
-click
-dbclick
-mouseenter
-mouseleave
-mousedown
-mouseup
-hover(func1,func2)#Êó±êĞüÍ£
-focus
-blur
-change
-scroll
-submit
-4.jqueryÌØĞ§
-hide(speed,callback)
-show(speed,callback)
-toggle(speed,callback)#Á½Õß½áºÏ
-fadeIn(speed,callback)
-fadeOut(speed,callback)
-fadeToggle(speed,callback)
-fadeTo(speed,opacity,callback)#opacityÍ¸Ã÷¶È
-slideDown()
-slideUp()
-slideToggle()
-----------------------------
-5.jquery¼òµ¥¶¯»­
-Ä¬ÈÏÇé¿öÏÂ£¬ËùÓĞµÄ HTML ÔªËØÓĞÒ»¸ö¾²Ì¬µÄÎ»ÖÃ£¬ÇÒÊÇ²»¿ÉÒÆ¶¯µÄ¡£ 
-Èç¹ûĞèÒª¸Ä±äÎª£¬ÎÒÃÇĞèÒª½«ÔªËØµÄ position ÊôĞÔÉèÖÃÎª relative, fixed, »ò absolute!
-$("button").click(function(){
-  $("div").animate({#jquery¶ÔÏóµÄanimate·½·¨´«Èë¸Ä±äºóÊôĞÔµÄÖµÃ»Ìáµ½µÄÊôĞÔ±£Áô
-    left:'250px',
-    opacity:'0.5',
-    height:'150px',
-    width:'150px'
-  });
-});
-¶¯»­¶ÓÁĞ
-$("button").click(function(){
-  var div=$("div");
-  div.animate({height:'300px',opacity:'0.4'},"slow");
-  div.animate({width:'300px',opacity:'0.8'},"slow");
-  div.animate({height:'100px',opacity:'0.4'},"slow");
-  div.animate({width:'100px',opacity:'0.8'},"slow");
-});
-stop()Í£Ö¹
-6.*****************DOM²Ù×÷************************
-.attr("href")#´øÊôĞÔÃû×Ö²ÎÊı propÒ²¿ÉÒÔ»ñÈ¡
-.attr("href","newurl")#¸Ä±äÊôĞÔÖµ
-.attr({"href":"null","title":"None"})
-$("#runoob").attr("href", function(i,origValue){
-    return origValue + "/jquery"; 
-  });
-.text() - ÉèÖÃ»ò·µ»ØËùÑ¡ÔªËØµÄÎÄ±¾ÄÚÈİ
-.html() - ÉèÖÃ»ò·µ»ØËùÑ¡ÔªËØµÄÄÚÈİ£¨°üÀ¨ HTML ±ê¼Ç£©
-.val() - ÉèÖÃ»ò·µ»Ø±íµ¥×Ö¶ÎµÄÖµ
-.text("hello")#innerHTML ²»¹ıÖ»¸ÄÎÄ±¾ĞÎÊ½
-.html("<a>hhh</a>")#innerHTML
-.val("ads")#¸ÄvalueÊôĞÔ
-Ò²¿ÉÒÔÓÃ»Øµ÷º¯ÊıµÄĞÎÊ½ origText±íÊ¾¾ÉÎÄ±¾ 
-$("#test1").text(function(i,origText){
-    return "¾ÉÎÄ±¾: " + origText + " ĞÂÎÄ±¾: Hello world! (index: " + i + ")"; 
-});
-*******************DOM²Ù×÷************************
-7.Ìí¼ÓÔªËØ
-.append()
-.prepend()
-.after()
-.before()
-before<p>prepend**append</p>after
-8.É¾³ıÔªËØ
-.remove()#É¾³ı±¾Éí²¢É¾³ı×ÓÔªËØ
-.empty()#²»É¾³ı±¾Éí£¬É¾³ı×ÓÔªËØ
-¿ÉÒÔ½øĞĞ¹ıÂË
-$("p").empty("#id")#É¾³ıp±êÇ©ÖĞid="id"µÄÔªËØ
-9.ĞŞ¸Äcss
-addClass()
-removeClass()
-toggleClass()
-.css()#cssµÄ´«²ÎºÍattr()µÄ·½·¨ÀàËÆ
-$("p").css({"background-color":"yellow","font-size":"200%"});
-10.±éÀúdomÊ÷
-#¿ÉÒÔ´«ÈëcssÑ¡ÔñÆ÷²ÎÊı¹ıÂË
-parent()
-parents()
-children()
-siblings()
+jqueryå’Œjavascript
+	jQueryç¼–ç¨‹æ¡†æ¶
+	$(document).ready(function(){
+		//documentå¯¹è±¡å°è£…ä¸ºjqueryå¯¹è±¡è°ƒç”¨readyæ–¹æ³•ä¼ å…¥function
+	});
+	jsæ¡†æ¶å¯¹æ¯”
+	window.onload=function(){
+	}
+	jqueryå¯¹è±¡å¯¹cssé€‰æ‹©å™¨å°è£…ç®€åŒ–äº†foråŠ å¿«äº†æŸ¥æ‰¾
+	jqueryæ›´é€šç”¨çš„å†™æ³•
+	$(function(){
+		//to-do 
+	})
+	æ™®é€šå¯¹è±¡å°è£…æˆjqueryå¯¹è±¡åŒ…æ‹¬documentå’Œfunctionç­‰
+	jqueryå¼•ç”¨
+	$();
+ES6ç›¸å…³æ–°è¯­æ³• ç®­å¤´å‡½æ•°è¯­æ³•,let
+
+	let å’Œ var çš„ä½œç”¨ 
+	varç›¸å½“äºglobal variable
+	letç›¸å½“äºå±€éƒ¨å˜é‡//å—çº§ä½œç”¨åŸŸ
+	ç”¨é€”:letç”¨äºforå¾ªç¯åšå®šæ—¶å™¨
+	
+	å‘½åç©ºé—´
+		// å”¯ä¸€çš„å…¨å±€å˜é‡MYAPP:
+		var MYAPP = {};
+		// å…¶ä»–å˜é‡:
+		MYAPP.name = 'myapp';
+		MYAPP.version = 1.0;
+		// å…¶ä»–å‡½æ•°:
+		MYAPP.foo = function () {
+			return 'foo';
+		};
+	
+	constå…³é”®å­—:ä¸èƒ½æ”¹å˜çš„å¸¸é‡
+	(parameters)=>{} //è¿”å›å¯¹è±¡æ˜¯ (parameters)=>({"json-key":"json-value"})
+	function(parameters){}
+	ä¸¤ç§å†™æ³•ä»…åœ¨thisæŒ‡é’ˆçš„å¼•ç”¨ä¸Šæœ‰æ‰€åŒºåˆ«
+	ç®­å¤´å‡½æ•°thisæŒ‡å®šçš„æ˜¯å…¶å¤–å±‚çš„å¯¹è±¡ //ç§°ä¸ºè¯æ³•ä½œç”¨åŸŸ
+	
+	...rest:å¯å˜é•¿åº¦å‚æ•°,å°è£…æˆä¸€ä¸ªArrayå»ä¼ é€’å‚æ•°
+	é—­åŒ…è¯¦è§£:
+	https://www.liaoxuefeng.com/wiki/001434446689867b27157e896e74d51a89c25cc8b43bdb3000/00143449934543461c9d5dfeeb848f5b72bd012e1113d15000
+0.å¸¸ç”¨æ–¹æ³•åˆé›†
+	.ready(function(){})
+	text()
+	html()
+	var()
+	.attr()
+	.css()
+	.on() //ç»‘å®šäº‹ä»¶
+	.attr()
+	example:
+		å¯ä»¥ä¼ å…¥jsonå¯¹è±¡ä¹Ÿå¯ä»¥ç”¨åŒå‚æ•°çš„æ–¹å¼å»è®¾ç½®å€¼
+		1.$("css_selector").css({"":"","":"",});
+		2.$("css_selector").css("key","value");
+		3.$("css_selector").css("key"); //è·å–å€¼
+1.é€‰æ‹©å™¨
+	cssé€‰æ‹©å™¨
+	$()//cssé€‰æ‹©å™¨ .class #id tag
+	
+	å¤šçº§é€‰æ‹©
+	, //
+	> //ç›´æ¥å­ç±»,ä¸‹ä¸€çº§
+	  //é€’å½’å­ç±»,é€’å½’éå†
+	+ //ç›¸å½“äºnext()æ–¹æ³•
+	~ //ç›¸å½“äºåé¢æ‰€æœ‰å…„å¼ŸèŠ‚ç‚¹ nextAll()
+	ä¼ªç±»é€‰æ‹©å™¨
+	:nth-child(an+b);//å¤šçº§åŒ¹é…å€æ•°
+	:nth-child(odd),:nth-child(even)
+	:eq()//æŒ‰ç…§æœ‰åºè¡¨çš„æ–¹å¼è¿›è¡Œéå†
+	:first 
+	:last
+	input[type=text] //å±æ€§é€‰æ‹©å™¨
+	:visible
+	ï¼šhidden
+2.æ–¹æ³•å°è£…
+	jqueryå®ç°åŸç†:
+	
+3.äº‹ä»¶å°è£…/å¯¹è±¡å°è£…
+	å°è£…åŸå‹æ˜¯$().event(callback)
+	onload=function(){}.ready(function(){})
+	function(){}#å›è°ƒå‡½æ•°ä½œä¸ºå‚æ•°ä¼ å…¥readyä¸­
+	æ‰€ä»¥äº‹ä»¶åä½œä¸ºå‡½æ•°
+	click
+	dbclick
+	mouseenter
+	mouseleave
+	mousedown
+	mouseup
+	hover(func1,func2)#é¼ æ ‡æ‚¬åœ
+	focus
+	blur
+	change
+	scroll
+	submit
+	4.jqueryç‰¹æ•ˆ
+	hide(speed,callback)
+	show(speed,callback)
+	toggle(speed,callback)#ä¸¤è€…ç»“åˆ
+	fadeIn(speed,callback)
+	fadeOut(speed,callback)
+	fadeToggle(speed,callback)
+	fadeTo(speed,opacity,callback)#opacityé€æ˜åº¦
+	slideDown()
+	slideUp()
+	slideToggle()
+5.jqueryç®€å•åŠ¨ç”»
+	é»˜è®¤æƒ…å†µä¸‹ï¼Œæ‰€æœ‰çš„ HTML å…ƒç´ æœ‰ä¸€ä¸ªé™æ€çš„ä½ç½®ï¼Œä¸”æ˜¯ä¸å¯ç§»åŠ¨çš„ã€‚ 
+	å¦‚æœéœ€è¦æ”¹å˜ä¸ºï¼Œæˆ‘ä»¬éœ€è¦å°†å…ƒç´ çš„ position å±æ€§è®¾ç½®ä¸º relative, fixed, æˆ– absolute!
+	$("button").click(function(){
+	  $("div").animate({#jqueryå¯¹è±¡çš„animateæ–¹æ³•ä¼ å…¥æ”¹å˜åå±æ€§çš„å€¼æ²¡æåˆ°çš„å±æ€§ä¿ç•™
+		left:'250px',
+		opacity:'0.5',
+		height:'150px',
+		width:'150px'
+	  });
+	});
+	åŠ¨ç”»é˜Ÿåˆ—
+	$("button").click(function(){
+	  var div=$("div");
+	  div.animate({height:'300px',opacity:'0.4'},"slow");
+	  div.animate({width:'300px',opacity:'0.8'},"slow");
+	  div.animate({height:'100px',opacity:'0.4'},"slow");
+	  div.animate({width:'100px',opacity:'0.8'},"slow");
+	});
+	stop()åœæ­¢
+	.animate(function,speed,"move_state",callback);
+6.*****************property************************
+	.attr("href")#å¸¦å±æ€§åå­—å‚æ•° propä¹Ÿå¯ä»¥è·å–
+	.attr("href","newurl")#æ”¹å˜å±æ€§å€¼
+	.attr({"href":"null","title":"None"})
+	$("#runoob").attr("href", function(i,origValue){
+		return origValue + "/jquery"; 
+	  });
+	.text() - è®¾ç½®æˆ–è¿”å›æ‰€é€‰å…ƒç´ çš„æ–‡æœ¬å†…å®¹
+	.html() - è®¾ç½®æˆ–è¿”å›æ‰€é€‰å…ƒç´ çš„å†…å®¹ï¼ˆåŒ…æ‹¬ HTML æ ‡è®°ï¼‰
+	.val() - è®¾ç½®æˆ–è¿”å›è¡¨å•å­—æ®µçš„å€¼
+	.text("hello")#innerHTML ä¸è¿‡åªæ”¹æ–‡æœ¬å½¢å¼
+	.html("<a>hhh</a>")#innerHTML
+	.val("ads")#æ”¹valueå±æ€§
+	ä¹Ÿå¯ä»¥ç”¨å›è°ƒå‡½æ•°çš„å½¢å¼ origTextè¡¨ç¤ºæ—§æ–‡æœ¬ 
+	$("#test1").text(function(i,origText){
+		return "æ—§æ–‡æœ¬: " + origText + " æ–°æ–‡æœ¬: Hello world! (index: " + i + ")"; 
+	});
+7.æ·»åŠ å…ƒç´ 
+	.append()
+	.prepend()
+	.after()
+	.before()
+	before<p>prepend**append</p>after
+8.åˆ é™¤å…ƒç´ 
+	.remove()#åˆ é™¤æœ¬èº«å¹¶åˆ é™¤å­å…ƒç´ 
+	.empty()#ä¸åˆ é™¤æœ¬èº«ï¼Œåˆ é™¤å­å…ƒç´ 
+	å¯ä»¥è¿›è¡Œè¿‡æ»¤
+	$("p").empty("#id")#åˆ é™¤pæ ‡ç­¾ä¸­id="id"çš„å…ƒç´ 
+9.ä¿®æ”¹css
+	addClass()
+	removeClass()
+	toggleClass()
+	.css()#cssçš„ä¼ å‚å’Œattr()çš„æ–¹æ³•ç±»ä¼¼
+	$("p").css({"background-color":"yellow","font-size":"200%"});
+	10.éå†domæ ‘
+	#å¯ä»¥ä¼ å…¥cssé€‰æ‹©å™¨å‚æ•°è¿‡æ»¤
+	parent()
+	parents()
+	children()
+	siblings()
 11.Ajax
-load·½·¨
-.load(URL,data,callback);#data±íÊ¾ÇëÇó×Ö·û´®µÄ²ÎÊı?i=5&j=3ÕâÖÖµÄ¼üÖµ¶ÔÊı¾İ
-$("#div1").load("demo_test.txt",function(responseTxt,statusTxt,xhr){});
-responseTxtÏìÓ¦ÎÄ±¾ statusTxt×´Ì¬ XMLHttpRequest¶ÔÏó
-xhr.status xhr.statusText ÏìÓ¦×´Ì¬ºÍÏìÓ¦×´Ì¬ÎÄ±¾
-GETºÍPOST·½·¨
-$.get() $.post()
-$.get(URL,callback);
-$.post(URL,data,callback);
-$.get("demo_test.php",function(data,status){});
-Ajax
-$.ajax({
-	type:"post",
-	url:"...",
-	data:{}//·¢ËÍµ½·şÎñÆ÷µÄÊı¾İ£¬¾ÍÊÇÆ´½Óµ½urlÉÏ
-	success:function(data,txtStatus){alert(data);},
-	error:function(){aletr("´íÎó");}
-	async:false //Í¬²½ÇëÇó
-	cache:false //²»»º´æ
-	¡£¡£¡£¡£//¾ßÌåÓÃµÄÊ±ºòÔÚ²éÑ¯¾ßÌåµÄ·½·¨
-});
-#Õâ¸öºÍÅÀ³æurllib requests¿âµÄ·¢ËÍÇëÇóºÜÏñ
+	loadæ–¹æ³•
+	.load(URL,data,callback);#dataè¡¨ç¤ºè¯·æ±‚å­—ç¬¦ä¸²çš„å‚æ•°?i=5&j=3è¿™ç§çš„é”®å€¼å¯¹æ•°æ®
+	$("#div1").load("demo_test.txt",function(responseTxt,statusTxt,xhr){});
+	responseTxtå“åº”æ–‡æœ¬ statusTxtçŠ¶æ€ XMLHttpRequestå¯¹è±¡
+	xhr.status xhr.statusText å“åº”çŠ¶æ€å’Œå“åº”çŠ¶æ€æ–‡æœ¬
+	GETå’ŒPOSTæ–¹æ³•
+	$.get() $.post()
+	$.get(URL,callback);
+	$.post(URL,data,callback);
+	$.get("demo_test.php",function(data,status){});
+	Ajax
+	$.ajax({
+		type:"post",
+		url:"...",
+		data:{}//å‘é€åˆ°æœåŠ¡å™¨çš„æ•°æ®ï¼Œå°±æ˜¯æ‹¼æ¥åˆ°urlä¸Š
+		success:function(data,txtStatus){alert(data);},
+		error:function(){aletr("é”™è¯¯");}
+		async:false //åŒæ­¥è¯·æ±‚
+		cache:false //ä¸ç¼“å­˜
+		ã€‚ã€‚ã€‚ã€‚//å…·ä½“ç”¨çš„æ—¶å€™åœ¨æŸ¥è¯¢å…·ä½“çš„æ–¹æ³•
+	});
+	# è¿™ä¸ªå’Œçˆ¬è™«urllib requestsåº“çš„å‘é€è¯·æ±‚å¾ˆåƒ
