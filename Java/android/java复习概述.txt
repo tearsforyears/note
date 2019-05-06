@@ -783,7 +783,7 @@
 
 	    public static void send_msg() {
 	        try {
-	            String req_url = getRequestUrl("13302088103", genRandomString());
+	            String req_url = getRequestUrl("...", genRandomString());
 	            System.out.println(req_url);
 	            URL url = new URL(req_url);
 	            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -805,8 +805,8 @@
 	    }
 
 	    public static String getRequestUrl(String phone, String code) throws Exception {
-	        String accessKeyId = "LTAIxVSZObRUtf3b";
-	        String accessSecret = "fk3ONTSLwZvcyo7WOxdt43cRlFoFCx";
+	        String accessKeyId = "...";
+	        String accessSecret = "...";
 	        String SignName = "Gauss";
 	        String templateParam = "{'code':'" + code + "'}"; //JSON格式字符串
 	        String templateCode = "SMS_164508451"; // template code
