@@ -201,3 +201,11 @@
 			[<class 'str'>, <class 'object'>]
 			通过mro，python巧妙地将多继承的图结构，转变为list的顺序结构。super在继承体系中向上的查找过程，变成了在mro中向右的线性查找过程，任何类都只会被处理一次。
 
+一段特殊的代码
+	import os, sys
+	print("回生")
+	os.execl(sys.executable, os.path.abspath(__file__), *sys.argv) 
+	等同于下面代码
+	import os
+	os.system("python "+os.path.abspath(__file__))
+	看着玩吧
