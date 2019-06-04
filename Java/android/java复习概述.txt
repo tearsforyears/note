@@ -879,7 +879,6 @@
 	3.有序性
 		代码按照顺序执行
 /**
-	andriod
 	jdbc-orm
 	ssm
 **/

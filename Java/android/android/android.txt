@@ -19,7 +19,7 @@ android和javaweb一样是极其具有商业价值的javaEE技术
 
 	Android.util.Log//用该类代替sysout
 		Log.d(class_name,msg) //debug
-		verbose debug importantppppp warning error
+		verbose debug importance warning error
 		//对应的首字符都可以用来打印
 1.android项目简介
 	//按照android项目的的虚拟路径来
@@ -1106,8 +1106,7 @@ android和javaweb一样是极其具有商业价值的javaEE技术
 			.resume()
 			.seekTo()
 			.isPlaying()
-			.getDuration()
-		
+			.getDuration()		
 9.Service
 	0.web初步
 		首先简述 WebView、WebViewClient、WebChromeClient 之间的区别:
@@ -1128,7 +1127,6 @@ android和javaweb一样是极其具有商业价值的javaEE技术
 			cm.removeAllCookie();
 			cm.getCookie(url);
 			cm.setCookie(url, cookie);
-
 	1.HttpURLConnection
 		// HttpClient 已经在6.0版本被移除
 		URL url = new URL("http://www.baidu.com");
@@ -1143,8 +1141,7 @@ android和javaweb一样是极其具有商业价值的javaEE技术
 		// 因为 android 不允许在线程中对UI进行操作 所以此方法可以代替在线程中开启的UI操作
 		runOnUiThread(()->{
 			//在这里进行UI操作
-		});
-		
+		});	
 	2.OKHttp
 		Square公司开发 轻量级网络库
 		优势
@@ -1162,9 +1159,101 @@ android和javaweb一样是极其具有商业价值的javaEE技术
 			支持session
 		使用方法
 			implementation("com.squareup.okhttp3:okhttp:3.14.1")
-    		testImplementation("com.squareup.okhttp3:mockwebserver:3.14.1")
-    		
-10.Utils
+    		testImplementation("com.squareup.okhttp3:mockwebserver:3.14.1")		
+    3.Service
+    	和web一样Service是在后台长期执行的任务,可以通过一些方式去创建
+    	在此忽略
+    	pass
+10.异步处理与多线程
+	0.基础
+		android不允许在线程中更新请求
+		android不允许在进程中发起网络请求
+		(可以使用Callable强行获取结果(未试验))
+		android 提供了一套异步处理机制
+		
+		//demo
+			public static final int UPDATE_TEXT = 1;
+			private Handler handler = new Handler(){
+				//handler是在主进程中执行的
+				@Override
+				public void handleMessage(Message msg){
+					switch(msg.what){
+						case UPDATE_TEXT:
+							//进行UI操作
+							break;
+						default:
+							break;
+					}
+				}
+			};
+
+			@Override
+			public void onClick(View v){
+				new Thread(()->{
+					Message message = new Message();
+					message.what = UPDATE_TEXT;
+					handler.sendMessage(message); //发送异步处理信号
+				}).start();
+			}	
+	1.异步消息处理机制
+		1.handler sendMessage
+			Message //发送信号
+			Handler //处理
+			MessageQueue //存放handler消息 每个线程独有
+			Looper.loop() // 当有消息队列消息时,把消息取出
+		2.AsyncTask
+			//继承AsyncTask类 需要指定三个泛型参数
+			//Params,Progress,Result
+			class task extends AsyncTask<Void,Integer,Boolean>{
+				@Override
+				onPreExecute()
+				
+				@Override
+				doInBackground(Params...)->publishProgress(Progress..)
+				//执行异步逻辑代码 可返回值 但此方法在线程中执行无法更新UI
+				//可选择调用publishProgress 告诉线程更新进度 onProgressUpdate 具体处理
+				
+				@Override
+				onPostExecute(Result) //该方法可以在其中跟新UI,其参数为上一方法的返回值
+				
+				@Override
+				onProgressUpdate(Progress...) //程序更新时,有publishProgress传入更新参数
+			}
+		3.深入handler
+			public static final int UPDATE_TEXT = 1;
+			private Handler handler = new Handler(){
+				//handler是在主进程中执行的
+				@Override
+				public void handleMessage(Message msg){
+					switch(msg.what){
+						case UPDATE_TEXT:
+							//进行UI操作
+							Toast.makeText(this,(String)msg.obj,Toast.LENGTH_SHORT).show();
+							break;
+						default:
+							break;
+					}
+				}
+			};
+
+			@Override
+			public void onClick(View v){
+				new Thread(()->{
+					Message message = handler.obtainMessage(UPDATE_TEXT);
+					handler.obj = "this is an string object for sending the msg";
+					handler.sendMessage(message); //发送异步处理信号
+				}).start();
+			}
+		4.Looper.loop() | Looper.prepare()
+			在子线程创建handler的时候得调用
+			new Thread(()->{
+				Looper.prepare();
+				new Handler((Message msg)->{
+
+				});
+				Looper.loop();
+			}).start();
+11.Utils
 	Bitmap位图包括像素的长宽颜色等
 	ARGB_8888：四个通道都是8位，每个像素占用4个字节，图片质量是最高的，但是占用的内存也是最大的
 	ARGB_4444：四个通道都是4位，每个像素占用2个字节，图片的失真比较严重

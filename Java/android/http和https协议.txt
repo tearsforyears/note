@@ -1,0 +1,95 @@
+# http协议:80
+	HTTP/0.9	1991年	不涉及数据包传输，规定客户端和服务器之间通信格式，只能GET请求	没有作为正式的标准
+	HTTP/1.0	1996年	传输内容格式不限制，增加PUT、PATCH、HEAD、 OPTIONS、DELETE命令	正式作为标准
+	HTTP/1.1	1997年	持久连接(长连接)、节约带宽、HOST域、管道机制、分块传输编码	2015年前使用最广泛
+	HTTP/2	2015年	多路复用、服务器推送、头信息压缩、二进制协议等	逐渐覆盖市场
+	HTTP /1.0
+		支持C/S架构
+		三次握手
+		四次挥手
+		特点:灵活无连接无状态
+		# 请求
+			GET POST
+			HEAD # 获取响应头
+			PUT # 请求服务器存储资源
+			DELETE
+			TRACE # 用于测试或者诊断
+			OPTIONS # 查询服务器性能
+		# 响应
+			1xx 提示信息
+			2xx 成功
+			3xx 重定向
+			4xx 客户端错误
+			5xx 服务器错误
+		# 报文格式
+			GET /index.jsp HTTP/1.1
+			Accept: image/gif,image/jepg,...
+			Accept-Charset
+			Accept-Encoding
+			Accept-Language
+			Host: 
+			Set-Cookie:
+		# cookie技术/session技术在此使用
+			HTTP /1.1 协议不明确标识都保持TCP
+
+	HTTP /1.1
+		该版本解决了上一版本的某些问题 使得http协议可以有状态
+		连接可以保持 Connection:Keep-Alive
+其他
+	FTP SMTP DNS NNTP
+	中介:Proxy Gateway Tunnel
+	Proxy:一个中间程序 充当服务器或客户机
+	Gateway:接收代理,作为其他服务器上层
+	Tunnel:作为两个链接的中继器,可能由http起动但是不属于是http通信
+# https:443
+	https = http + ssl
+	TLS/传输层加密协议 SSL
+	# 内容加密 身份验证 数据保护
+	
+
+# 加密相关
+	对称加密 
+		加密速度快 适合数据比较长的时候使用
+		加密和解密过程中使用同一组秘钥
+		AES DES 3DES IDEA RC4 RC6
+	非对称加密
+		采用两个密钥 publickey pravatekey
+		加密采用公钥
+		解密采用私钥
+		RSA ECC DSA(数字签名)
+	hash算法 数据摘要
+		MD5 MD2等 用于比对密码等字符串
+	混合加密:结合非对称加密技术和加密技术 Hybrid Cryptography
+		1.简单加密
+			client:RSA(AES("msg","public_key"),"public_key")
+			server:RSA^-1(AES^-1("MSG"))
+		2.混合加密
+			明文消息msg
+			1.生成对称秘钥key1
+			2.利用key1进行对msg对称加密(AES)
+			3.key1用RSA_public_key进行加密
+			4.加密的信息+加密的秘钥=传输数据
+			以AES和RSA为例
+				String aes_key = AES.genAesKey();
+				1.加密过程
+				String msg'= RSA(aes_key,"public key")+AES("msg",aes_key);
+				2.解密过程
+				String msg = AES^-1(msg'.subString(),RSA^-1(msg'.subString(),"private key"))
+	数字签名技术 digital signature
+		公钥加密技术和数字摘要技术的结合
+		接收方能正事发送方的真实身份
+		发送方时候不能否认发送过的报文
+		接收方或非法者不能伪造篡改报文
+		数字签名 包含电子文件数据摘要以及发送者的公钥和私钥三个部分
+		发送方通过私钥加密发送接受方
+		接收方用公钥解密 对比msg和hash值是否相同
+		# 以RSA和MD5为例
+			1.加密过程
+			数字签名 = RSA(MD5(msg),"private key")
+			send(msg + 数字签名)
+			2.比对签名
+			md5_msg=RSA^-1(数字签名,"public key")
+			if(md5_msg==md5(msg)){
+			}
+	利用数字签名技术和混合加密技术目前可以安全传输信息
+	CA 为服务器端颁发的蕴含公钥的证书
