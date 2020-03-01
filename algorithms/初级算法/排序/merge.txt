@@ -1,0 +1,25 @@
+#coding=utf-8
+def mergesort(lis):
+    if len(lis)==1:
+        return lis
+    mid=len(lis)/2#求出中间数
+    left=mergesort(lis[:mid])
+    right=mergesort(lis[mid:])
+    return merge(left,right)
+#关键操作
+def merge(l_lis,r_lis):
+    l_cur,r_cur=0,0#初始化指针
+    res=[]
+    while l_cur<len(l_lis) and r_cur<len(r_lis):
+        if l_lis[l_cur]<=r_lis[r_cur]:
+            res.append(l_lis[l_cur])
+            l_cur+=1
+        else:
+            res.append(r_lis[r_cur])
+            r_cur+=1
+    res+=l_lis[l_cur:]
+    #把后面那部分扔上去
+    res+=r_lis[r_cur:]
+    return res
+
+print mergesort([1,3,5,9,7,6,4,2,1,3])

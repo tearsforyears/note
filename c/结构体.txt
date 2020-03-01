@@ -1,0 +1,37 @@
+struct data{
+     int day;
+     int month;
+     int year;
+} time1,time2;
+# typedef的用法: typedef char * String
+struct data time1=...;
+typedef struct Student{
+	int a;
+}Stu;
+typedef struct Student{....} Stu;
+struct Student是原本的类型
+Stu stu1=...;
+
+当类用
+#include"stdio.h"
+void echo(int a){
+	printf("%d",a);
+}
+int len(char * str1){
+	int p=0;
+	while(str1[p]!=0)p++;
+	return p;
+}
+typedef struct data{
+	int num;
+	void print(int a){
+		printf("%d",a);
+		printf("\n%d",num);
+	}
+}Tools;
+int main(){
+	Tools t;
+	t.num=3;
+	t.print(4);
+	return 0;
+}

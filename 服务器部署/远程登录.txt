@@ -1,0 +1,9 @@
+0.window自带远程桌面
+1.xshell等工具
+确实很方便无论是敲打命令还是文件上传,这体现shell命令行的操作功底
+# 文件上传和下载
+sudo apt-get install lrzsz # rz sz 命令完成上传和下载
+2.ssh
+	ssh root@39.97.173.55 //可以在cmd上登录linux
+
+	495385

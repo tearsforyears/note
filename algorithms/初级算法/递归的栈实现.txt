@@ -1,0 +1,65 @@
+recursion递归
+//algorithm must be start in a simple example(if you learn)
+//but conclude in a high point
+头递归和尾递归
+1.头递归 阶乘 //每一步都可以得到中间答案 自上向下或者自下向上的递归
+2.尾递归 斐波那契数列//只有到n==1或者n==2的时候才能知道答案
+
+def f(n):
+    if n==1 or n==2:
+        return 1
+    return f(n-1)+f(n-2)  
+
+def empty(stk):
+    if len(stk)==0:
+        return True
+    else:
+        return False
+def top(stk):
+    if len(stk)==0:
+        print None
+    else:
+        return stk[len(stk)-1]
+
+def fib(n):
+    res = 0
+    stk = []
+    stk.append(n)  # 初始入栈
+
+    while not empty(stk):
+        nn = top(stk)  # 获得栈顶元素
+        stk.pop()  # 栈顶出栈
+        if nn == 1 or nn == 2:
+            res += 1
+        else:
+            stk.append(nn - 1)
+            stk.append(nn - 2)
+            print stk
+        #print res
+    return res
+
+print fib(10)
+//实现排列数
+//这个实现后面压栈的数目会发生改变
+//不容易去实现 可以实现不过逻辑会变长
+//有goto语句实现可以快点 但是现在没时间实现先放着
+def f(lis,cur):
+    if cur+1==len(lis):
+        print lis
+    for i in range(cur,len(lis)):
+        swap(lis,cur,i)
+        f(lis,cur+1)
+        swap(lis,cur,i)
+def f(lis,cur):
+    stk1=[]
+    stk2=[]
+    stk1.push(cur)
+    stk2.push(lis)#初始化栈
+
+    while not stk1.empty() and not stk2.empty():
+        s_cur=stk1.top()
+        stk1.pop()
+        s_lis=stk2.top()
+        stk2.pop()
+	#这里用两个栈去保存参数的信息
+

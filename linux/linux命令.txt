@@ -1,0 +1,178 @@
+bash terminal 命令
+
+pwd 显示当前目录
+cd
+mkdir -p //创建多级目录
+rmdir //删除
+ls -a //list 等同于cmd的dir //用隐藏的说法 -a l详细信息
+echo hello > filepath //创建文件
+
+tar //把目录打包或者归档成一个文件，程序不能打包文件夹的情况下
+tar -c -f cc.tar ./cc	//归档文件 需要打包的文件
+tar -cf	//
+tar -x -f -C cc.tar . //解开到指定目录
+man //查询其他命令的帮助信息
+
+rm //删除文件
+touch aa //生成一个新文件
+echo hello aa > bb // >流的重定向
+echo hello //流直接输出到屏幕
+mv aa ./cccc    //移动文件
+cp aa ./cccc	//复制
+
+cat tac //猫一眼 看一下 反过来看一下
+less more //more缓冲显示 less也可以一页页翻 less比more更优秀
+这两个都支持查询
+head tail //查看默认前10行 查看默认后10行
+
+jedit //和双击效果一样
+vi 进入编辑模式
+//k j h l 对应上下左右 nG定位到第n行 i 进入插入模式esc退出 
+//q退出 w保存 !q强制退出 wq保存并退出
+
+gzip -d -l -v -num //指定-d就是解压缩 不指定就是压缩
+//-l 显示压缩文件的大小未压缩的大小等等 -v 显示压缩比
+//-num 指定一个数字表示压缩速度-1 最快 -9最慢 -6默认//aa.gz
+
+clear 清屏
+bzip2 -z 压缩 bzip2 -d 解压缩 //其他指定和gzip差不多
+
+tar -z -j //使用gzip bzip2压缩
+tar -f //这个在后面要跟上归档文件名
+tar -t//查看归档文件里面的文件
+tar -C//把归档文件还原
+
+find -name//查找文件
+//支持通配符 find -name "a*" //以a开头的文件
+
+grep在文件内容搜索,支持正则！！！！！！！
+grep -c -I -n //只输出匹配行的技术 不区分大小写(char) 显示匹配行以及行号
+grep [a-z] filepath
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+扇区存储文件，实现文件系统
+
+file name->inode->[data](存放实际数据的扇区)
+
+hardlink:
+filename2->inode 
+//原本有filename1指向inode 但是filename1和2没关系
+
+softlink：//类似于windows的快捷方式
+filename2->filename1->inode
+
+ln 建立连接文件
+ln file1 file2 //建立硬链接
+ln -s file1 file2 //建立软连接
+
+//用户和组
+whoami //显示登陆用户
+groups //这是属于什么组的
+
+sudo ls /root //借用管理员的权限 输入自己本身的密码
+//sudo cd这并不能用 sudo进行了命令的限制
+//在/etc/sudoers这个文件保存sudo的信息
+
+/etc/passwd //记录了用户的信息
+root:x:0:0:root:/root:/bin/bash
+用户名：口令：用户标示号：组标示号：注释：宿主目录：命令解释器
+/etc/shadow //记录用户的密码信息(root可读)
+UID 超级管理员是0 自定义用户从1000开始
+
+文件权限
+用户有三个权限 r w x //读 写 执行
+对一个文件来说用户有三类
+文件拥有者，文件拥有者同组的用户，其他用户
+ls -l可以看文件的权限 //最开始的字符是- d l //文件 目录 连接
+//剩下每三个一组
+//修改文件权限是 4-r 2-w 1-x
+chmod //修改文件权限ls
+
+更改文件的所有者
+chown user:group filepath
+chown -r //更改目录
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+用户的管理
+
+useradd 选项 用户名 
+//-d -m 指定用户主目录,如果主目录不存在 -m指定
+//-d tiger /home/tiger -m
+//-g -G //指定用户组，指定用户所属的附加组
+//-s -u //指定用户登陆的shell 指定用户的uid
+
+usermod 选项 用户名
+//-p -U //修改密码 解锁用户
+//-l -L//新登陆名 解锁用户帐号密码
+
+passwd
+-l 锁定口令 禁用帐号
+-u 口令解锁
+-d 清空口令
+-f 强迫用户下次登陆时修改口令
+
+userdel //删除用户帐号
+//-r 同时删除目录
+
+su - tiger //切换工作目录和用户
+ps  -ef //查看进程
+kill num //杀掉进程
+
+//需要补充组的用法
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Network
+1.桥接模式
+需要路由器支持Bridge
+虚拟机可以获得宿主机器同等级的待遇
+分配单独的ip(局域网ip)此时虚拟机的网段和宿主一样
+
+工作原理:
+路由器：一般分配一个 公网ip 通过公网ip去访问真正的网络 4
+网络接口: wlan 以太网
+路由器建立一个局域网 局域网内有主机电脑
+
+2.NAT 网络地址转换功能
+通过系统服务把包的地址进行转化
+DHCP 自动分配ip服务,来共享宿主机器的网络访问
+DNS
+
+3.host-only(主机模式)
+让虚拟机之间可以相互访问，但是不能访问网络
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ifconfig //ipconfig
+修改ip地址
+ifconfig eth0(网卡) 192.168.0.6//修改ip的地址
+ping //连通性测试
+netstat TCP UDP//查看网络状态的信息
+netstat -at -au //查看tcp连接 产看udp连接
+netstat -al //l监听 listened
+//借助管道命令 查看进程id
+netstat -a | grep :      //-a表示查询所有的
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+linux 系统管理
+who //显示登陆的用户
+clear
+kill //杀死进程 
+ps -ef 
+shutdown //关机 -r -h -now //立即重启 不重启 立即关机
+halt //关闭电源
+reboot //重启
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+linux 管道命令
+     |		//对数据进行操作
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+软件安装
+Ubuntu: Debian Package //.deb后缀
+sudo dpkg -i package_file.deb 来安装.deb文件
+sudo dpkg -r package_name 来卸载
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+apt 是一个强大的包管理系统
+sudo apt-get install packagename
+sudo apt-get update //获取新的更新包
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+linux远程登陆
+telnet协议 //明文传输 不安全
+SSH //secure shell 原本是UNIX上
+OpenSSH //替代SSH
+在ubuntu上默认安装了客户端没有安装服务器
+借助putty连接服务器
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+部署javaweb的开发环境

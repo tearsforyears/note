@@ -1,0 +1,7 @@
+class BiTree{
+    private Object data;
+    private BiTree left;
+    private BiTree right; 
+    
+    public BiTree(Object data){this.data=data}
+}

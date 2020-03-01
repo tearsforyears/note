@@ -1,0 +1,160 @@
+﻿指针tm不是地址，只是一个用来存地址的特殊变量。
+#include <stdio.h>
+int main()
+{
+	int a=4;
+	printf("%d\n",a);
+   	int *a1;
+	a1=a;
+	printf("%d",a1);//a1=4 本来我a1是要存地址现在你认为让我是个数 那我只能是4了
+   return 0;
+}
+重点
+指针的加减
+指针的加减并不是数值的运算 而是地址的运算
+你可能会想，指针是不是也有+，-操作呢？答案是肯定的，但不是把这个位置的值+，-，而是把地址往后或往前移动。
+    int a=1,*p,*q;
+    p=&a;
+    q=p+1;#本来指针是为了设计出来存地址的+-操作也是地址的
+    printf("%p %p",p,q); 地址1 地址1+4
+    ---------------------------
+    int a=1,*p,*q;
+    p=a;
+    q=p+1;#本来指针是为了设计出来存地址的+-操作也是地址的，现在你给我存了一个数，那我加减操作不能变的哇
+    printf("%p %p",p,q); 1 5
+客官来讲，指针的操作就是c语言一套特殊的api，没有什么神奇的地方。
+这个api给我们一个完全从地址去考虑数据结构操作的方法
+换言之我们可以去控制这些地址的变化从而取出数据来
+
+p_a1=12;这句话是很危险的.我们创建了一个指向int的指针,但是并没有初始化,也就是说,指针会得到一个随机的地址(至少大部分系统上面是这样)#猜测正确 理论成立
+
+指针与数组(这个理念可以大大把返回参数的本质说的很明白了)
+a[i]连续的i个空间开辟
+a[10]#可以应用的引用就是a 这个数组名是一个指针类型的变量 所以他的加减可以直接引用
+显然*(a+i)==a[i] a+i=&a[i] 装逼技巧+=1
+
+关于参数引用问题
+定义
+def swap(int* a,int *b){
+    temp=*a
+    *a=*b
+    *b=temp
+}
+调用
+swap(&a,&b)
+函数指针(划重点!)
+swap==&swap#这两者本质上都是函数指针
+
+函数指针的定义方法 返回值 (*指针名字)(参数名字)
+int (* p)(int, int) = & max; // &可以省略
+在传递参数的使用也是按照上面这种方法定义的 定义花一年 调用快如狗
+// 实现回调函数
+void populate_array(int *array, size_t arraySize, int (*getNextValue)(void))
+{
+    for (size_t i=0; i<arraySize; i++)
+        array[i] = getNextValue();
+}
+ 
+// 获取随机值
+int getNextRandomValue(void)
+{
+    return rand();
+}
+ 
+int main(void)
+{
+    int myarray[10];
+    populate_array(myarray, 10, getNextRandomValue);
+    for(int i = 0; i < 10; i++) {
+        printf("%d ", myarray[i]);
+    }
+    printf("\n");
+    return 0;
+}
+
+结构体指针
+结构体定义
+struct tag { 
+    member-list
+    member-list 
+    member-list  
+    ...
+} variable-list ;
+
+
+
+#include<cstdio>
+struct student
+{
+    int snum;
+    int age,grade;
+};
+student T;
+student *p;
+int main()
+{
+    p=&T;
+    T.snum=15;
+    T.age=12;
+    T.grade=90;
+    printf("%d\n",(*p).snum);
+    printf("%d\n",p->age);#这个->就是为了简化指针要找结构体成员的简化写法
+    printf("%d\n",T.grade);
+}
+NULL指针和void*
+    //转化为NULL指针
+    int *p_a=0;
+    int *p_b=NULL;
+Void*是一种特殊类型的指针,能够用来存放任何类型对象的地址.通俗来说,就是我不知道这个指针指向的是什么类型的对象. 
+
+可变参数实例
+#include <stdio.h>
+#include <stdarg.h>
+ 
+double average(int num,...)
+{
+ 
+    va_list valist;
+    double sum = 0.0;
+    int i;
+ 
+    /* 为 num 个参数初始化 valist */
+    va_start(valist, num);
+ 
+    /* 访问所有赋给 valist 的参数 */
+    for (i = 0; i < num; i++)
+    {
+       sum += va_arg(valist, int);
+    }
+    /* 清理为 valist 保留的内存 */
+    va_end(valist);
+ 
+    return sum/num;
+}
+ 
+int main()
+{
+   printf("Average of 2, 3, 4, 5 = %f\n", average(4, 2,3,4,5));
+   printf("Average of 5, 10, 15 = %f\n", average(3, 5,10,15));
+}
+定义一个函数，最后一个参数为省略号，省略号前面可以设置自定义参数。
+在函数定义中创建一个 va_list 类型变量，该类型是在 stdarg.h 头文件中定义的。
+使用 int 参数和 va_start 宏来初始化 va_list 变量为一个参数列表。宏 va_start 是在 stdarg.h 头文件中定义的。
+使用 va_arg 宏和 va_list 变量来访问参数列表中的每个项。
+使用宏 va_end 来清理赋予 va_list 变量的内存。
+
+初级内存管理
+1	void *calloc(int num, int size);
+在内存中动态地分配 num 个长度为 size 的连续空间，并将每一个字节都初始化为 0。所以它的结果是分配了 num*size 个字节长度的内存空间，并且每个字节的值都是0。
+2	void free(void *address); 
+该函数释放 address 所指向的内存块,释放的是动态分配的内存空间。
+3	void *malloc(int num); 
+在堆区分配一块指定大小的内存空间，用来存放数据。这块内存空间在函数执行完成后不会被初始化，它们的值是未知的。
+4	void *realloc(void *address, int newsize); 
+该函数重新分配内存，把内存扩展到 newsize。
+
+*void 代表可以强行转化
+
+实例
+description = (char *)malloc( 200 * sizeof(char) ); #差不多description [200]
+free(description)
