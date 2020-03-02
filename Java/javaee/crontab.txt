@@ -1,0 +1,40 @@
+# Crontab
+
+这是liunx提供的一个定时调度的命令
+
+azukaban可以解决稍微大型的调度问题
+
+但对于轻量级而言用此命令会更加快捷
+
+```shell
+crontab -l # list 列出用户所有定时任务
+crontab -e # edit
+crontab -r # remove
+crontab -i # remove for prompt
+```
+
+/etc/crontab 里存着系统的定时调度任务
+
+linux: cat /etc/crontab 可以看到一些信息
+
+### cron表达式
+
+```shell
+* * * * * command# min,hour,day for month,month,day of week
+```
+
+/ 表示每隔一段时间 比如 */2 * * * * 表示每隔两分钟
+
+\- 表示从一段时间
+
+, 表示几个时间间隔合并
+
+*/30 [3-5],[17-20] * * * 表示 从每天的3点到5点和17点到20点 每隔三十分钟
+
+0 * * * * * 表示每个小时的第0分钟
+
+### 操作
+
+创建 /etc/crontab 文件
+
+然后用crontab -e 用上面命令格式就可以了
