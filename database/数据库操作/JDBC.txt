@@ -1,0 +1,83 @@
+﻿《JDBC》
+1.database pool
+1>set up a connection max of the pool
+2>when acccess the database first the pool create a connnection(if this pool's max connection is not enough) or return wait() to those programs
+3>when the connection is useless to the program the program give this connection back to the pool and next step
+4>this can make the connection more fast and was useful to those progrem which is allow a lot of people to access.
+2.dll data definition language
+//create database XXXX;
+//use database XXXXX;
+//show databases;
+//show creat databases; //查看创建数据库的语句
+//drop database XXXX;
+//create table xxxxx（columns...）
+//show tables;
+//desc xxxx;//查看表结构  
+3.dml data control language(SQL)
+4.index (not reality)
+5.查询优化
+>尽量不用 select *
+>把多余的SQL语句合成一条
+>where 1=1 不使用 全表扫描
+>使用between and 字句
+>使用带占位符的SQL语句(参数化查询)
+6.MYSQL帐号管理
+创建帐号 create user 'username'@'%' identified by 'password'
+删除帐号 drop user'username'@'%'
+给帐号授权 grant all privileges on dandandb.* to'dandan'@'%'
+查看授权 show grants for 'username'@'%'
+取消授权 revoke all privileges on dandandb.* from 'dandan'@'%'
+修改自己的密码 mysqladmin -u曾用名 -ppassword newpassword
+修改别人的密码(root登陆)set password for username=password('newpassword')
+找回root密码(百度)
+7.存储引擎 InnoDB MyISAM
+8.Java对mySQL的支持
+>1加载驱动 Class.forName("com.mysql.jdbc.Driver") 
+//Driver类加载(内部是java.sql.DriverManger类（jdk本身有的类）去注册这个Dirver)
+//
+>2创建连接 DriverManger.getConnection(url,username,password)
+>3connection.PreparedSatatement(sql语句)
+//用可变长度参数实现 
+自定义方法：excuteUpdate(Connection con, String sql, Object... paramenters){
+PreparedStatement ps=null
+ps=connection.prepareStatement(SQL语句) //values(?,?)用？代表占位符
+//引用可变长度参数的方法
+paramenters.length----数组长度
+paramenters[i]------引用元素
+//由此可见 该语法本质是封装成数组
+ps.setObject(int index,Object obj) //设置参数的方法！！！！！！！！！！
+//注意 ps.setObject(int index,Object obj)中第一个参数是以1开始的
+ps.excuteUpdate()------执行更新返回int 表示影响了多少行
+}
+>关于ResultSet ---ps.excuteQuery();
+ps.excuteUpdate是返回int 作用于insert语句
+ps.excuteQuery是返回ResultSet 作用于select语句
+是个Set接口
+rs.next()表示遍历到下一条数据，返回一个boolean值true 表示下一条数据存在
+rs.getObject("")
+rs.getString("")
+rs.getInteger("")
+rs.getInt("")//等等等等
+9.JDBC事务
+原子性，一致性，隔离性，持久性
+回滚事物：
+conn.setAutoCommit(false);
+/**    **/
+conn.rollback();
+10.批量提交
+ps.addBatch();
+/**  **/
+ps.excuteBatch();
+//chengxunyuan的SQLjingdian
+
+
+
+
+
+DB深入
+1.四个特性详解
+原子性Atomicity(要么全做 要么全部做)
+一致性Consistency(基于原子性，数据库状态改变与否的一致性)】
+隔离性Isolation(一个事物的执行不会被其他事物干扰)
+持久性Durability(一个事物一旦提交，它对数据库中数据的改变就是永久性的)
+2.关系型数据库
