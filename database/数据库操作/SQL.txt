@@ -1,0 +1,80 @@
+﻿《SQL语句》
+1.select from
+select * from T_tableName 
+where id=1
+SELECT name from T_tableName
+where name='queen'
+2.insert
+INSERT INTO T_tableName(Id,columnName1,columnName2)
+values(?,?,?)  //参数化查询防止拼接漏洞
+3.Update
+UPDATE T_tableName SET columnName1=''
+4.or and not <=等可以直接使用作为逻辑判断筛选符 从而确定范围
+5.DELETE FROM T_tableName where(nessary!) boolean expression
+6.drop table T_tableName
+7.as起别名 或者 空格起别名
+--------------------------------------------------------------
+______________________________________________________________
+8.聚合函数
+max count avg sum min 
+use method eg: max(columnName) from T_tableName where...
+
+9.order by ASC(升序) DESC(降序)
+select * from T_tableName order by fieldName ASC //对该字段进行升序排列
+order by 多列排序
+select * from T_tableName order by fieldName1,fieldName2//先按字段1进行排再按字段2进行排
+
+10.like模糊匹配 columnName like 't__' 或 columnName like 't%'//前者表示
+//3个字符t开头，后者表示任意个字符T开头
+//该方法需要用到全文检索性能比较低 不推荐使用 
+
+11.查找与null相关 where is (not) null
+
+12.limit字句//offset偏移量
+limit可以指定select语句返回的记录数
+select * from table limit 5,10 返回数据的第六到第十行数据显示在结果集//从0开始 limit 5，-1 到最后一行 limit 5 前五行 这个字句是对select的结果集限定
+
+13.group by
+select age.AVG(salary) from T_Users group by age //根据年龄分组 计算平均工资
+
+14.left join ......on
+SELECT o.Number,o.Price,c.name,c.age
+FROM T_orders o //from T_orders as o
+LEFT JOIN T_customers c
+ON o.customerId=c.id
+//这是一个完整的left join查询，on后面写的是外键的关联关系 或者说是查询条件
+//左查询的作用是完全保留左边表的数据 右边的表连接失败的时候 用null填充 //right join相反
+
+15.嵌套查询（）
+>集合运算 in all any some exists
+>in() 在结果集里
+>any() 大于任何一个都行
+>some() 和any差不多
+>exists() 存在
+eg: 
+select age,studentname
+from T_students
+where age>( select age from student where studentName='dandan')
+//where age>all(select age from student where studentName='dandan1')
+
+select studentName
+from student as s
+where exists(select * from Grade as g where s.studentId=g.studentId and scorce >90)
+
+16.集合查询
+>交 union
+>并 intersect
+>差 except
+
+17. localhost==127.0.0.1:3306
+
+18.关于sql的一些补充
+重复 当然可以用groupby
+SELECT DISTINCT column_name,column_name
+FROM table_name;#重复语句
+SELECT DISTINCT country FROM Websites;
+
+正则匹配和like用法相似
+REGEXP 'ok$'
+
+IN()可以多个值 用法和=类似
