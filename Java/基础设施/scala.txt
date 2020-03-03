@@ -1,0 +1,415 @@
+scala
+# 环境
+	path:jre
+	path: ./scala/bin
+	path: ./scala/
+	reference:
+		https://blog.csdn.net/hjy1821/article/details/83751384
+		https://www.runoob.com/scala/scala-tutorial.html
+
+# 基本语法
+
+```scala
+# hello world
+	object HelloWorld {
+	   def main(args: Array[String]) Unit={ # Unit指定返回值类型可以不写
+	      println("Hello, world!") // 输出 Hello World
+	   }
+	}
+	scalac HelloWorld.scala # complie 生成.class文件
+	scala HelloWorld
+# scala 基本函数转python
+	# scala
+		def func(arg:Int) Int={3} //scala最后一句自动返回
+	# python
+		def func(arg:int)->int:return 3;
+# 数据类型
+	Byte,Short,Int,Long(64),Float(32),Double(64)
+	Char(16):Unicode字符,String,Boolean
+
+	Unit:void 无返回值的函数类型
+	Null # Null的唯一实例的null
+	# None # Option两个子类之一 另一个是Some 用于安全函数的返回值
+	Nothing:其他类型的子类型
+	Any:所有类的超类
+	AnyRef->Any 所有引用的超类
+	AnyVal->Any 所有值的超类
+	Nil: 长度为0的List
+# 变量声明
+	var,val // var是变量,val是常量
+	# 这里先回顾下java的final关键字
+		class A{
+			static final ArrayList<Integer> lis = new ArrayList<>();
+			System.out.print(lis); // []
+			lis.add(3);
+			System.out.print(lis); // [3]
+		}
+		//val相当于static final 也是固定引用不固定内存的
+		//可见 final关键字是固定引用而不是固定内存的
+		//scala中也有final,和java类似
+# if else
+	if(false){
+		// code
+	}else if(false){
+		// code
+	}else{
+		//code
+	}
+# for in
+	in 被 <- 代替了
+	# collection的简便写法
+		0 to 10 // range(10+1)
+		0 to (10,2) // range(0,10+1,2)
+		0 until 10 // range(10)
+		0 until (10,3) // range(0,10,3)
+	# 普通for循环
+		for(i<- 1 until 10;){}
+	# 多重循环
+		for(i<- 1 until 10;j<- 1 until 10;){}
+		上面的代码等效下面的python代码
+		"""
+			for i in range(1,11):
+				for j in range(1,11):
+					# code
+			用列表生成式描述
+			[# code for i in range(1,11) for j in range(1,11)]
+		"""
+	# 列表生成判断
+		for(i<- 1 until 10;j<- 1 until 10;if (i%2)==0){}
+		# [# code for i in range(1,11) for j in range(1,11) if i%2==0]
+		# 这里的if关键字独立于 后面的布尔表达式存在
+	# yield 集合化 (python也是类似)
+		val ls = for(i<- 1 to 100;if i%2==0) yield i
+# while
+	while(true){
+		// code
+	}
+	do{
+		// code
+	}while(true)
+# 方法
+	# 普通函数定义
+		def func(a:Int = 10):Unit={
+			// code
+		}
+		def func():Int{
+			// code
+		}
+		def func(a:Int) = 2*a
+		// 和python标准写法差不多
+		def func(a:int = 0) -> int:
+	# 递归
+		def f(n:Int):Int={
+			if(n==0||n==1)
+				1
+			else
+				f(n-1)+f(n-2)
+		}
+		// 从这里我们看出来 最后一句指的是执行时最后一句而非代码
+	# 可变长度参数
+		def func(args:Double*) = {
+			for(arg <- args){
+				println(arg)
+			}
+		}
+		// python
+		def func(*args): # 无法实现类型是double的检查
+			for arg in args:
+				print(arg)
+		// java
+		public static void func(double... args){
+			for(double arg:args){
+				System.out.println(arg);
+			}
+		}
+	# 匿名函数
+		终于把java的假匿名函数实现了[暴风哭泣]
+		()->{} // java 中能用来实现 单方法接口类的抽象方法
+		scala中用来实现内部类
+		val func = (x:Int)->{
+			x
+		}
+		val func = ()->{}
+		// python
+		func = lambda x: return x
+	# 支持闭包写法
+		def func1():Int={
+			def func2():Int={
+
+			}
+		}
+	# 支持偏函数
+		def func(a:Int,b:Int)={}
+		val func = func(3,b:Int)
+		// python
+		from functools import partial
+		func=partial(func,a=3)
+	# 支持高阶函数
+		//函数类型的写法
+		//(param_type,)=>return_type
+		# 函数作为参数
+			def f(func:(Int,Int)=>Int){
+				func(10)
+			}
+		# 函数作为返回值
+			def f(): (Int,Int)=>Int ={
+				return func
+			}
+	## 科里化函数
+		def f(a:Int)(b:Int)(c:Int) = a*b*c
+		f(3)(4)(5) # 这种调用方式 是高阶函数的简化
+		>>> 60
+# 函数
+	相对于def定义出来的东西
+	()=>{}称为函数
+	方法和函数最大的不同是函数可以作为参数
+	而方法必须经过{println}类似这样的包装之后才能当成参数
+	此外可以通过下划线转换成函数
+	def m1():Int{3}
+	var f1 = m1 _
+	这个下划线有点秀啊
+	{println}的封装过程其实就是把
+	另外函数和方法的调用如果没有参数可以不加括号
+	函数必须要有参数列表而方法可以没有
+# class 和 object
+	# 基本理解
+		class{}
+		object{def main(atgs:Array[String]):Unit={}}
+		两者是不一样的东西
+		class 更纯粹的面向对象了
+		程序的入口变成object类的main方法 class不在充当程序的入口
+	# class称为伴生类
+		class 自带getter setter方法 需要用new
+		除了方法不执行其他的都执行 
+	# object称为伴生对象
+		属性都是静态的 main函数写里面 单例对象 静态方法 不用new
+	# 语法
+		class Person{
+			val name = "name"
+			def sayName()={
+				"my name is" + name
+			}
+			/*重写构造模式*/
+			def this(id:Int,name:String){
+				// to-do
+			}
+			/*类似static块 类初始化时会执行apply方法*/
+			def apply(name:String,age:Int)={
+				new Person(name,age)
+			}
+		}
+		class Person(id:Int,name:String){
+			/*code*/
+		}
+		val person = new Person()
+		print(person.name)
+```
+# 基本api
+```scala
+# 数组
+	()的语义发生了变化 等价其他语言的[]
+	# 基本索引
+		val arr=new Array[Int](10) // 数组
+		for(i <- 0 until 10){
+			arr(i)
+		}
+	# 特殊的循环方法
+		arr.foreach{println}
+		这句话等价于 # 匿名函数省出新天地
+		arr.foreach({println})
+		arr.foreach(()=>{println})
+	# 二维数组
+		val matrix = new Array[Array[String]](10)
+		for(index <- 0 until matrix.length){
+      		matrix(index) = new Array[String](10)
+    	}
+    	foreach(x=>{println()})
+    # 二维索引
+    	for(i <- 0 until matrix.length){
+			for(j <- 0 until matrix(i).length){
+				matrix(i)(j) = i*j + ""
+  			}
+		}
+		for(i <- 0 until matrix.length;j <- 0 until matrix(i).length){
+  			matrix(i)(j) = i*j + ""
+		}
+	[这个二维数组相当的不好用且反人类奥,盲猜应该是用递归实现的数据结构]
+	()应该是对递归的改写
+# 不可变List
+	# 这些列表不可变 相当于tuple
+	# 但是scala还有tuple
+	val list = List(1,2,3,4)
+	.contains()
+	.drop()
+	.reverse
+	.take(3) // 取前三个元素组成新的列表
+	一种创建list的笨比方法
+	1::2::3::Nil // 我人没了
+# 可变list
+	import scala.collection.mutable.ListBuffer 
+	var ls = new ListBuffer[Int]
+# map和foreach
+	其语义有点类似于python但可以实现不同的功能
+# set
+	.intersect // .&
+	.dfff // .&~
+	.subsetOf
+	.max
+	.min
+	var set=1::2::3::Nil.toSet
+	set.mkString
+### Map
+	// {"k1":"v1","k2":"v2"}
+	val dict = Map("k1"->"v1","k2"->"v2")
+	dict.values
+	dict.keys
+	.filter // 返回一个dict
+	.count
+	.contains // for key
+	.get()
+	for(item <-dict){
+		print(item._1)
+		print(item._2)
+	}
+
+# tuple
+    var t1= Tuple2(1,"hello") # tuple2???
+    var t2= ("1","2")
+
+# 字符串
+	# hashCode()
+	# index发生了变化
+		"123"(0)
+		// python
+		"123"[0]
+	# StringBuilder
+		val sb=new StringBuilder()
+		sb.append("")
+		sb.append("")
+		print(sb)
+```
+
+# scala 与 java 运行编译的差异
+```shell
+# 编译与运行指令
+	# java
+		java javac 编译.java成.class 并运行
+		java demo命令直接运行jvm 去寻找.class文件里面的demo类
+		java demo.java 直接报错
+		javac demo.java 直接编译成.class文件
+	# scala
+		scalac test.scala把test.scala经由jvm解释成.class文件
+		scala命令运行主类名或者编译运行主类
+		scala demo 会直接运行.class文件中已经编译好的demo类的main方法
+		scala demo.scala 会临时编译demo.scala 并且解释临时生成的字节码
+	# java和scala互相使用是不可以的
+		java 调用编译好的scala类会报错
+```
+# 其他一些高级特性
+```scala
+# Trait 实现多继承
+# Match Case
+	类似于switch case
+	x match {
+		case x:Int=>println("type is int")
+		case x:String=>println("type is string")
+		case x:Double=>println("type is double")
+		case 1 => print("res is one")
+	}
+# 样例类
+	实现了 toString equals copy hashCode等方法
+	可以new 可以不用new
+	实现了getter方法 对val字段
+	实现了setter和getter 对var字段
+# Action Model
+	用来编写分布式系统和并行计算的
+	解放了多线程模式下共享锁的问题被用于Erlang
+	其基于消息传递模型
+	extends Actor
+	//Actor与Actor之间通信
+		case class Message(actor:Actor,msg:Any)
+
+		class Actor1 extends Actor{
+		  def act(){
+		    while(true){
+		      receive{
+		        case  msg :Message => {      //类型匹配
+		          println("i sava msg! = "+ msg.msg)
+		          
+		          msg.actor!"i love you too !"
+		          }
+		        case msg :String => println(msg)
+		        case  _ => println("default msg!")
+		      }
+		    }
+		  }
+		}
+
+		class Actor2(actor :Actor) extends Actor{
+		  actor ! Message(this,"i love you !")
+			def act(){
+				while(true){
+					receive{
+		  			case msg :String => {
+		  			  if(msg.equals("i love you too !")){
+		  			    println(msg)
+		  			   actor! "could we have a date !"
+		  			  }
+		  			}
+		  			case  _ => println("default msg!")
+					}
+				}
+			}
+		}
+
+		object Lesson_Actor2 {
+		  def main(args: Array[String]): Unit = {
+		    val actor1 = new Actor1()
+		    actor1.start()
+		    val actor2 = new Actor2(actor1)
+		    actor2.start()
+		  }
+		}
+# 隐式转换系统 implicit进行隐式声明
+	尝试让编译器自己推到出结果
+	简而言之在执行时候找不到参数就在作用域内找类似值(??)
+	object test{
+		implicit var abc = "Dilireba"
+		implicit def string2Int(num:String) = Integer.parseInt(num) 
+		def addNum(num:Int) = {
+	      num + 1000
+	    }
+	  
+		def sayName(implicit name:String) = {
+		    println("I Love " + name)
+		}
+	}
+	//调用sayName如果没有参数则会找到相近abc赋值
+	//调用addNum如果没有参数找不到对应Int字段则找到string2Int方法 调用该函数该函数找字符串返回int返回addNum
+	// 尽量不要使用
+# _
+	(_,1)等价于
+	(x)=>{(x,1)}
+	_+_等价于
+	(x,y)=>{x+y}
+
+	在前面已经看到了,可以代表参数
+	_1,_2可以代表不同参数的位置 item
+	_还可以当*用
+	import com.hpe.scala.Util._
+	其可以表示三种含义
+		1.所有
+		2.占位符
+		3.简写模式
+		4.转换函数成方法
+# 异常处理
+	try{
+
+	}catch{
+		case ex:IOException =>{
+
+		}
+	}
+# 提取器Extractor
+	..
+```

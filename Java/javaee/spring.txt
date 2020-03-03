@@ -1,0 +1,917 @@
+# Spring
+
+```java
+spring 是一个出色的中间件框架 其核心为AOP面向切面编程和IOC控制反转
+spring和spingMVC主导主流的javaweb开发
+远古时期spring还是由xml进行各种配置 到进行注解配置的时候加大代码的可读性
+推荐使用注解来进行spring配置
+
+多年以后再回望这里 发现反射虽然是实现spring的核心但其DI逻辑并不难 AOP也是
+难得是IoC容器的装配 Spring的启动流程 SpringFactory生产bean的过程
+以及springMVC/spring boot的启动 从这看spring的技术跨越现代web技术的方方面面
+是最重要的框架
+```
+
+### index
+
+-   base DI & IOC - @Component
+    -   ApplicationContext extends BeanFactory (接口继承)
+    -   Bean的生命周期
+    -   spring中的单例并非线程安全
+    -   SpEL @Value
+    -   @Lazy
+    -   @Autowired
+    -   @Resource(bean_name)
+-   spring/springMVC 启动
+
+-   AOP  - @Aspect
+    -   @Before
+    -   @After
+    -   @Around
+    -   三种实现方式
+        -   jdk增强
+        -   cglib增强
+        -   AspectJ
+-   数据库管理
+    -   事务管理 @Transactional
+    -   数据库连接池JDBC配置
+-   Crontab - @Scheduler
+
+### spring-pom.xml
+
+```xml
+<dependencies>
+    <!-- spring最基本的环境支持依赖，会传递依赖core、beans、expression、aop等模块 -->
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-context</artifactId>
+        <version>4.3.2.RELEASE</version>
+    </dependency>
+    
+    <!-- 提供了对其他第三方库的内置支持，如quartz等 -->
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-context-support</artifactId>
+        <version>4.3.2.RELEASE</version>
+    </dependency>
+    
+    <!-- spring处理对象关系映射的模块，传递依赖了jdbc、transaction等模块 -->
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-orm</artifactId>
+        <version>4.3.2.RELEASE</version>
+    </dependency>
+    
+    <!-- spring对面向切面编程的支持 -->
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-aspects</artifactId>
+        <version>4.3.2.RELEASE</version>
+    </dependency>
+    
+    <!-- spring处理前端表现层的模块，即springMVC -->
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-webmvc</artifactId>
+        <version>4.3.2.RELEASE</version>
+    </dependency>
+
+    <!-- 第三方定时器框架 -->
+    <dependency>
+        <groupId>org.quartz-scheduler</groupId>
+        <artifactId>quartz</artifactId>
+        <version>2.2.3</version>
+    </dependency>
+
+    <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.11</version>
+    </dependency>
+    
+    <dependency>
+        <groupId>mysql</groupId>
+        <artifactId>mysql-connector-java</artifactId>
+        <version>5.1.37</version>
+    </dependency>
+    
+    <!-- c3p0依赖 -->
+    <dependency>
+        <groupId>com.mchange</groupId>
+        <artifactId>c3p0</artifactId>
+        <version>0.9.5</version>
+    </dependency>    
+</dependencies>
+<build>
+    <plugins>
+        <!-- 指定JDK编译版本 -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.1</version>  
+            <configuration>  
+              <source>1.8</source>
+              <target>1.8</target>
+            </configuration> 
+        </plugin>
+    </plugins>
+</build>
+```
+
+### applicationContext.xml
+
+```xml
+<context:component-scan base-package=”com.test”></context:component-scan>
+<!--开启spring对象扫描-->
+<aop:aspectj-autoproxy></aop:aspectj-autoproxy>
+<!--aspectj 需要添加如上配置-->
+
+xmlns:task="http://www.springframework.org/schema/task" <!--加入命名空间-->
+
+http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.1.xsd
+<!--加入解析地址-->
+<task:annotation-driven scheduler="myScheduler"/>
+<task:scheduler id="myScheduler" pool-size="10"/>
+```
+
+
+
+### spring的使用demo
+
+```java
+- applicationContext.xml
+	<beans>
+  <!--getBeans("chinese")这样调用-->
+    <bean id="chinese" class="com.bean.ChineseImpl">
+      <property name="name">
+        <value>小明</value>
+      </property>
+      <property name="age">
+        <value>10</value>
+      </property>
+    </bean>
+  </beans>
+- pojo.java
+    interface Person{
+      public void speak();
+    }
+    class Chinese implements Person{
+      public String name;
+      public int age;
+      // getter and setter 
+      public void speak(){};
+    }
+		public static void main(String[] args){
+      ApplicationContext ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
+      // 注意这里的applicationContext在maven项目中在resource中
+      Person p = (Chinese)ctx.getBean("chinese")
+    }
+```
+
+
+
+### DI & IOC
+
+```java
+依赖注入和控制反转
+Bean/Core->BeanFactory
+spring管理bean的创建
+BeanFacory 和 ApplicationContext 都是用于充当容器管理javaBean的
+依赖注入 调用实例方法时,要把实例属性注入才能让方法调用正确
+IoC 原本要由程序员创建对象,全部交给spring管理了,控制权反转了
+BeanFactory是个接口 所有管理对象的组件都实现了这个接口
+	getBean(name);
+  getBean(name,clz);
+	containsBean(name);
+依赖注入是目前最优秀的解耦合方式,Bean以配置文件的方式组织在一起而不是硬解耦合
+```
+
+### applicationContext.xml
+
+```xml
+- applicationContext.xml
+对于普通的pojo类我们可以如下声明
+<!--空注入-->
+<beans>
+  <!--单例模式-->
+  <bean id="chinese" class="com.bean.ChineseImpl" scope="singleton" lazy-init="true">
+  </bean>
+  <bean id="american" class="com.bean.AmericanImpl">
+  </bean>
+</beans>
+
+<!--如果字段中的类型是其他Beans的话-->
+<bean id="userDao" class="com.rupeng.container.UserDao"></bean>
+<bean id="userService" class="com.rupeng.container.UserService">
+    <property name="userDao" ref="userDao"></property>
+  	<!--其成员变量是类 用ref指定关联的类-->
+</bean>
+
+<!--构造注入(不常见)-->
+<bean id="user1" class="com.rupeng.container.User">
+    <constructor-arg index="0" value="蛋蛋"></constructor-arg>
+    <constructor-arg name="age" value="16"></constructor-arg>
+</bean>
+
+
+<!-- 注入普通值 -->
+<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+	<property name="driverClass" value="com.mysql.jdbc.Driver"/>  
+	<property name="jdbcUrl" value="jdbc:mysql://localhost/springDemo?characterEncoding=UTF8"/>  
+	<property name="user" value="root"/>  
+	<property name="password" value="root"/>  
+</bean>
+
+<!-- 注入集合 -->
+<bean id="team1" class="com.rupeng.container.Team">
+    <property name="members">
+        <list>
+            <value>蛋蛋</value>
+            <value>建国</value>
+            <value>王自健</value>
+        </list>
+    </property>
+</bean>
+```
+
+# Spring bean初始化流程
+
+bean的总的创建过程为：
+
+1 Spring扫描并保存配置文件中的bean定义
+
+2（开始依次创建对象）创建一个对象之后，如果所有的依赖都已存在，则注入所有依赖，然后执行init-method（否则不注入也不执行init-method）
+
+3（等所有的对象都创建出来之后）为还没有注入依赖的bean注入所有依赖，然后执行init-method
+
+ 可以简化为：创建对象—> 注入依赖 —> init-method
+
+# Spring基本注解
+
+标注函数基本功能的组件
+
+```xml
+<context:component-scan base-package=”com.test”></context:component-scan>
+<!--beans.xml引入spring扫描基本的包 只有引用了这个基本组件才能用下面注解-->
+```
+
+```java
+@Component // 标注到类上(下同) 把普通pojo类引入到spring框架中 
+// 相当于 <bean id='' class=''/>
+// 泛指组件 无法确定具体层的时候可以标注
+@Service // 标注业务层逻辑 DAOImplements
+// ctx.getBeans("user") // 类名小写
+// Service("classname") // 可以自定义名字
+@Controller	// 控制层
+@Repository // DAO层
+
+// 上面的所有注解效果和@Component一样但是可读性更好
+@Scope // singleton单例 prototype原型(每次都用新的) 
+// request session globalSession application 每次请求会话创建一个
+@PostConstruct // Bean创建时执行
+@PreDestroy // Bean销毁时执行
+
+@Autowired 
+// 自动填充 自动在IoC容器中找相应的属性填充 最好是单个适用 多个报错或者 按名称找到
+//  @Qualifier("userJdbcImps") 可以用于指定要自动填充的类的名字
+@Resource(name=,type=) // 根据名字或者类型去匹配
+@Value("#{1}") // SpEL表达式给pojo类注入默认初始值
+@Value("${}") // 获取配置文件的值 在此不详细叙述
+
+// 会在接下来详细讲
+@Bean
+@Configruation
+```
+
+# @Autowired/@Resource
+
+这两个注解都是用来标注在Pojo类的字段上用来完成自动装配的
+
+装配指的是spring在遇到bean属性没有明确注入的时候会去已经加载的bean中找相应的类型或者名字类似的填充到这个属性中
+
+beans.xml 中可以配置default-autowire为byName,byType,constructor和autodetect.
+
+byName 装配 <bean id='bean_name'> 中bean_name和属性名一致的
+
+byType 是找和装配属性数据类型类似的对象装配进里面
+
+constructor 是byType标注在构造器的装配
+
+autodetect通过bean的自省机制决定用constructor还是byType,如果发现默认构造器用byType
+
+通过上面我们可以看出spring的复杂性不在AOP内省反射 而是加载机制 这是spring的核心机制
+
+"Spring几乎考虑了所有可能性,所以方法特别复杂但完整有条理."
+
+@Autowired标注在setter方法上 用的是byType装配
+
+@Resource 也可用来装配bean 只不过是按name默认装配@Resource("bean_name")
+
+写在字段按字段查找,写在setter上默认使用name进行装配
+
+顺带一提@Autowired想要按名字匹配的话并用如下注解@Qualifier("baseDao")
+
+# Spring启动
+
+这里顺便把springmvc启动讲了
+
+<font color="red">spring的启动是建立在servlet启动之上的</font> web的启动过程是springmvc的前部分
+
+Tomcat初始化jar包,一些相关组件,并去读web.xml里面的内容
+
+按顺序初始化context-param,listener,filter,servlet // 原本javaweb的启动如此
+
+**org.springframework.web.context.ContextLoaderListener**
+
+这个类继承ContextLoader 实现了ServletListener
+
+上面这个类在web初始化的时候,准确的说在Listener初始化的时候就配置
+
+Listener 让web应用在ServletContext出来之前把WebApplication注入ServletContext
+
+ContextLoader才去读取spring的beans.xml(由SpringFramework实现ContextLoader)
+
+所以这里的**ContextLoader指的是spring的context**
+
+**ServletContext的初始化早于WebApplicationContext 后者放于前者中于加载入Tomcat时完成**
+
+这个时候就开始了spring的配置而**DispatcherServlet**得到初始化得到servlet阶段
+
+spring初始化开始 读取beans.xml 读取了之后启动 简化如下
+
+1.读取配置文件 加载各类定义资源
+
+2.准备BeanFactory (设置ClassLoader 设置EL表达式 设置公共的单例bean)
+
+2.5 中间有包扫描组件的过程 也有加载组件的构成 都在实例化之前 全部由中间件实现交由给Factory去生产相对应的bean
+
+3.Bean的实例化和注入 
+
+# SpEL表达式
+
+Spring Expression Language
+
+其有三种用途 @Value <bean>配置 Expression(api中手动解析)
+
+基本表达式语法
+
+```SpEL
+常量 #{'hello world'}
+java.lang下基本类的方法调用 #{T(System).currentTimeMillis()}
+直接引用当前对象 #this 
+直接引用其他IoC容器中的对象 #user
+基本运算和正则 #{1+1} #{'123' matches '\\d{3}'} #{1>3}
+定义list {1,2,3} // 没有#
+定义map {name:'zs',age:10} // 类json的定义方法
+集合访问 {1,2,3}[0]
+dict访问 #dict["key"] // #dict #array是一体的表示对对象的访问
+赋值表达式 #array[0]=3
+
+user?.name // 如果不为空则解析
+T(com.test.Test) // 加载全路径的类到JVM
+```
+
+# Spring 定时调度
+
+```xml
+xmlns:task="http://www.springframework.org/schema/task" <!--加入命名空间-->
+
+http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.1.xsd
+<!--加入解析地址-->
+<task:annotation-driven scheduler="myScheduler"/>
+<task:scheduler id="myScheduler" pool-size="10"/>
+```
+
+基于linux系统的crontab cron表达式
+
+\* \* \* \* \* \*  // sec min hour day4month month day4year
+
+```java
+@Scheduled(fixedDelay = 2000)
+@Scheduled(corn = "*/5 * * * * * *")
+// 以上两种标注方式都可以 分别是每隔两秒执行一次和五秒执行一次
+- Task1.java
+@Component
+public class Task1 {
+    @Scheduled(fixedDelay = 2000)
+    public void task(){
+        System.out.println(System.currentTimeMillis());
+    }
+}
+```
+
+# Spring 集成 Quartz
+
+Quartz是一个重量级的任务调度框架
+
+```java
+// 继承QuartzJobBean类
+public class MyJob extends QuartzJobBean {
+    @Override
+    protected void executeInternal(JobExecutionContext context) throws JobExecutionException {
+
+    }
+}
+```
+
+```xml
+<!--配置job工厂-->
+<bean id="jobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
+    <property name="jobClass" value="com.rupeng.quartz.MyJob"></property>
+    <property name="jobDataMap">
+        <map>
+            <entry key="username" value="蛋蛋"></entry>
+        </map>
+    </property>
+</bean>
+
+<!--配置调度规则-->
+<!-- 简单触发器 -->
+<bean id="simpleTrigger"  class="org.springframework.scheduling.quartz.SimpleTriggerFactoryBean">  
+    <property name="jobDetail" ref="jobDetail" />
+    <property name="repeatInterval" value="2000" /><!-- 固定频率 -->
+</bean> 
+
+<!-- 也可以使用cron表达式指定调度规则 -->
+<bean id="cronTrigger"  class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">  
+    <property name="jobDetail" ref="jobDetail" />  
+    <property name="cronExpression" value="0/5 * * * * ?" />
+</bean>
+```
+
+# aspectj切面
+
+这是一个强大的第三方中间件处理工具
+
+切面架构 类似python的装饰器
+
+这个切面是一个解耦合的神器
+
+其有三个类
+
+-   pojo.class
+
+    被用于切面的类 主要业务逻辑在里面
+
+    没有装饰之前的方法在Pojo类中
+
+-    aspect.class
+
+    切面注解的集合类 要标注@Aspect和@Component
+
+    一般有@Pointcut方法供其他注解使用
+
+    还有@Before等方法供spring框架拦截业务逻辑方法
+
+-    main.class
+
+    spring框架调用类的方法
+
+    ((class)ctx.getBean("name")).method(param); 
+
+```xml
+<aop:aspectj-autoproxy></aop:aspectj-autoproxy>
+<!--aspectj 需要添加如上配置-->
+```
+
+```java
+@Aspect // 把类当成切面供类读取 定义所有Pointcut和After等方法
+@PointCut // 定义处理注解
+@Before 
+@After 
+@AfterReturning	// 和上面的区别是 只有当返回返回值的时候才会执行(无异常)
+@AfterThrowing
+@Around // Before和After的统一
+// 以上注解都需要传入参数指定那些在那些方法执行前执行
+比如
+@Before("execution(* *(..))") // 表示匹配所有方法
+@Before("pointCut1()") // 匹配定义好的PointCut方法
+其表达式格式如下
+execution(modifiers-pattern? ret-type-pattern declaring-type-pattern? name-pattern(param-pattern)throws-pattern?)
+
+- modifiers-pattern? 可选值 * public private
+- ret-type-pattern 匹配返回值
+- declaring-type-pattern?类路径匹配 可选值
+- name-pattern(param-pattern) 方法名和参数类型
+- throws-pattern? 可选值 抛出异常类型
+execution(* com.savage.server.*(..))  匹配com.savage.server 下的所有方法
+execution(* com.savage.server.*(int,int)) 匹配参数列表是int的方法
+
+```
+
+### aspectj切面的使用例子
+
+```java
+// pojo类中有一函数叫run是业务逻辑(该对象交给spring管理)
+@Pointcut("execution(* com.test.PojoClass.run(..))")
+public void pojorun(){} // 这是个工具函数只是为了简化上面表达式 方法体为空
+
+@Before("pojorun()") 
+// 这么写相当于 @Before("execution(* com.test.PojoClass.run(..))")
+
+@Component
+@Aspect
+public class MyAspect{
+  @Pointcut("execution(* com.test.PojoClass.run(..))")
+  public void run(){}
+  
+  @Before("run()")
+  public void before(JoinPoint jp){
+    // joinpoint为切入点 可以观察到切面内的情况
+    System.out.println(Arrays.asList(jp.getArgs()));
+    System.out.println(jp.getSignature());
+    System.out.println(jp.toLongString());
+    System.out.println("before");
+    
+  }
+  
+  @After("run()")
+  public void after(JoinPoint jp){
+    System.out.println("after");
+  }
+  
+  // 这个和装饰器很像了
+  @Around("run() || run()") // 可以用或和且表达式的形式 此处作为例子
+	public Object around(ProceedingJoinPoint jp) throws Throwable{
+    System.out.println("before");
+    Object returnValue = jp.proceed(); // 闭包执行
+    System.out.println("after");
+    return returnValue;
+  }
+  
+  // 下面这两个用的比较少
+  @AfterReturning(pointcut = "run()", returning ="returnValue")
+  public void afr(JoinPoint jp,Object returnValue){}
+  
+  @AfterThrowing(pointcut = "run()", throwing ="exception")
+  public void aft(JoinPoint jp,Exception exception){}
+}
+```
+
+# AOP 执行原理
+
+1 在创建Spring容器时，Spring会读取并保存切面配置信息。创建bean后，如果这个bean匹配了切入点表达式，Spring就会创建其代理对象代理这个bean、 
+
+2 使用代理bean第一次调用某个目标方法时，Spring会把所有匹配的通知和目标方法按照通知类型有序的组成一个调用链，并把此调用链缓存起来以便重复使用，然后执行此调用链
+
+# AOP的其他方式
+
+-   1 JDK动态代理
+
+    其实就是利用反射实现
+
+    ```java
+    // 公共接口MyInterface定义show方法
+    // 基本类MyTarget实现show方法
+    // 装饰器类(增强类)
+    import java.lang.reflect.InvocationHandler;
+    import java.lang.reflect.Method;
+    
+    public class MyInvocationHandler implements InvocationHandler {
+    
+        private Object targetObject;
+    
+        public MyInvocationHandler(Object targetObject) {
+            this.targetObject = targetObject;
+        }
+    
+        @Override
+        public Object invoke(Object proxyObject, Method method, Object[] args) throws Throwable {
+    
+            System.out.println("可以在目标方法执行前进行预处理");
+            Object returnValue = method.invoke(targetObject, args);
+          //执行目标方法
+            System.out.println("也可以在目标方法执行后进行后处理");
+            return returnValue;
+        }
+    }
+    
+    // 测试代码
+    @Test
+    public void test1() {
+    
+        MyTarget targetObject = new MyTarget();
+        MyInvocationHandler invocationHandler = new MyInvocationHandler(targetObject);
+    
+        //生成代理类并直接返回代理类的对象
+        MyInterface proxyObject = (MyInterface) Proxy.newProxyInstance(MyTarget.class.getClassLoader(),
+                MyTarget.class.getInterfaces(), invocationHandler);
+    
+        proxyObject.show();
+    }
+    ```
+
+    
+
+-   2 CGLIB字节码代理
+
+    不需要借助相应的接口实现，而是借助继承实现
+
+    ```java
+    import org.springframework.cglib.proxy.MethodInterceptor;
+    import org.springframework.cglib.proxy.MethodProxy;
+    
+    public class MyMethodInterceptor implements MethodInterceptor {
+    
+        private Object targetObject;
+    
+        public MyMethodInterceptor(Object targetObject) {
+            this.targetObject = targetObject;
+        }
+      
+        @Override
+        public Object intercept(Object proxyObject, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
+            System.out.println("预处理");
+            Object returnValue = method.invoke(targetObject, args);
+            System.out.println("后处理");
+            return returnValue;
+        }
+    }
+    // 测试代码
+    @Test
+    public void test1() {
+    
+        MyTarget targetObject = new MyTarget();
+        MyMethodInterceptor methodInterceptor = new MyMethodInterceptor(targetObject);
+    
+      	// 这里只不过是把继承动态写出来了
+        Enhancer enhancer = new Enhancer();
+        enhancer.setSuperclass(MyTarget.class);
+        enhancer.setCallback(methodInterceptor);
+    
+        MyTarget proxyObject = (MyTarget) enhancer.create();
+        proxyObject.show();
+    }
+    ```
+
+    总结下JDK动态代理是实现共同的接口然后在增强类里面调用相应的目标类接口
+
+    而CGLIB则是用目标类为父类子类为增强类相当于Override父类的方法
+
+    只不过两者都用了动态的写法让代码解耦合
+
+# Spring资源管理
+
+```java
+ApplicationContext ctx = new ClassPathXmlApplicationContext("xxx.xml");
+// 上面是正常的写法 但是其实还可以通过其他方法获得上面xml的文件流
+new ClassPathResource("com/test/...").getInputStream();
+new FileSystemResource("/Users/...").getInputStream();
+new UrlResource("file:").getInputStream();
+// 以上方法都可以获得文件流
+
+ClassPath* 用的是 ClassLoader.getResourceAsStream()
+FileSystem* 用的是 new File() new FileInputStream()
+UrlResource* 用的是 new Url() openConnection() 实现
+```
+
+# 数据库访问支持和事务
+
+声明式事务管理是spring的核心模块之一
+
+事务ACID 原子性 一致性 隔离性 持久性
+
+编程式事务管理: 把事务的提交和回滚嵌入到业务逻辑中
+
+声明式事务管理: 利用AOP把事务作为Cutpoint,利用注解就不用再try-rollback了
+
+spring一般用事务管理器去管理事务
+
+```xml
+<!--环境配置-->
+<!-- 数据库连接池 -->
+<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+	<property name="driverClass" value="com.mysql.jdbc.Driver"/>
+	<property name="jdbcUrl" value="jdbc:mysql://localhost/dbname?characterEncoding=UTF8"/>
+	<property name="user" value="root"/>
+	<property name="password" value="root"/>
+</bean>
+<!--
+普通的数据源配置如下,其它数据源可以去org.springframework.jdbc.datasource下找
+-->
+<!--
+<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+    <property name="username" value="root"/>
+    <property name="password" value="root"/>
+    <property name="url" value="jdbc:mysql:///spring_data"/>
+</bean>
+-->
+<!--利用spring内部的模板类即可-->
+<!--
+<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+-->
+
+
+
+<!-- 事务管理器 -->
+<bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+	<property name="dataSource" ref="dataSource" />
+</bean>
+
+<!--
+jpa事务处理
+<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+        <property name="sessionFactory" ref="sessionFactory" />
+s</bean>
+-->
+
+<!-- 事务属性 -->
+<tx:advice id="txAdvice" transaction-manager="txManager">
+	<tx:attributes>
+		<!--propagation配置事务传播行为-->
+            <tx:method name="purchase" propagation="REQUIRES_NEW"/>
+            <!--isolation配置事务的隔离级别-->
+            <tx:method name="update*" isolation="SERIALIZABLE"/>
+            <!--rollback-for配置事务遇到异常必须回滚，no-rollback-for配置事务遇到异常必须不能回滚-->
+            <tx:method name="add*" rollback-for="java.io.IOException" no-rollback-for="com.dmsd.spring.tx.BookStockException"/>
+            <!--read-only配置事务只读属性-->
+            <tx:method name="find*" read-only="true"/>
+            <!--timeout配置事务的超时属性-->
+            <tx:method name="get*" timeout="3"/>
+	</tx:attributes>
+</tx:advice>
+
+<!-- 织入事务 -->
+<aop:config>
+	<aop:advisor advice-ref="txAdvice" pointcut="execution(* com.jdbctest.* *(..))" />
+</aop:config>
+
+<!-- 启用事务注解 -->
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+```
+
+通常我们用orm访问数据库用的比较多的就mybatis和jpa(注解)
+
+### 事务传播行为
+
+事务传播行为指的是当事务中调用另外的事务应该如何调用
+
+指定方法是不是一定要在事务中运行
+
+propagation中可以指定
+
+-   REQUIRED (默认) 如果当前有事务则使用当前的事务 如果没有则开启新事务必须运行在事务中
+
+-   SUPPORTS 如果当前有事务则用当前的事务 如果没有事务则不开启新事务可运行在事务中也可不运行在事务中，支持事务运行
+
+REQUIRED_NEW 必须运行在新事务中(挂起原事务启动新事务)
+
+NOT_SUPPORTED 不支持运行在事务中(如果有事务会挂起)
+
+MANDATORY 必须运行在事务中否则抛出异常
+
+NEVER 必须不是运行在事务中否则抛出异常
+
+NESTED 启动嵌套事务(单独进行回滚,其他行为和REQUIRED一致)
+
+### 事务隔离级别
+
+-   三种读数据现象
+
+    脏读 读到了其他事务没有提交的数据
+
+    幻读 读到了本该不存在的数据(其他事物插入的数据)
+
+    不可重复读 两次读表结果不一致
+
+READ_COMMITED (默认) 只能读其他已经其他事务提交之后的 不可重复读和幻读有可能
+
+即是其他事务如果修改等全部提交完之后再读,如果没有修改读上一次的
+
+READ_UNCOMMITED 最坏的,上面三种都可能出现
+
+REPEATABLE_READ 读期间禁止其他事务修改字段 有可能幻读
+
+SERIALIZABLE 性能比较低 读写互斥
+
+### 利用注解配置事务
+
+```java
+	@Transactional(propagation=Propagation.REQUIRES_NEW,
+			isolation=Isolation.READ_COMMITTED,
+			noRollbackFor={UserAccountException.class},
+			rollbackFor = IOException.class,
+			readOnly=false,
+			timeout=3)
+	@Override
+	public void purchase(String username, String isbn) {
+    // 业务逻辑
+  }
+```
+
+### 事务失效
+
+这是由于反射中调用其他方法内有this.方法的时候 不会把这个this,方法的注解获得 所以可以有以下解决方案
+
+```java
+@Transactional
+	@Override
+	public void purchase(String username, String isbn) {
+		this.update(username, isbn);
+	}
+ 
+	@Transactional // 这个注解没用
+	public void update(String username, String isbn) {
+		//1. 获取书的单价
+		int price = bookShopDao.findBookPriceByIsbn(isbn);
+		//2. 更新数的库存
+		bookShopDao.updateBookStock(isbn);
+		//3. 更新用户余额
+		bookShopDao.updateUserAccount(username, price);
+	}
+```
+
+修改配置
+
+```xml
+<!--开启aspectj代理，并暴露aop代理到ThreadLocal-->
+<aop:aspectj-autoproxy expose-proxy="true"/>
+```
+
+修改代码
+
+```java
+@Transactional
+@Override
+public void purchase(String username, String isbn) {
+	((BookShopServiceImpl)AopContext.currentProxy()).update(username, isbn);
+}
+```
+
+
+
+# web中配置spring
+
+```xml
+- web.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd" id="WebApp_ID" version="3.1">
+    
+    <context-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:beans.xml</param-value>
+    </context-param>
+    <!-- 初始化spring容器 -->
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+  
+    <!-- 设置post请求编码和响应编码 -->
+    <filter>
+        <filter-name>characterEncodingFilter</filter-name>
+        <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+            <init-param>
+                <param-name>encoding</param-name>
+                <param-value>UTF-8</param-value>
+            </init-param>
+        <init-param>
+            <!-- 为true时也对响应进行编码 -->
+            <param-name>forceEncoding</param-name>
+            <param-value>true</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>characterEncodingFilter</filter-name>
+        <!-- 设置为/*时才会拦截所有请求求 -->
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+</web-app>
+```
+
+```xml
+- pom.xml 配置相应的依赖
+<!-- servlet依赖 -->
+<dependency>
+    <groupId>javax.servlet</groupId>
+    <artifactId>javax.servlet-api</artifactId>
+    <version>3.1.0</version>
+    <scope>provided</scope>
+</dependency>
+<!-- JSP依赖 -->
+<dependency>
+    <groupId>javax.servlet.jsp</groupId>
+    <artifactId>jsp-api</artifactId>
+    <version>2.2</version>
+    <scope>provided</scope>
+</dependency>
+<!-- JSTL依赖 -->
+<dependency>
+    <groupId>org.glassfish.web</groupId>
+    <artifactId>jstl-impl</artifactId>
+    <version>1.2</version>
+    <exclusions>
+        <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+        </exclusion>
+        <exclusion>
+            <groupId>javax.servlet.jsp</groupId>
+            <artifactId>jsp-api</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+```
+

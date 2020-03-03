@@ -1,0 +1,35 @@
+idea plugins
+
+所有插件的入口是Tools -> plugin_name
+
+安装相关的操作是 settings->plugin
+
+-   mybatris log plugin
+
+    把mybatis输出的语句打印到控制台上
+
+    本质上是个jar包或者java程序
+
+    启动之后会有单独窗口显示输出拼接出来的sql语句
+
+-   database navigator
+
+    添加数据库和driver
+
+    在表上可以实现简单的CRUD
+
+-   big data tools
+
+    支持spark和zeeplin的大数据工具
+
+-   Resultful Toolkit
+
+    前后端接口工具
+
+- Diagrams
+
+  原生支持的插件 对于生成类的分析图而言十分好用
+  
+  
+  
+    
