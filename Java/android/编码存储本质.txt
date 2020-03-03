@@ -12,14 +12,16 @@
 	StreamReader是位于字符层和二进制层之间充当沟通桥梁
 	String和Chars相当于字符层的结构 String对 char[] 进行了封装
 
-	>>> bytes("雨女无瓜","utf-8")
-	b'\xe9\x9b\xa8\xe5\xa5\xb3\xe6\x97\xa0\xe7\x93\x9c'
+```python
+>>> bytes("雨女无瓜","utf-8")
+b'\xe9\x9b\xa8\xe5\xa5\xb3\xe6\x97\xa0\xe7\x93\x9c'
+```
 
-	可以看出来 bytes本质就是用二进制去存储的
-	而char和bytes之间要进行一层encode
-	只有encode之后才能把char变成二进制 熟悉的编码例如utf8等
-	就是在字符层转换到二进制层的过程中进行了二进制编码
-	同样我们要把二进制数据进行解码得到人类能够识别的字符串
+可以看出来 bytes本质就是用二进制去存储的
+而char和bytes之间要进行一层encode
+只有encode之后才能把char变成二进制 熟悉的编码例如utf8等
+就是在字符层转换到二进制层的过程中进行了二进制编码
+同样我们要把二进制数据进行解码得到人类能够识别的字符串
 
 编码的操控还有一层Buffered
 	BufferedReader/BufferedWriter

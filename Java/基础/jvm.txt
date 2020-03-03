@@ -1,5 +1,9 @@
 # jvm
 
+---
+
+[TOC]
+
 Java virtual machine
 
 之前已经写过类似的文档 但总结起来就是每次都有新的认识
@@ -10,24 +14,31 @@ Java virtual machine
 
 -   内存结构 
 -   类加载过程
+    -   ***类的初始化***
 -   Javaapi/shell 
 -   GC
 
-### 内存结构
+### 简单内存结构
 
 ​	heap 用于存放process级别数据 class内的变量等 new 出来的变量等 数组等
 
 ​	stack 存放thread/function级别数据 局部变量操作数栈动态链接方法出口
 
-​	方法区 常量池 static变量区 类接口等加载去
+​	方法区 process级数据 常量池 static变量区 类接口等加载去
 
-​	navtive 方法区 process级别数据 存放c++实现的方法 主要针对字节码操作
+​	navtive 方法区 global级别数据 被jvm环境使用 存放c++实现的方法 主要针对字节码操作
+
+​	在多线程中还会进一步深化此知识 不过对于内存结构而言 相对简单如上的模型是
 
 ### 类加载过程
 
 -   加载前
 
     Complier完成对.java文件的编译变成.class文件
+
+    这个编译过程会对一些运算进行替换比如1==1替换成true
+
+    这一阶段就会加入常量池
 
 -   加载
 
@@ -39,7 +50,7 @@ Java virtual machine
 
     这个过程主要加载类的static变量完成默认值注入(只针对变量) 生成引用 
 
-    对final static变量直接注入值
+    ***对final static变量直接注入值***
 
 -   ClassLoader
 
@@ -57,15 +68,54 @@ Java virtual machine
 
     -   双亲委派模型(主要) 
 
-        用户加载器->系统加载器->扩展加载器->根加载器
+        用户加载器->应用加载器/系统加载器/上下文加载器->扩展加载器->根加载器
 
         按照此方式往上加载类
+        
+        好处是父类加载了就没必要自己加载一次
+        
+        平时默认是使用系统加载器的 也可以自己制自己的加载器
+        
+        ```java
+        Class.forName(); 
+        // 用当前类加载器
+        Classloader.getSystemClassLoader().loadClass();
+        // 用系统加载器
+        Thread.currentThread().getContextClassLoader().loadClass();
+        // 用上下文加载器
+        ```
+        
+        
 
--   初始化
+    ClassLoader的代码结构
 
-    clinit方法和init方法
+    -   **defineClass** 
 
-    在编译.class文件的时候注入到里面
+        byte流解析成jvm能够识别的对象
+
+    -    **findClass** 
+
+        通过类名去加载对象,通常我们定义自己的类加载器用该方法实现
+
+    -    **loadClass** 
+
+        加载类到JVM
+
+    -    **resolveClass**
+
+        动调用这个使得被加到JVM的类被链接
+
+    双亲委派模型
+
+    ​	![图片](https://upload-images.jianshu.io/upload_images/1833901-97c7f6c8d8e0965f.png)
+
+-   ***初始化***
+
+    clinit方法和init方法 是指类的初始化和对象的初始化
+
+    而注意一点 无clinit在执行的时候会阻塞所有static变量和代码块
+
+    在编译.class文件的时候注入到字节码里面
 
     -   clinit是类的初始化
 
@@ -76,19 +126,76 @@ Java virtual machine
     -   init是实例的初始化
 
         实例初始化 类的构造方法和普通代码块的执行
+        
+    -   初始化顺序和方法执行特点
+
+        ***1.类的初始化*** clinit方法的特性
+
+        ​	先执行父类在执行子类,
+
+        ​	先执行staic方法在执行普通方法,
+
+        ​	先初始化成员变量在初始化方法
+
+        ​	***而静态代码块和静态成员变量按顺序从类的上往下依次执行***
+
+        ​	***数组定义不会触发初始化！！ 本质上是加载数组类***
+
+        ​	类的初始化条件 本质上是new,getstatic,putstatic,invokestatic指令执行的时候
+
+        	1. new 不包括 new ClassName[10]
+         	2. 反射调用的时候
+         	3. 父类初始化
+         	4. 虚拟机加载的时候
+         	5. 方法invoke 内部有隐式的new
+
+        ***2.对象的初始化*** init方法特性
+
+        ​	执行变量初始化 方法指针生成等 和clinit类似
+
+**学会了?来试试下面习题吧**
+
+```java
+public class StaticTest{
+    public static void main(String[] args){
+        staticFunction();
+    }
+
+    static StaticTest st = new StaticTest();
+
+    static{
+        System.out.println("1");
+    }
+
+    {
+        System.out.println("2");
+    }
+
+    StaticTest(){
+        System.out.println("3");
+        System.out.println("a="+a+",b="+b);
+    }
+
+    public static void staticFunction(){
+        System.out.println("4");
+    }
+
+    int a=110;
+    static int b =112;
+}
+```
 
 -   使用
-
 -   卸载
 
-### javaapi/shell
+### javaapi/shell获取jvm相关信息
 
 ```shell
 java -verbose:class 即可查看加载了哪些类
 java -verbose:gc 可查看gc清理
 ```
 
-### java 主要通过java.lang.management相关的类实现功能
+java 主要通过java.lang.management相关的类实现功能
 
 ```java
 import java.lang.management.ClassLoadingMXBean;
@@ -346,3 +453,31 @@ Mark-compact算法 存活对象向一个方向移动
 Mark-sweep算法 直接回收产生内碎片
 
 Copying算法 回收之后复制整齐 性能开销太大
+
+GC:
+	主动调用 System.gc();
+	垃圾回收机制回收没有被引用变量引用的对象。
+	当Java对象被创建出来后，垃圾回收机制会实时监控每一个对象的运行状态，如：对象申请，引用，被引用，赋值等。当垃圾回收机制监控到某个对象不再被引用变量引用时，垃圾回收机制就会回收它所占用的空间。 
+　　所以！在我们不再需要使用一个对象时，要记得取消对该对象的所有引用，
+	这样，垃圾回收机制才能自动回收它，否则就会造成内存泄漏。
+	复制实际算法:
+		新生代:大规模清理对象
+		copying算法:堆内存分割成两个空间 递归访问可达对象复制到其中一半
+		//遍历空间成本小，复制成本大
+		老年代:对象存活率高，没有额外空间
+		Mark-Sweep:递归遍历标记可达对象，然后全部遍历回收没标记的对象
+		//碎片多，遍历两次，内存利用率高
+		Mark-Compact:标记整理 标记可达对象，搬到同一区域，回收不可达对象
+	GC内存管理技巧
+	1.尽量使用直接量
+	2.使用StringBuilder和StringBuffer
+	3.无用对象设置为null
+	4.少使用静态对象
+	5.尽量避免在常用方法循环中创建对象
+	6.缓存经常使用的对象
+		1.文件
+		2.内存缓存(用一个map结构实现)
+	7.考虑使用SoftReference
+	8.使用int类型等少使用包装类
+	9.减少同一时间大量创建对象(减少gc使用频率)
+	10.不要显式调用System.gc()、finalize方法
