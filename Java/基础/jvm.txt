@@ -499,3 +499,60 @@ GC:
 	8.使用int类型等少使用包装类
 	9.减少同一时间大量创建对象(减少gc使用频率)
 	10.不要显式调用System.gc()、finalize方法
+
+#### 引用类型
+
+强引用,弱引用,软引用,虚引用
+
+强引用:Object obj=new Object(); // 我们平时自己new出来的有带变量接受称强引用
+
+如果这些对象是OutOfMemoryError 也就是说jvm不可能回收这类对象
+
+弱引用:new Object(); // 没有明确变量引用时jvm会考虑回收
+
+软引用:obj=null; //只有在内存不足的时候JVM才会回收该对象一般我们会配合ReferenceQueue去使用
+
+```java
+import java.lang.ref.SoftReference; 
+public class SoftRef {  
+    public static void main(String[] args){  
+        System.out.println("start");            
+        Obj obj = new Obj();            
+        SoftReference<Obj> sr = new SoftReference<Obj>(obj);  
+        obj = null;  
+        System.out.println(sr.get());  
+        System.out.println("end");     
+    }       
+}
+class Obj{  
+    int[] obj ;  
+    public Obj(){  
+        obj = new int[1000];  
+    }  
+}
+```
+
+虚引用:在任何时候都可能被垃圾回收器回收
+
+```java
+import java.lang.ref.PhantomReference;
+import java.lang.ref.ReferenceQueue;
+public class PhantomRef {
+    public static void main(String[] args) {
+        ReferenceQueue<String> queue = new ReferenceQueue<String>();
+        PhantomReference<String> pr = new PhantomReference<String>(new String("hello"), queue);
+        System.out.println(pr.get());
+    }
+}
+```
+
+| 引用类型 | 被回收时间    | 用途           | 生存时间      |
+| -------- | ------------- | -------------- | ------------- |
+| 强引用   | 从来不会      | 对象的一般状态 | JVM停止运行时 |
+| 软引用   | 内存不足时    | 对象缓存       | 内存不足时    |
+| 弱引用   | jvm垃圾回收时 | 对象缓存       | gc运行后      |
+| 虚引用   | 未知          | 未知           | 未知          |
+
+在实际使用的过程中弱引用与虚引用几乎没用到
+
+所以我们使用完对象一般把变量置为null

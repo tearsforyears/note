@@ -39,7 +39,7 @@ spirngmvc在耦合性和路由配置上比纯servlet来的要好不少
   这里我们人为忽略mybatis的配置留后面整合时使用的一些依赖
   
 #### /webapp/WEB-INF/web.xml
-  
+
 ```xml
   <web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd" id="WebApp_ID" version="3.1">
     <!-- 利用spring自己的filter配置响应编码-->
@@ -63,10 +63,10 @@ spirngmvc在耦合性和路由配置上比纯servlet来的要好不少
   </filter-mapping>
   
 </web-app>
-  ```
-  
+```
+
   #### /webapp/WEB-INF/beans.xml/applicationContext.xml
-  
+
   ```xml
   <?xml version="1.0" encoding="UTF-8"?>
   <beans xmlns="http://www.springframework.org/schema/beans"
@@ -76,9 +76,9 @@ spirngmvc在耦合性和路由配置上比纯servlet来的要好不少
       <context:component-scan base-package="org.example.Component"/>
   </beans>
   ```
-  
+
 #### /pom.xml
-  
+
   ```xml
   <?xml version="1.0" encoding="UTF-8"?>
   
@@ -532,6 +532,10 @@ public class DoubleEditor extends PropertyEditorSupport {
 ​	拦截器和sevlet中的filter差不多 只不过简化了代码 增加了成功后相应
 
 ​	filter的调用逻辑是 filter1->filter2->...->service->...->filter2->filter1
+
+​	而加入了拦截器后的调用逻辑是 filter->interceptor->service->interceptor->filter
+
+​	其本质上的区别的就是filter基于servlet实现 而interceptor基于AOP完成对方法的拦截
 
 ​	doChain方法相当于类似栈的端点
 
