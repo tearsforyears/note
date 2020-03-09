@@ -1,0 +1,165 @@
+# Docker
+
+[TOC]
+
+## 概述
+
+---
+
+**Docker 属于 Linux 容器的一种封装，提供简单易用的容器使用接口。**
+
+docker上可以运行tomcat mysql 其启动十分迅速 是轻量级的虚拟机
+
+docker的隔离性稍弱属于进程性的隔离而一般虚拟机是系统上的隔离
+
+Docker在Dockerfile上编写了容器的构造过程易于集群分发和部署
+
+docker本质上是个可供web容器运行的**容器(Container)** 是一个虚拟机
+
+其核心配置文件为**Dockerfile**,核心环境是**镜像(Image)**
+
+其和git类似 都有着**仓库(Repository)**可以push和pull**镜像(Image)**
+
+也可以操作tar文件进行load和save**镜像(Image)**
+
+而通过镜像去run的程序称为一个容器可以通过commit编程镜像
+
+其全部采用Restful的方式去进行网络通信
+
+## 架构
+
+---
+
+![架构](https://www.runoob.com/wp-content/uploads/2016/04/576507-docker1.png)
+
+## 使用感受
+
+---
+
+wdnmd 太强了 完全不用考虑太多环境问题 还支持自定义镜像
+
+---
+
+## demo
+
+安装mysql映射到3307端口 
+
+1.docker pull mysql # 可以指定版本 mysql:5.7 默认最新
+
+2.docker images # 查看装好没
+
+3.docker run -p 3307:3306 --name mysql -e MYSQL_ROOT_PASSWORD=123456 -d mysql # navicat能连上了 这里的配置参数-e 是代表传递环境变量的意思
+
+4.docker ps
+
+4.docker rm -f {id} # 退出docker
+
+大大简化了配置的过程啊 牛逼
+
+---
+
+配置centos并使用shell命令行
+
+1.docker pull centos
+
+2.docker run -d -i centos # -i 是即使不进入命令行或者不调用也不会shutdown process
+
+3.docker exec -it {id} bash # 进入命令行
+
+## 常用指令
+
+```shell
+docker pull nginx # 类似git pull 
+docker pull mysql 
+
+docker images # 查看本地镜像
+docker ps # 查看本地运行的容器
+
+docker rm -f {id} # 删除容器
+docker rmi {id} # 删除镜像
+
+docker run -i -d -p 81:80 nginx # -d 是后台运行 -p 是指定内外端口映射
+# 81 是外部端口 80 是内部端口
+docker exec -it {id} bash # 进入容器的bash
+
+# 构建相关命令
+docker build -t {镜像名} . 
+# .代表当前目录下的Dockerfile文件 使用dockerfile去创建镜像
+docker save {镜像名}>1.tar # 保存成tar文件
+docker commit {容器名} {镜像名}# 保存成镜像
+```
+
+docker有自己类似github的社区可以把镜像上传到此[docker](https://www.docker.com)
+
+内置端口映射特别好用 能基本隔离普通组件和代码运行环境
+
+## 集群创建相关工具
+
+![相关命令](https://dl.iteye.com/upload/picture/pic/137199/7dae6c9a-a506-3bde-8ef6-893793134eb7.png)
+
+### Dockerfile
+
+从已知镜像中定制 我们用的核心指令是build 和 save
+
+```dockerfile
+FROM nginx # 基于nginx创建定制化镜像
+RUN echo '这是一个本地构建的nginx镜像' > /usr/share/nginx/html/index.html
+# 执行命令行
+```
+
+RUN指令得写成如下形式 要不会创建三层镜像使得系统臃肿
+
+```dockerfile
+FROM centos
+RUN yum install wget
+RUN wget -O redis.tar.gz "http://download.redis.io/releases/redis-5.0.3.tar.gz"
+RUN tar -xvf redis.tar.gz
+
+# 以上执行会创建 3 层镜像。可简化为以下格式：&& 连接起来
+FROM centos
+RUN yum install wget \
+    && wget -O redis.tar.gz "http://download.redis.io/releases/redis-5.0.3.tar.gz" \
+    && tar -xvf redis.tar.gz
+```
+
+创建镜像
+
+```shell
+docker build -t nginx:test . 
+# 会把.下的文件打包发送给docker引擎 所以不要放多余的文件 假设当前目录有home.txt
+# .称为上下文路径 
+```
+
+COPY指令 #add指令同样可以做到但是官方推荐用copy
+
+```dockerfile
+COPY hom* /mydir/ # 可以把上下文路径中的文件复制到容器指定文件夹
+COPY hom?.txt /mydir/
+```
+
+MAINTANER 维护者信息 
+
+```dockerfile
+MAINTAINER tearsforyears <1027664894@qq.com>
+```
+
+ENV 设置环境变量
+
+```dockerfile
+ENV JAVA_HOME /usr/bin/java
+```
+
+CMD指令
+
+和RUN唯一的不同就是RUN是在build的时候执行的CMD在docker run的时候执行
+
+### Compose
+
+用于定义多容器运行的组件
+
+定义好docker-compose.yml执行docker-compose up # 后续用到时补充
+
+### Docker Machine
+
+在虚拟机上安装docker 也可以集中管理所有docker主机 比如给100台服务器安装docker
+
