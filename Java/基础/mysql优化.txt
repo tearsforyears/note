@@ -2,5 +2,94 @@
 
 ---
 
-## InnoDB和B+树
+优化的方向有两个sql结构优化,索引,存储过程(因数据库迁移问题等已经弃用)
+
+## 索引
+
+---
+
+索引本质上就是一种数据结构 用来存储某一个key的数据结构
+
+常用的索引结构BST AVLTree 红黑树 B树等 为的是让查找次数更少
+
+索引是根据表来的而不是根据数据库 引擎也是根据表来的 引擎决定了表的结构
+
+建立索引意味着可以通过数据结构去找到相应的节点
+
+## InnoDB MyISAM B+树
+
+---
+
+B+树数据结构特点:高度低 索引次数小 相比于B树其节点数据全在叶子节点上 使得中间索引能够放得下更多 mysql默认是分配16k 树的高度在不超过3的前提下 就能轻松索引千万级数据了
+
+InnoDB: 其文件为聚集索引,及叶子节点的索引存储的是数据本身而非数据的地址
+
+MyISAM: 其文件为非聚集索引,叶子节点存储的是数据的地址
+
+B+树支持叶子节点的前驱后继指针非常良好的支持范围查找(where id>20) 减少磁盘I/O 
+
+---
+
+## 优化实践(建立索引)
+
+多个单列索引:多个单列字段加上索引 mysql在分析的时候只取最有用的一个 而这种时候 根据where字句的情况完全可以用来判别 是应该采用联合索引还是单个索引
+
+联合索引:多个字段有先后顺序的索引 但本质相当于一个索引 其本质内容就是 按照key1排序然后在按照key2排序然后在按照key3以此类推
+
+## 索引类型
+
+-   普通索引
+
+    NORMAL
+
+-   唯一索引(字段的值必须唯一)
+
+    UNIQUE
+
+-   全文索引(这个和我们认知差不多 mysql会预分词(国外)等索引的时候就按照词去索引就快了)
+
+    FULLTEXT 只能标注在 char varchar上
+
+-   空间索引(支持一些比较新的openGIS类型的空间数据的索引)
+
+    SPATIAL
+
+---
+
+mysql 在建立表的时候已经为主键和外键建立了索引 剩下的查询字段我们自己手动建立索引
+
+查看表的索引
+
+show index from tablename;
+
+创建索引 删除索引
+
+```sql
+# 创建普通索引
+ALTER table tableName ADD INDEX indexName(columnName) USING BTREE;
+# 创建联合索引
+ALTER TABLE `test`.`user` ADD INDEX `combine_index`(`id`, `user_name`(3)) USING BTREE;
+ALTER TABLE `test`.`user` 
+DROP INDEX `combine_index`;
+```
+
+创建之后我们可以看到表的结构信息变了
+
+```sql
+| user  | CREATE TABLE `user` (
+  `id` bigint(20) NOT NULL,
+  `pass_word` varchar(255) NOT NULL,
+  `user_name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `name_index` (`user_name`(10)) USING BTREE, # 索引
+  KEY `pass_index` (`pass_word`(3)) USING BTREE  # 索引
+  KEY `combine_index` (`id`,`user_name`(3)) USING BTREE # 联合索引
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 |
+```
+
+查看运行分析
+
+```java
+EXPLAIN select * from users
+```
 

@@ -675,6 +675,8 @@ UrlResource* 用的是 new Url() openConnection() 实现
 
 声明式事务管理: 利用AOP把事务作为Cutpoint,利用注解就不用再try-rollback了
 
+或者是@Transactional注解标注的方法
+
 spring一般用事务管理器去管理事务
 
 ```xml
