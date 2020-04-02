@@ -69,6 +69,41 @@ smembers
 
 也就是说对于临时高峰值业务(抢票 秒杀系统等) 我们直接存取redis集群 等待redis空闲时进行持久化
 
+## redis持久化方式
+
+redis有两种持久化的方式 rdb和aof (redis database和append only file)
+
+rbd 是快照的方式持久化 可以手动触发 阻塞redis线程 可以创建子线程持久化(BGSAVE)
+
+aof 是保存操作命令的  aof回复比较慢 适合保存增量数据
+
+一般我们使用RDB/AOF混合方式做的持久化
+
+redis默认开启rbd 要开启aof要在配置文件中写 appendonly yes
+
+## redis的线程模型
+
+redis是队列循环加单线程模型
+
+其利主要利用了IO复用(请求注册,注册操作)
+
+## redis缓存击穿和缓存雪崩
+
+缓存击穿:一个key非常热点 并发操作 导致这个缓存瞬间穿破缓存直接请求数据库
+
+解决方案 布隆过滤器 缓存空对象
+
+缓存雪崩: 在缓存层出现了错误 导致直接访问存储层 存储层调用量暴增
+
+解决方案: redis高可用集群 限流降级 数据预热
+
+## 和memcached的对比
+
+-   线程模型是单线程
+-   在数据类型上支持更多
+-   比memcached可用性更高
+-   Memcached采用LRU算法 而redis利用vm去管理虚拟内存
+
 ## 如何在项目中使用写在springboot
 
 ```xml
@@ -169,7 +204,7 @@ System.out.println(operations.get("user"));
 
 集群的三种模式
 
--   master-slave(non-HA)
+-   **master-slave(non-HA)**
 
     一个master多个slave slave读 master写
 
@@ -181,7 +216,7 @@ System.out.println(operations.get("user"));
 
     备份master节点 不备份slave节点 
 
--   Sentinel(哨兵模式)
+-   **Sentinel(哨兵模式)**
 
     sentinel是一个独立选举master的节点 当master挂了之后会从原来的集群中选择一个slave当成节点 (sentinel不要和master节点放在一起挂了之后就和master-slave一样人没了)
 
@@ -189,11 +224,13 @@ System.out.println(operations.get("user"));
     
     通过下面分布式选举可以确定新的master并更新到sentinel
     
--   Cluster
+-   **Cluster**
 
-    哨兵模式解决了集群高可用的问题 但并没有解决集群扩容问题 其本质还是读写分离的服务器
+    哨兵模式解决了集群高可用的问题 但并没有解决集群扩容问题 其本质还是读写分离的服务器其可用性比Sentinel要高 因为所有节点都是一主一从(或者一主多从)的模式 不支持同时处理多个key 支持动态扩容 并发很高的时候处理多个key的创建可能会发生不可预测的问题
 
-    其可用性比Sentinel要高 因为所有节点都是一主一从(或者一主多从)的模式 不支持同时处理多个key 支持动态扩容 并发很高的时候处理多个key的创建可能会发生不可预测的问题
+    其本质的核心是通过hash算法算出一个slot 把对应的key放到对应的节点上
+
+Sentinel 保证了其高可用性为了选举 cluster提高了单机性能的扩充
 
 ### 分布式选举
 

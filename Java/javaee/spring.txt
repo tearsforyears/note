@@ -1,4 +1,8 @@
+
+
 # Spring
+
+---
 
 ```java
 spring 是一个出色的中间件框架 其核心为AOP面向切面编程和IOC控制反转
@@ -12,6 +16,8 @@ spring和spingMVC主导主流的javaweb开发
 是最重要的框架
 ```
 
+[TOC]
+
 ### index
 
 -   base DI & IOC - @Component
@@ -22,6 +28,10 @@ spring和spingMVC主导主流的javaweb开发
     -   @Lazy
     -   @Autowired
     -   @Resource(bean_name)
+    -   @Import
+    -   @Bean
+    -   @PostConstruct 
+    -   @PreDestory  
 -   spring/springMVC 启动
 
 -   AOP  - @Aspect
@@ -246,6 +256,22 @@ bean的总的创建过程为：
 
  可以简化为：创建对象—> 注入依赖 —> init-method
 
+## 详细的初始化流程
+
+@PreDestory bean销毁之前执行的方法 标注在方法上 下同
+
+@PostConstruct bean构造之前执行的方法
+
+@Lazy(true) 
+
+![bean初始化流程](https://images0.cnblogs.com/i/580631/201405/181453414212066.png)
+
+![bean初始化流程](https://images0.cnblogs.com/i/580631/201405/181454040628981.png)
+
+我们来解读上面这张流程图
+
+
+
 # Spring基本注解
 
 标注函数基本功能的组件
@@ -278,9 +304,10 @@ bean的总的创建过程为：
 @Value("#{1}") // SpEL表达式给pojo类注入默认初始值
 @Value("${}") // 获取配置文件的值 在此不详细叙述
 
-// 会在接下来详细讲
-@Bean
-@Configruation
+@Bean // 标注在方法上生成bean
+@Configruation 
+
+@Singleton // 标注在类上 自动实现单例
 ```
 
 # @Autowired/@Resource
@@ -311,9 +338,19 @@ autodetect通过bean的自省机制决定用constructor还是byType,如果发现
 
 顺带一提@Autowired想要按名字匹配的话并用如下注解@Qualifier("baseDao")
 
-# Spring启动
+# @Bean/@Import
 
-这里顺便把springmvc启动讲了
+@Bean 标注在方法上用于指定方法返回值生成的类
+
+@Import 用于导入资源
+
+@Import({Pojo.class})
+
+# @Async
+
+这个注解很特殊 标注的方法调用时相当于开启子线程去执行此种方法
+
+# Springweb启动
 
 <font color="red">spring的启动是建立在servlet启动之上的</font> web的启动过程是springmvc的前部分
 

@@ -1,0 +1,180 @@
+# mysql优化
+
+---
+
+优化的方向有两个sql结构优化,索引,存储过程(因数据库迁移问题等已经弃用)
+
+## 索引
+
+---
+
+索引本质上就是一种数据结构 用来存储某一个key的数据结构
+
+常用的索引结构BST AVLTree 红黑树 B树等 为的是让查找次数更少
+
+索引是根据表来的而不是根据数据库 引擎也是根据表来的 引擎决定了表的结构
+
+建立索引意味着可以通过数据结构去找到相应的节点
+
+## 索引覆盖(Using index)
+
+---
+
+覆盖索引指的是索引切实被用上了的意思,指的是查询数据的时候不用扫描行 扫描索引
+
+看下论坛的解释如下
+
+解释一： 就是select的数据列只用从索引中就能够取得，不必从数据表中读取，换句话说查询列要被所使用的索引覆盖。
+
+解释二： 索引是高效找到行的一个方法，当能通过检索索引就可以读取想要的数据，那就不需要再到数据表中读取行了。如果一个索引包含了（或覆盖了）满足查询语句中字段与条件的数据就叫做覆盖索引。
+
+解释三：是非聚集组合索引的一种形式，它包括在查询里的Select、Join和Where子句用到的所有列（即建立索引的字段正好是覆盖查询语句[select子句]与查询条件[Where子句]中所涉及的字段，也即，索引包含了查询正在查找的所有数据.
+
+
+
+## InnoDB MyISAM B+树
+
+---
+
+B+树数据结构特点:高度低 索引次数小 相比于B树其节点数据全在叶子节点上 使得中间索引能够放得下更多 mysql默认是分配16k 树的高度在不超过3的前提下 就能轻松索引千万级数据了
+
+InnoDB: 其文件为聚集索引,及叶子节点的索引存储的是数据本身而非数据的地址
+
+MyISAM: 其文件为非聚集索引,叶子节点存储的是数据的地址
+
+B+树支持叶子节点的前驱后继指针非常良好的支持范围查找(where id>20) 减少磁盘I/O 
+
+---
+
+## 优化实践(建立索引)
+
+多个单列索引:多个单列字段加上索引 mysql在分析的时候只取最有用的一个 而这种时候 根据where字句的情况完全可以用来判别 是应该采用联合索引还是单个索引
+
+联合索引:多个字段有先后顺序的索引 但本质相当于一个索引 其本质内容就是 按照key1排序然后在按照key2排序然后在按照key3以此类推
+
+## 索引类型
+
+-   普通索引
+
+    NORMAL
+
+-   唯一索引(字段的值必须唯一)
+
+    UNIQUE
+
+-   全文索引(这个和我们认知差不多 mysql会预分词(国外)等索引的时候就按照词去索引就快了)
+
+    FULLTEXT 只能标注在 char varchar上
+
+-   空间索引(支持一些比较新的openGIS类型的空间数据的索引)
+
+    SPATIAL
+
+---
+
+mysql 在建立表的时候已经为主键和外键建立了索引 剩下的查询字段我们自己手动建立索引
+
+查看表的索引
+
+show index from tablename;
+
+创建索引 删除索引
+
+```sql
+# 创建普通索引
+ALTER table tableName ADD INDEX indexName(columnName) USING BTREE;
+# 创建联合索引
+ALTER TABLE `test`.`user` ADD INDEX `combine_index`(`id`, `user_name`(3)) USING BTREE;
+ALTER TABLE `test`.`user` 
+DROP INDEX `combine_index`;
+```
+
+创建之后我们可以看到表的结构信息变了
+
+```sql
+| user  | CREATE TABLE `user` (
+  `id` bigint(20) NOT NULL,
+  `pass_word` varchar(255) NOT NULL,
+  `user_name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `name_index` (`user_name`(10)) USING BTREE, # 索引
+  KEY `pass_index` (`pass_word`(3)) USING BTREE  # 索引
+  KEY `combine_index` (`id`,`user_name`(3)) USING BTREE # 联合索引
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 |
+```
+
+查看运行分析
+
+```java
+EXPLAIN select * from users
+```
+
+## mysql的锁
+
+在sql字段后面加上个for update 这是排它锁 这个排它锁其他事务可以读但是不可以写
+
+这是innodb在事务中可以使用的锁 for update nowait也可以 区别在于如果没有nowait其他事务会等待 如果有的话 其他事务会断开链接
+
+### 乐观锁(mysql默认使用)
+
+认为所有的操作不一定会修改数据 有点类似CAS操作 如果数据操作冲突了 让用户决定如何去做
+
+mysql使用数据库版本号来控制
+
+![mysql版本控制](https://upload-images.jianshu.io/upload_images/4461377-d7472568e615e335.png)
+
+```sql
+# step1: 查询出商品信息 把version存起来
+select (quantity,version) from items where id=100;
+# step2: 根据商品信息生成订单
+insert into orders(id,item_id) values(null,100);
+# step3: 修改商品的库存
+update items set quantity=quantity-1,version=version+1 where id=100 and version=#{version};
+# 最后这句也是修改只有一个线程能成功的原因 多了个版本控制字段version
+```
+
+如果是主从分离的数据库select一般是用于访问从数据库的 但是如果把select放在了事务中 访问的是主数据库 另外 如果并发操作很高的时候 从数据库同步可能不及时也会导致查询失败
+
+秒杀系统的核心代码(细粒度的乐观锁)
+
+```sql
+# 仍挑选以库存数作为乐观锁
+# step1: 查询出商品信息
+select (inventory) from items where id=100;
+# step2: 根据商品信息生成订单
+insert into orders(id,item_id) values(null,100);
+# step3: 修改商品的库存
+update items set inventory=inventory-1 where id=100 and inventory-1>0;
+# 这个操作就会失败了
+```
+
+这种如果对行操作version字段保持着相当高的冲突
+
+我们可以采用更加细粒度的直接对字段加锁 一般数据库有类似quantity这样的高并发的字段的时候 我们可以命名quantity_cc 单独控制一个字段的高并发
+
+### 悲观锁
+
+认为所有操作都会修改数据库的数据 重量级锁全锁定读写
+
+mysql想使用悲观锁得 set autocommit=0;
+
+然后sql语句得写成这样
+
+```sql
+//step1: 查出商品状态
+select quantity from items where id=100 for update;
+//step2: 根据商品信息生成订单
+insert into orders(id,item_id) values(null,100);
+//step3: 修改商品的库存
+update Items set quantity=quantity-2 where id=100;
+```
+
+这个for update 是mysql使用悲观锁的方式 其他事务得等到该事务提交之后才能使用
+
+这个锁的是扫描过的所有字段 如果不加索引 相当于全表锁
+
+---
+
+## 集群搭建
+
+主从数据库 master-slave 读写分离模式

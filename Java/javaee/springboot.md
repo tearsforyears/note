@@ -36,7 +36,7 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
 -   **@RequestMapping @GetMapping @HeadMapping**
 
--   **@Controller @Component @Repositroy @Configuration**
+-   **@Controller @Component @Repositroy @Configuration** 默认名字为类名小写
 
 -   **@PathVariable**("name") **@GetMapping**("{name:[a-zA-Z]}{1,}")
 
@@ -48,9 +48,13 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
     可以指定initMethod,destroyMethod用于加载或者销毁类
 
+    默认的name为方法名字本身
+
 -   **@Scope @Description** // 用于指定bean的作用范围和描述
 
 -   **@Transactional** 事务注解 此注解标注在方法上(不要标记在接口上) 用于事务处理 发生异常时回滚 因为是 基于类代理和接口代理实现的 所以标注在接口上基本会在别的组件代理接口时失去效果 另外类内调用该方法也是不起作用的 只有当创建类的时候 该注解才会注入事务
+
+-   **@Autowired @Resource** 根据类型 根据名字注入资源 
 
 ## ***springboot重要注解***
 
@@ -85,13 +89,15 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
     -   @Delete
     -   @Update
 
-## 创建项目
+## tourist
+
+### 创建项目
 
 [Spring initializr](http://start.spring.io/)用于创建springboot项目选择web-springweb 当然idea可以自己选
 
 一堆依赖可以通过选择配置上去 springboot采用默认配置简化了很多其他框架的配置
 
-## 项目目录结构
+### 项目目录结构
 
 是准的web项目结构 有SpringMVC javaweb任意一知识理解此架构不难
 
@@ -125,7 +131,7 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
 ```
 
-## 快速运行的demo
+### 快速运行的demo
 
 ```java
 package com.example.controller;
@@ -145,7 +151,7 @@ public class IndexController {
 }
 ```
 
-## 配置依赖环境pom.xml
+### 配置依赖环境pom.xml
 
 pom.xml的配置简化了非常多 demo项目很容易可以跑出来 而且基本不用自己动手
 
@@ -190,7 +196,7 @@ pom.xml的配置简化了非常多 demo项目很容易可以跑出来 而且基�
     </build>
 ```
 
-## application.properties
+### application.properties
 
 这个文件在resource下是全局配置文件 我们约定这个文件里面一些值可以直接被项目的各个组件所引用
 
@@ -219,7 +225,7 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL5InnoDBDialec
 spring.jpa.show-sql= true
 ```
 
-## 自定义Filter的配置类
+### 自定义Filter的配置类
 
 ```java
 @Configuration // 相当于一个独立的beans.xml注入整体的xml中
@@ -264,7 +270,7 @@ public class WebConfiguration {
 }
 ```
 
-## JPA的简单使用
+### JPA的简单使用
 
 ---
 
@@ -542,6 +548,66 @@ operations.set("user", user);
 System.out.println(operations.get("user"));
 ```
 
+### redis-api
+
+```java
+@Autowired
+private StringRedisTemplate stringRedisTemplate; 
+// 只是操作string类型时候用 本质是序列化的工具不同
+@Autowired
+private RedisTemplate redisTemplate;
+
+// 以下方法提供操作redis的对象
+StringRedisTemplate.opsForValue().* // 操作String字符串类型
+StringRedisTemplate.delete(key/collection) // 根据key/keys删除
+StringRedisTemplate.opsForList().*  // 操作List类型
+StringRedisTemplate.opsForHash().*  // 操作Hash类型
+StringRedisTemplate.opsForSet().*  // 操作set类型
+StringRedisTemplate.opsForZSet().*  // 操作有序set
+
+// string
+stringRedisTemplate.opsForValue().set("aaa", "111");
+System.out.println(stringRedisTemplate.opsForValue().get("aaa"));
+System.out.println(stringRedisTemplate.opsForValue().size("aaa"));
+stringRedisTemplate.opsForValue().append("aaa"," 222");
+
+// list
+redisTemplate.opsForList().leftPush()
+redisTemplate.opsForList().rightPush()
+redisTemplate.opsForList().rightPop()
+redisTemplate.opsForList().leftPop()
+List<String> ls =  redisTemplate.opsForList().range("list",0,redisTemplate.opsForList().size("list")-1); // 读取的结果就是List
+
+// hash
+Map<String,String> dict = new HashMap<String, String> ();
+dict.put("hello","world");
+dict.put("redis","json");
+stringRedisTemplate.opsForHash().putAll("testMap",dict);       System.out.println(stringRedisTemplate.opsForHash().entries("testMap"));
+
+// set
+redisTemplate.opsForSet().add("testSet", "1", "2", "3");
+redisTemplate.opsForSet().members("testSet").forEach((item) -> {
+  System.out.println(item);
+});
+
+// object
+// 本质就是操作序列化字符串
+// 当然可以存json都是没问题的 Fastjson为例
+User user = new User(11L, "redis", "redisPass");
+ValueOperations<String, User> operations = redisTemplate.opsForValue();
+String user_str = JSON.toJSONString(user);
+redisTemplate.opsForValue().set("user_json", user_str);
+String json_user = (String) redisTemplate.opsForValue().get("user_json");
+System.out.println(JSON.parseObject(json_user, User.class));
+
+// 利用配置好的序列化解析器我们也可以像这样子dump
+// 下面这种官方推荐
+User user = new User("ready", "perfect");
+ValueOperations<String, User> operations = redisTemplate.opsForValue();
+operations.set("user", user);
+System.out.println(operations.get("user"));
+```
+
 ---
 
 ## **springboot-jpa(hibernate)**
@@ -759,7 +825,7 @@ String findUserPhoneNumberByUserName(@String username);
     }
     ```
 
--   创建结果集接口接收数据
+-   创建结果集接口
 
     ```java
     // DAO
@@ -774,7 +840,7 @@ String findUserPhoneNumberByUserName(@String username);
     }
     ```
 
-## springboot-mybatis
+## springboot-mybatis(推荐使用)
 
 orm框架发展到现在就剩以mybatis/mybatis-plus的灵活sql和不用写一句sql,jpa-hibernate为顶层的两大框架,hibernate经过jpa优化已经开发难度已经很低了,而mybatis经过注解等优化之后基本也是非常完善的技术体系了 按照经验而言mybatis给了DBA存在的理由 优化可以做的特别好
 
@@ -818,7 +884,7 @@ public class User implements Serializable {
 }
 ```
 
-复杂查询
+### 复杂查询
 
 mybatis的Pojo比较自由 没有hibernate那样的约束 只是用于保存结果而已 用于维护的表关系的注解如下
 
@@ -871,25 +937,297 @@ mybatis.config-location=classpath:mybatis/mybatis-config.xml
 mybatis.mapper-locations=classpath:mybatis/mapper/*.xml
 ```
 
-## 文件上传
+### mybatis plus
 
+是国人写的一个增强mybatis的工具 也就是增强使用 原生sql一样可以实现
 
+```xml
+<dependency>
+  <groupId>com.baomidou</groupId>
+  <artifactId>mybatis-plus-boot-starter</artifactId>
+  <version>3.1.1</version>
+</dependency>
+```
 
-## 登录认证
+```java
+package com.example.mbttest;
 
+import com.baomidou.mybatisplus.extension.plugins.PaginationInterceptor;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
+@Configuration
+@MapperScan("com.example.mbttest.mapper")
+public class MybatisPlusConfig {
+
+    /**
+     * 注册分页插件
+     */
+    @Bean
+    public PaginationInterceptor paginationInterceptor() {
+        return new PaginationInterceptor();
+    }
+}
+```
+
+```java
+public interface UserMapper extends BaseMapper<User> {
+  // 这种写法就可以 继承mybatis plus写的一些基本crud方法
+  // 和springboot-jpa写法类似 不过封装的代码相对比较少
+  // 如果需要类jpa的查询方式可以使用 不过用mybatis原生查询会比较好
+}
+```
+
+## 功能实现相关
+
+### 定时调度
+
+springboot集成了定时调度框架
+
+@EnableScheduling 注解在启动类开启定时调度
+
+@Scheduled 注解在方法上启动定时调度
+
+支持 crontab 表达式 支持参数化调用
+
+```java
+@Component
+public class SchedulerTask {
+    private int count=0;
+    @Scheduled(cron="*/6 * * * * ?")
+    private void process(){
+        System.out.println("this is scheduler task runing  "+(count++));
+    }
+}
+@Component
+public class Scheduler2Task {
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+    @Scheduled(fixedRate = 6000)
+    public void reportCurrentTime() {
+        System.out.println("现在时间：" + dateFormat.format(new Date()));
+    }
+
+}
+```
+
+### 邮件
+
+springboot集成了javamail并且封装了代码
+
+```xml
+<dependencies>
+	<dependency> 
+	    <groupId>org.springframework.boot</groupId>
+	    <artifactId>spring-boot-starter-mail</artifactId>
+	</dependency> 
+</dependencies>
+```
+
+```properties
+spring.mail.host=smtp.qiye.163.com //邮箱服务器地址
+spring.mail.username=xxx@oo.com //用户名
+spring.mail.password=xxyyooo    //密码
+spring.mail.default-encoding=UTF-8
+```
+
+执行代码相比于自己写javamail简单了太多了
+
+```java
+SimpleMailMessage message = new SimpleMailMessage();
+message.setFrom("from@qq.com");
+message.setTo("to@qq.com");
+message.setSubject("subject");
+message.setText("content");
+mailSender.send(message);
+```
+
+支持发送html格式的邮件
+
+```java
+MimeMessage message = mailSender.createMimeMessage();
+MimeMessageHelper helper = new MimeMessageHelper(message, true);
+helper.setFrom("from@qq.com");
+helper.setTo("to@qq.com");
+helper.setSubject("subject");
+helper.setText("content", true);
+mailSender.send(message);
+```
+
+还可以发送带附件的mail 具体看javamail的api了 基本一致
+
+### 文件上传
+
+配置启动类 是为了解决文件>10M时候出现的连接重置问题
+
+```java
+@SpringBootApplication
+public class FileUploadWebApplication {
+
+    public static void main(String[] args) throws Exception {
+        SpringApplication.run(FileUploadWebApplication.class, args);
+    }
+    @Bean
+    public TomcatServletWebServerFactory tomcatEmbedded() {
+        TomcatServletWebServerFactory tomcat = new TomcatServletWebServerFactory();
+        tomcat.addConnectorCustomizers((TomcatConnectorCustomizer) connector -> {
+            if ((connector.getProtocolHandler() instanceof AbstractHttp11Protocol<?>)) {
+                //-1 means unlimited
+                ((AbstractHttp11Protocol<?>) connector.getProtocolHandler()).setMaxSwallowSize(-1);
+            }
+        });
+        return tomcat;
+    }
+}
+```
+
+上传的代码相对简单就是接受file参数
+
+```java
+@PostMapping("/upload") 
+public String singleFileUpload(@RequestParam("file") MultipartFile file) {
+    if (file.isEmpty()) {
+        return "{'state':'failed','msg':'Please select a file to upload'}";
+    }
+
+    try {
+        // Get the file and save it somewhere
+        byte[] bytes = file.getBytes();
+        Path path = Paths.get(UPLOADED_FOLDER+file.getOriginalFilename());
+        Files.write(path, bytes);
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+
+    return "{'state':'succes','msg':'success upload your file'}";
+}
+```
+
+### 登录认证
+
+待定
+
+## 配置文件
+
+springboot里面有两种配置文件 application.properties`和`application.yml
+
+这两种配置文件如果不设置优先级的话.yml先于.properties (.yml是yaml文件)
+
+这里介绍下yml的格式比起.properties 用成员运算符带来的冗余 yml倾向python那种以空格为命名空间分界的方法
+
+```properties
+name=hello
+server.port=8080
+server.url=localhost
+# list 集合
+servers[0]=dev.bar.com
+servers[1]=foo.bar.com
+# map 集合本身就是上面这些属性
+```
+
+```yml
+name: hello
+server:
+    port: 8080
+    url: localhost 
+server: {port: 8080,url: localhost}# map单行写法
+servers: # list集合
+  - dev.bar.com
+  - foo.bar.com
+servers: - dev.bar.com,- foo.bar.com # 单行这么写可以
+```
+
+这很json 值和冒号中间必须有空格 例如 name:mysql(错的) name: mysql(对的)
+
+这个map解析老出问题可以使用spel解决问题
+
+解决的思路是 把集合存成python的字符串#{${map}} 让spel来解决解析问题
 
 ---
 
-## RabbitMQ
+## 集成RabbitMQ
+
+```shell
+docker pull rabbitmq:management # 这个后缀是带管理后台的意思
+docker run -d --hostname my-rabbit -p 5672:5672 -p 15672:15672 rabbitmq:management
+```
+
+配置pom.xml
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-amqp</artifactId>
+</dependency>
+```
+
+application.properties
+
+```properties
+spring.application.name=Spring-boot-rabbitmq
+spring.rabbitmq.host=192.168.0.86
+spring.rabbitmq.port=5672
+spring.rabbitmq.username=admin
+spring.rabbitmq.password=123456
+
+# spring.rabbitmq.listener.simple.acknowledge-mode: 表示消息确认方式，其有三种配置方式，分别是none、manual和auto；默认auto
+
+# spring.rabbitmq.listener.simple.concurrency: 最小的消费者数量
+# spring.rabbitmq.listener.simple.max-concurrency: 最大的消费者数量
+# spring.rabbitmq.listener.simple.prefetch: 指定一个请求能处理多少个消息，如果有事务的话，必须大于等于transaction数量.
+```
+
+rabbitmq-api
+
+```java
+rabbitTemplate.convertAndSend("testTopicExchange","key1.a.c.key2", " this is  RabbitMQ!"); // Exchange routing_key message
+```
 
 
 
 
 
-## springboot-spring web原理应用相关
+
+
+## springboot-spring web原理相关
+
+---
 
 组件/服务/实体类的单例和多例 首先毫无疑问的web处理请求是多例实现的(NIO) 因为要复用各种请求加速访问进度 其次服务是单例的 因为都是用相同的函数 不存在同时执行会有线程安全的问题 实体类是多例的 (难道你实体类就一个?) 其实是多个实体类 不会存在线程安全问题 单例则会有线程安全问题**单例和多例和线程同步是基于状态进行分类的 也就是说 单例是类中没有可改变的状态则不会引发安全问题 多例是类中有可改变的状态避免线程安全问题 而线程同步则是当多例会额外分配内存(或者有些功能无法实现) 的时候 用单例去实现制约的一种方式** 
 
 为什么要使用redis来保存会话参数 那是因为session本质上要开启磁盘IO 放redis中服务器关闭的时候进行初始化 设置销毁时间会比存内存来的更加实际 redis里存放的对性能要求十分高的数据(热点数据) 尤其是dict型的数据 会很高 访问数据库相当于访问文件效率不会高
+
+## springboot启动原理
+
+web的启动原理不必多说,下面大致讲述springboot配置构成ApplicationContext初始化的过程
+
+@SpringBootApplication 是springboot应用的起点 其为以组合注解如下
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Inherited
+@SpringBootConfiguration // 配置到IOC容器中
+@EnableAutoConfiguration // 自动添加mvc和tomcat等基础依赖
+@ComponentScan(excludeFilters = { // 扫描符合条件的注解
+        @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+        @Filter(type = FilterType.CUSTOM, classes = AutoConfigurationExcludeFilter.class) })
+```
+
+@EnableAutoConfiguration里面@Import(EnableAutoConfigurationImportSelector.class)
+
+是Configuration的加载器 这个加载器加载如下资源 
+
+![springboot加载资源](https://images2017.cnblogs.com/blog/249993/201712/249993-20171207162607144-677920507.png)
+
+另一提@Configuration标注的类都会被加载到IOC(前提要被包扫描到)
+
+也就是说这边的初始化流程是先初始化包扫描器去扫描bean和configuration
+
+然后由SpringFactoriesLoader去加载配置到IOC(此时还未到ApplicationContext初始化)
+
+SpringFactoriesLoader是EnableAutoConfigurationImportSelector.class的核心加载器这是spring框架原有的工具类 之后会从 springboot(.*?).jar/META-INF/spring.factories 加载配置文件
+
+全部注入完成之后ApplicationContext就初始化完成交给web容器处理
 
