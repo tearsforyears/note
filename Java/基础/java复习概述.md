@@ -488,13 +488,13 @@ double...dbarray //封装成数组自己遍历吧
 ​		字符流是处理2个字节的Unicode字符,字符数组或者字符串
 ​	// inputstream和outputstream是相对于程序而言的
 ​	
-	//控制台读写bufferedreader inputstreamreader
-		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-		br.read();//读入字符注意是字符char
-		br.readLine();//读入一行字符串string
-	//文件读写
-		InputStream,OutputStream,Writer,Reader都是抽象类
-		
+​	//控制台读写bufferedreader inputstreamreader
+​		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+​		br.read();//读入字符注意是字符char
+​		br.readLine();//读入一行字符串string
+​	//文件读写
+​		InputStream,OutputStream,Writer,Reader都是抽象类
+​		
 		###bytes
 		InputStream fis = new FileInputStream("path");
 			//InputStream主要方法
@@ -775,6 +775,7 @@ double...dbarray //封装成数组自己遍历吧
 	            mex.printStackTrace();
 	        }
 	    }
+	
 	阿里云短信接口
 		短信签名和短信模版
 		public static String genRandomString() {

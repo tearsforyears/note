@@ -104,7 +104,7 @@ Exchange还可以设置其持久化属性
 
 ### 持久化
 
-消息队列是在内存中的数据结构 如果不设置持久化的
+消息队列是在内存中的数据结构 如果不设置持久化的 会因为掉电而消失 而持久化比较影响性能所以持久化的开启与否要根据业务去斟酌
 
 ### ACK机制
 
@@ -182,3 +182,22 @@ rabbitmq的默认端口是5672
 </dependency>
 ```
 
+```properties
+spring.application.name=Spring-boot-rabbitmq
+spring.rabbitmq.host=192.168.0.86
+spring.rabbitmq.port=5672
+spring.rabbitmq.username=admin
+spring.rabbitmq.password=123456
+
+# spring.rabbitmq.listener.simple.acknowledge-mode: 表示消息确认方式，其有三种配置方式，分别是none、manual和auto；默认auto
+
+# spring.rabbitmq.listener.simple.concurrency: 最小的消费者数量
+# spring.rabbitmq.listener.simple.max-concurrency: 最大的消费者数量
+# spring.rabbitmq.listener.simple.prefetch: 指定一个请求能处理多少个消息，如果有事务的话，必须大于等于transaction数量.
+```
+
+基本api的使用移步springboot
+
+## rabbitmq的镜像集群
+
+待后续

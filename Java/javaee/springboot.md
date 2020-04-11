@@ -11,7 +11,7 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 其特性如下
 
 -   快速创建独立的Spring项目
--   嵌入式servlet 无需war
+-   嵌入式servlet 无需war即可运行
 -   大量自动配置
 -   无需配置xml
 -   准生产环境 运行时监控
@@ -28,9 +28,23 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
 真的是约定大于配置的典型 默认的配置可以更改 但是默认的配置会使得项目顺滑程度提高了很多倍
 
+其主要优点如下
+
+-   不用配置乱七八糟的beans.xml/web.xml 改用配置更好的properties和yaml并行配置
+-   配置上还采用了一堆默认配置 使得开箱即用非常厉害 spring.io直接集成文件速度起飞
+-   集成服务器debug速度和只用运行jar速度快如闪电的boot
+-   集成服务器 部署微服务简直不要太开心
+-   集成各种各样的组件 却没有提高耦合度 从某种意义上讲配置的另一个好处
+-   集成监控并有springboot-admin等开源监控实现(微服务和单项目监控)
+-   和docker无缝贴合,springcloud的基础环境
+
 ---
 
+## 目录
+
 [TOC]
+
+---
 
 ## spring-springmvc注解review
 
@@ -207,7 +221,9 @@ logging.level.com.favorites=DEBUG
 logging.level.org.springframework.web=INFO
 logging.level.org.hibernate=ERROR
 # 自定义变量
-com.example.name=z3 # @Value(${com.example.name})
+com.example.name=z3 
+# @Value(${com.example.name})
+
 database.engine=innodb
 database.username=root
 database.password=root
@@ -224,6 +240,42 @@ spring.jpa.properties.hibernate.hbm2ddl.auto=update
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL5InnoDBDialect
 spring.jpa.show-sql= true
 ```
+
+### properties和yml配置文件
+
+springboot里面有两种配置文件 application.properties`和`application.yml
+
+这两种配置文件如果不设置优先级的话.yml先于.properties (.yml是yaml文件)
+
+这里介绍下yml的格式比起.properties 用成员运算符带来的冗余 yml倾向python那种以空格为命名空间分界的方法
+
+```properties
+name=hello
+server.port=8080
+server.url=localhost
+# list 集合
+servers[0]=dev.bar.com
+servers[1]=foo.bar.com
+# map 集合本身就是上面这些属性
+```
+
+```yml
+name: hello
+server:
+    port: 8080
+    url: localhost 
+server: {port: 8080,url: localhost}# map单行写法
+servers: # list集合
+  - dev.bar.com
+  - foo.bar.com
+servers: - dev.bar.com,- foo.bar.com # 单行这么写可以
+```
+
+这很json 值和冒号中间必须有空格 例如 name:mysql(错的) name: mysql(对的)
+
+这个map解析老出问题可以使用spel解决问题
+
+解决的思路是 把集合存成python的字符串#{${map}} 让spel来解决解析问题
 
 ### 自定义Filter的配置类
 
@@ -305,7 +357,7 @@ JPA:Java Persistence API  持久层的一些列api 是sun整合orm技术的一�
 spring.datasource.url=jdbc:mysql://localhost:3306/test
 spring.datasource.username=root
 spring.datasource.password=root
-spring.datasource.driver-class-name=com.mysql.jdbc.Driver
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 spring.jpa.properties.hibernate.hbm2ddl.auto=update
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL5InnoDBDialect
 spring.jpa.show-sql= true
@@ -396,7 +448,7 @@ JpaRepository的api前缀和方法命名规则 后续会进一步讲述
 
     findUserByUserNameAndPassWord // And 或者 Or 字段名和或者与查询
 
-## 连接redis
+## 集成redis
 
 ```xml
 <dependency>
@@ -842,6 +894,25 @@ String findUserPhoneNumberByUserName(@String username);
 
 ## springboot-mybatis(推荐使用)
 
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/test
+spring.datasource.username=root
+spring.datasource.password=root
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+```
+
+```xml
+<dependency>
+  <groupId>mysql</groupId>
+  <artifactId>mysql-connector-java</artifactId>
+</dependency>
+<dependency>
+  <groupId>org.mybatis.spring.boot</groupId>
+  <artifactId>mybatis-spring-boot-starter</artifactId>
+  <version>2.1.2</version>
+</dependency>
+```
+
 orm框架发展到现在就剩以mybatis/mybatis-plus的灵活sql和不用写一句sql,jpa-hibernate为顶层的两大框架,hibernate经过jpa优化已经开发难度已经很低了,而mybatis经过注解等优化之后基本也是非常完善的技术体系了 按照经验而言mybatis给了DBA存在的理由 优化可以做的特别好
 
 按照经验而言 互联网公司一般用mybaits 非互联网公司用hibernate
@@ -979,6 +1050,120 @@ public interface UserMapper extends BaseMapper<User> {
 }
 ```
 
+## 集成spring-security
+
+spring-security是一个准们用来处理安全的框架 和认证登录不一样 其专门用来处理XSS攻击,跨站伪造等,同时其具备集成相应登录框架授权框架的能力.
+
+添加依赖即可使用 使用之后项目所有接口需要登录才能够访问和使用
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+```
+
+导入则连接到该站点都需要进行登录验证
+
+-   可以通过表单的形式post请求验证
+-   可以通过HttpBasic Auth把信息放到请求头请求验证
+
+配置用户名和密码
+
+```properties
+spring.security.user.name=admin
+spring.security.user.password=123
+```
+
+springboot-security提供了BCryptPasswordEncoder这个类供密码进行加密
+
+我们不是所有接口都需要进行验证才能查看对应的信息 我们需要更改SpringSecurity的配置类
+
+该类继承WebSecurityConfigurerAdapter类,重写configure方法
+
+```java
+@Configuration
+public class BrowserSecurityConfig extends WebSecurityConfigurerAdapter {
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        //实现的效果：让它去表单登录，而不是alert框
+        http.formLogin()
+          			.loginProcess("/doLogin") // 处理登录接口
+          			.loginPage("/login") // 没登录的用户前往此登录
+                .and()
+                .authorizeRequests()//对请求进行授权
+                .anyRequest()//任何请求
+                .authenticated();
+    }
+}
+```
+
+下面是一个稍微完整的例子
+
+```java
+@Configuration
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+    @Autowired
+    VerifyCodeFilter verifyCodeFilter;
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.addFilterBefore(verifyCodeFilter, UsernamePasswordAuthenticationFilter.class);
+        http.authorizeRequests()//开启登录配置
+        .antMatchers("/hello").hasRole("admin")//表示访问 /hello 这个接口，需要具备 admin 这个角色
+        .anyRequest().authenticated() //表示剩余的其他接口，登录之后就能访问
+        .and()
+        .formLogin()
+        //定义登录页面，未登录时，访问一个需要登录之后才能访问的接口，会自动跳转到该页面
+        .loginPage("/login_p")
+        //登录处理接口
+        .loginProcessingUrl("/doLogin")
+        //定义登录时，用户名的 key，默认为 username
+        .usernameParameter("uname")
+        //定义登录时，用户密码的 key，默认为 password
+        .passwordParameter("passwd")
+        //登录成功的处理器
+        .successHandler(new AuthenticationSuccessHandler() {
+            @Override
+            public void onAuthenticationSuccess(HttpServletRequest req, HttpServletResponse resp, Authentication authentication) throws IOException, ServletException {
+              // 这里一般操作是把user放session(redis)里面去 然后给出响应
+              // json登录成功的响应
+                }
+            })
+            .failureHandler(new AuthenticationFailureHandler() {
+                @Override
+                public void onAuthenticationFailure(HttpServletRequest req, HttpServletResponse resp, AuthenticationException exception) throws IOException, ServletException {
+                    // 一般是提示登录失败之后跳转到登录或者其他页面
+                  	// json提示失败和要跳转的连接
+                }
+            })
+            .permitAll()//和表单登录相关的接口统统都直接通过
+            .and()
+            .logout()
+            .logoutUrl("/logout")
+            .logoutSuccessHandler(new LogoutSuccessHandler() {
+                @Override
+                public void onLogoutSuccess(HttpServletRequest req, HttpServletResponse resp, Authentication authentication) throws IOException, ServletException {
+                    // 消除session授权或是置空
+                  	// 提示登出成功
+                }
+            })
+            .permitAll()
+            .and()
+            .httpBasic()
+            .and()
+            .csrf().disable();
+    }
+}
+```
+
+
+
+其认证流程如下
+
+![](https://upload-images.jianshu.io/upload_images/15200008-545f402fe2355967.png)
+
+可以看到其本质是拿filter链去实现的 先验证表单 在验证报文头
+
 ## 功能实现相关
 
 ### 定时调度
@@ -1105,43 +1290,375 @@ public String singleFileUpload(@RequestParam("file") MultipartFile file) {
 
 ### 登录认证
 
-待定
+我们常见的登录方式就以下几种
 
-## 配置文件
+-   ####cookie-session登录 可以用redis做分布式处理
 
-springboot里面有两种配置文件 application.properties`和`application.yml
+    -   web端处理尚可 android端如果不是h5就不能用session了
+    -   cookie不能跨域
+    -   CSRF(跨站请求伪造)
+    -   Session同步问题 分布式锁
 
-这两种配置文件如果不设置优先级的话.yml先于.properties (.yml是yaml文件)
+-   ####cookie-session改进
 
-这里介绍下yml的格式比起.properties 用成员运算符带来的冗余 yml倾向python那种以空格为命名空间分界的方法
+    不在使用基于cookie去存储数据了,session改用redis分布式
+
+    web使用local storage(h5技术,类似数据库),android使用本地数据库
+
+    改进之后的流程如下
+
+    1.  用户通过传统验证
+    2.  服务端把登录信息构造好放到redis中,返回给用户key
+    3.  用户不在利用cookie存储key而采用local storage存储
+    4.  下次请求的时候把key拿出来附带进请求
+
+    关于localStorage的存储
+
+    ```js
+    // 存入
+    var obj={"name":"ycyzharry","id":"30"};
+    obj = JSON.stringify(obj); // 转成JSON格式的字符串。
+    localStorage.setItem("temp",obj);
+    // 获取
+    console.log(localStorage.getItem("temp"));
+    obj=JSON.parse(localStorage.getItem("temp")); 
+    
+    // 删除
+    localStorage.clear(); 
+    localStorage.removeItem("name"); 
+    
+    // 遍历数据
+    for(var i=0;i<localStorage.length;i++){
+       var key=localStorage.key(i);
+       var v =localStorage.getItem(key);
+       console.log(key+v);
+     }
+    ```
+
+-   #### 基于JWT的token
+
+    上面的cookie和session还有状态维系的信息 比如cookie换session,key换redis的value
+
+    JWT(JSON Web Token)
+
+    流程如下
+
+    1.  用户登录
+    2.  服务器端把认证信息利用指定算法(eg.HS256)非对称加密,加密私钥保存在服务器端,加密的东西称之为`用户签名`,头部和载荷信息进行base64加密,Token格式如下**`头部.载荷.签名`**,加密结果(Token)发送给客户端
+    3.  客户端用cookie或者local storage存好token
+    4.  下次请求时token放在报文头的authorization字段中
+    5.  服务器端取得token解析确认是否走下面流程
+
+---
+
+-   #### OAuth2.0 令牌登录
+
+    权威网站例如微博QQ开放api进行登录,等都是第三方站点服务器上的数据,我们需要获得这些数据进行本站点的注册等(不同于其他 这个相当于第三方登录)
+
+    `OAuth允许用户提供一个令牌,而不是用户名和密码访问特定的数据,所以可以让用户可以授权给第三方网站访问第三方网站服务器上的特定数据`
+
+    涉及以下角色:用户,用户终端(客户端),应用服务器端(app服务器),授权服务器端(微信服务器)
+
+    微信是采用授权码的方式 流程如下
+
+    1.  用户触发微信登录事件,引导至微信授权页面
+    2.  授权完成之后会生成授权码(code),并发生页面跳转(redirect_url),把此授权码发送到应用服务器中
+    3.  应用服务器端可以请求微信服务器获取令牌数据(access_token)
+    4.  应用服务器用令牌向微信服务器获取头像等
+
+    ![授权过程](http://www.ruanyifeng.com/blogimg/asset/2014/bg2014051204.png)
+
+    这是一个授权码流程的抽象
+
+### JWT
+
+jwt这个规范不仅可以用在登录认证中也可以用在web间传递消息
+
+Token格式:**`载荷.头部.签名`**
+
+#### 载荷(payload)
+
+```json
+{
+    "iss": "John Wu JWT", // jwt的签发者
+    "iat": 1441593502, // 何时签发
+    "exp": 1441594722, // token过期时间
+    "aud": "www.example.com", // 接受jwt的用户
+    "sub": "jrocket@example.com", // jwt面向的用户
+  
+  	// 用户自定义字段
+    "from_user": "B",
+    "target_user": "A"
+}
+```
+
+以上为JWT中载荷信息,对其进行Base64编码则成为了token的一部分
+
+node中对其进行编码可以用下面这种形式
+
+```js
+var base64url = require('base64url') // npm install base64url
+var header = {
+    "from_user": "B",
+    "target_user": "A"
+}
+console.log(base64url(JSON.stringify(header)))
+```
+
+#### 头部header
+
+```json
+{
+  "typ": "JWT",
+  "alg": "HS256" // JWT签名使用HS256算法
+}
+```
+
+base64进行编码
+
+#### 签名
+
+`= HS256(base64(荷载).base64(头部),秘钥)`
+
+#### token
+
+`= base64(载荷).base64(头部).签名`
+
+如果token被人动过的话那么token将会被拒绝返回401
+
+token信息会暴露,只用于传递一些非敏感信息,例如用户密码就绝对不能放到token中,token更多的是用于一种授权,或者携带一些非敏感数据用于完成程序,同时也可以让一些重复操作例如登录少去访问数据库 有一定的限流作用
+
+### springboot集成jwt
+
+```xml
+<dependency>
+    <groupId>com.auth0</groupId>
+    <artifactId>java-jwt</artifactId>
+    <version>3.5.0</version>
+</dependency>
+```
+
+```java
+public class JwtUtil {
+    private static final long EXPIRE_TIME = 24 * 60 * 60 * 1000;
+    private static final String TOKEN_SECRET = "ssxxzyzybaba";
+
+    public static String getJWTToken(Map<String, String> map) {
+        // 过期时间
+        Date date = new Date(System.currentTimeMillis() + EXPIRE_TIME);
+        // 私钥及加密算法
+        Algorithm algorithm = Algorithm.HMAC256(TOKEN_SECRET);
+        // 标准头信息
+        HashMap<String, Object> header = new HashMap<>(2);
+        header.put("typ", "JWT");
+        header.put("alg", "HS256");
+        // 附带username和userID生成签名
+        JWTCreator.Builder builder = JWT.create().withHeader(header);
+        for (String key : map.keySet()) {
+            builder = builder.withClaim(key, map.get(key));
+        }
+        return builder.sign(algorithm);
+    }
+
+
+    public static boolean verity(String token) {
+        try {
+            Algorithm algorithm = Algorithm.HMAC256(TOKEN_SECRET);
+            JWTVerifier verifier = JWT.require(algorithm).build();
+            DecodedJWT jwt = verifier.verify(token);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        } catch (JWTVerificationException e) {
+            return false;
+        }
+    }
+
+    public static String getTokenValue(String token, String key) {
+        return JWT.decode(token).getClaim(key).asString();
+    }
+}
+```
+
+再看token的途中发现了些有趣的代码,比如用拦截器实现自己的注解的利用,原理解释preHandler的时候可检测注解是否有,这个整挺好. 对spring的启发是AOP的时候 利用自己定义的注解和spring本身的AOP进行代码的注入,同样的想法也可以在javaweb-filter/拦截器中使用
+
+
+
+
+
+### 单点登录
+
+单点登录指的是在多系统中 一个点登录了就可以在其他系统登录 不用重复登录
+
+我们一般的登录流程是把user_id等参数封装到token中,client检查token签名,token是否过期,接收方是不是客户端等,并把token存在cookie或者local storage中
+
+其设计思路有
+
+1.  local storage存token,其他站点检查token决定重定向到首页还是继续登录
+2.  分布式session完美解决单点登录问题
+
+### 唯一登录
+
+redis记录/token记录session_id,uid,然后进行session_id对比 如果发现不同则取消另一session_id登录的授权
+
+---
+
+### 监控springboot项目
+
+在微服务时代监控项目显得尤为重要 因为区域自治 docker的大规模应用更是如此 轻量级自治意 味着耦合度降低 同时也意味着集中式监控特别难 所以监控变得尤为重要
+
+#### Spring Boot Actuator
+
+基于restful完成监控的一个组件
+
+一般需要添加 `spring-boot-start-security` 依赖,访问监控端点的时候需要输入验证信息
+
+一般用于监控两类端点,原生端点和用户自定义端点,自定义端点指扩展性指标,在运行时监控
+
+-   原生端点
+
+    应用配置类 加载的springbean yml 环境信息 请求映射信息
+
+    度量指标类 **堆栈,请求连接,连接,metrics**
+
+    操作控制类 操作控制 主要是shutdown关闭
+
+-   自定义端点
+
+一些重要的restful-api
+
+-   GET /beans
+-   GET /env GET /env/{name}
+-   GET /flyway /liquidbase 数据库迁移信息
+-   GET /heapdump 
+-   GET /httptrace 最近100个HTTP request response
+-   GET /logfile 显示logfile /loggers 显示和修改log
+-   GET /metrics /metrics/{name} app的度量信息,内存用量,http请求计数
+-   GET /scheduledtasks 显示定时任务
+-   POST /shutdown 要把endpoints.shutdown.enabled=true带上 关闭监控
+-   GET /threaddump 获取线程快照
+-   GET /mappings 描述全部url路径
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
 
 ```properties
-name=hello
-server.port=8080
-server.url=localhost
-# list 集合
-servers[0]=dev.bar.com
-servers[1]=foo.bar.com
-# map 集合本身就是上面这些属性
+management.endpoints.web.exposure.include=*
+management.endpoints.web.base-path=/info
+# 修改路径 如果不写的话默认是 /actuator
 ```
 
-```yml
-name: hello
-server:
-    port: 8080
-    url: localhost 
-server: {port: 8080,url: localhost}# map单行写法
-servers: # list集合
-  - dev.bar.com
-  - foo.bar.com
-servers: - dev.bar.com,- foo.bar.com # 单行这么写可以
+因为是restful接口所以返回的是json格式 对于用户可能不太好监控,而且需要不断调接口也影响集群性能,所以对此就有了另一个开源软件springboot-admin去实现监控,其基于actuator实现
+
+#### springboot-admin
+
+**每个应用都认为是一个客户端**,通过 HTTP 或者**使用 Eureka **注册到 admin server 中进行展示,Spring Boot Admin UI 部分使用 VueJs 将数据展示在前端。
+
+##### 监控单体应用
+
+新建一个单独的项目admin server端 主要如下
+
+```xml
+<dependency>
+  <groupId>de.codecentric</groupId>
+  <artifactId>spring-boot-admin-starter-server</artifactId>
+  <version>2.2.0</version><!--2.1.0有问题-->
+</dependency>
 ```
 
-这很json 值和冒号中间必须有空格 例如 name:mysql(错的) name: mysql(对的)
+```java
+@SpringBootApplication
+@EnableAdminServer // 启动server
+public class AdminApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(AdminApplication.class, args);
+    }
+}
+```
 
-这个map解析老出问题可以使用spel解决问题
+```properties
+server.port=8000
+# 把监控服务部署在8000端口
+```
 
-解决的思路是 把集合存成python的字符串#{${map}} 让spel来解决解析问题
+client端添加配置如下
+
+```xml
+<dependency>
+  <groupId>de.codecentric</groupId>
+  <artifactId>spring-boot-admin-starter-client</artifactId>
+  <version>2.2.0</version>
+</dependency>
+```
+
+```properties
+management.endpoints.web.exposure.include=*
+# management.endpoints.web.base-path=/info
+# 恢复默认
+
+# 指定admin的地址
+spring.boot.admin.client.url=http://localhost:8000
+```
+
+##### 监控微服务
+
+客户端和服务端都添加监控依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+```java
+@Configuration
+@EnableAutoConfiguration
+@EnableDiscoveryClient
+@EnableAdminServer
+public class SpringBootAdminApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(SpringBootAdminApplication.class, args);
+    }
+
+    @Configuration
+    public static class SecurityPermitAllConfig extends WebSecurityConfigurerAdapter {
+        @Override
+        protected void configure(HttpSecurity http) throws Exception {
+            http.authorizeRequests().anyRequest().permitAll()  
+                .and().csrf().disable();
+        }
+    }
+}
+```
+
+```yaml
+eureka:   
+  instance:
+    leaseRenewalIntervalInSeconds: 10
+    health-check-url-path: /actuator/health
+    metadata-map:
+      startup: ${random.int}    #needed to trigger info and endpoint update after restart
+  client:
+    registryFetchIntervalSeconds: 5
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVICE_URL:http://localhost:8761}/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"  
+  endpoint:
+    health:
+      show-details: ALWAYS
+```
+
+
 
 ---
 
@@ -1179,13 +1696,350 @@ spring.rabbitmq.password=123456
 
 rabbitmq-api
 
+### 消息发送
+
 ```java
-rabbitTemplate.convertAndSend("testTopicExchange","key1.a.c.key2", " this is  RabbitMQ!"); // Exchange routing_key message
+@Test
+void test() throws Exception {
+  String context = "this is time " + new Date() + " to send the msg";
+  System.out.println("Sender : " + context);
+  Thread.sleep(1000);
+  rabbitTemplate.convertAndSend("testQueue", context); // 简单消息发送
+}
+
+// 路由键消息发送
+@Test
+void testTopic() {
+  String context1 = "this is msg1";
+  String context2 = "this is msg2";
+  rabbitTemplate.convertAndSend("exchange", "topic.messages", context1);
+  rabbitTemplate.convertAndSend("exchange", "topic.message", context2);
+}
 ```
 
+### rabbitmq handler
 
+这个handler可以在任意springboot项目中 因为消息队列也是跨网络的
 
+类的形式
 
+```java
+@Component
+@RabbitListener(queues = "testQueue")
+public class SimpleMessageHandler {
+    @RabbitHandler
+    public void process(String msg) {
+        System.out.println("Receiver: get the msg at " + new Date() + " : " + msg);
+    }
+}
+```
+
+方法的形式 两者区别不大
+
+```java
+@Component
+public class TopicMessageHandler {
+    @RabbitListener(queues = "topic.message")
+    public void process(String msg) {
+        System.out.println("message queue:"+msg);
+    }
+    @RabbitListener(queues = "topic.messages")
+    public void processes(String msg) {
+        System.out.println("messages queue:"+msg);
+    }
+}
+
+```
+
+### 配置类
+
+```java
+@Configuration
+public class RabbitConfig {
+    @Bean
+    public Queue TestQueue() {
+        return new Queue("testQueue", true);
+    }
+}
+```
+
+```java
+@Configuration
+public class TopicRabbitConfig {
+
+    final static String message = "topic.message";
+    final static String messages = "topic.messages";
+
+    @Bean
+    public Queue queueMessage() {
+        return new Queue(TopicRabbitConfig.message);
+    }
+
+    @Bean
+    public Queue queueMessages() {
+        return new Queue(TopicRabbitConfig.messages);
+    }
+
+    @Bean
+    TopicExchange exchange() {
+        return new TopicExchange("exchange");
+    }
+  
+    @Bean
+    Binding bindingExchangeMessage(Queue queueMessage, TopicExchange exchange) {
+        return BindingBuilder.bind(queueMessage).to(exchange).with("topic.message");
+    }
+
+    @Bean
+    Binding bindingExchangeMessages(Queue queueMessages, TopicExchange exchange) {
+        return BindingBuilder.bind(queueMessages).to(exchange).with("topic.#");
+    }
+}
+```
+
+## springboot部署
+
+### 传统项目部署
+
+把根路径项目文件直接扔到tomcat的/webapps目录下直接运行就行
+
+这种情况下 访问url的名字前要带项目名 如果想改变的话修改/conf/server.xml
+
+war包直接扔到tomcat下也可完成 **如果要修改url的路径的话** 在server.xml/`<Host>`标签中加入路径doc映射 
+
+```xml
+<!--部署在其他的一些路径-->
+<Context path="/test" docBase="/tomcat/apache-tomcat-7.0.73/webapps/myBlog" reloadable="false" allowLinking="true"></Context> 
+<!--部署在根路径-->
+<Context path="" docBase="springbootDeployTest" debug="0" reloadable="true" />
+<!--如果是根路径的话什么都不要加 如果是普通的路径则可以加url例如path="/test"-->
+```
+
+path代表url docBase是war包的路径或者是web项目所在路径
+
+### springboot部署
+
+---
+
+springboot不同于其他javaweb,其实对服务器容器进行了封装,运行于内嵌的服务器之上,这种集成给开发带来了便利,但是对于其他需要共同协作的项目springboot需要更改其部署方式
+
+springboot提供了和传统项目一样的war包打包方式 但是我们要去除内置的容器以及
+
+但是对于微服务的部署springboot是有天然优势的 因为内嵌服务器能够让springboot服务之间自治而不需要一个个部署到相应的tomcat 下面分别说明两种部署方式
+
+#### springboot打包成war包
+
+修改启动器
+
+```java
+@SpringBootApplication
+@MapperScan("com.example.mbttest.mapper")
+public class MbttestApplication extends SpringBootServletInitializer {
+    
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+        return application.sources(MbttestApplication.class);
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(MbttestApplication.class, args);
+    }
+
+}
+```
+
+```xml
+<!--部署相关去除内置tomcat依赖 provided不会被打包进去-->
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-tomcat</artifactId>
+  <scope>provided</scope>
+</dependency>
+<!--或者使用下面这种方式去除-->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+    <!-- 移除嵌入式tomcat插件 -->
+    <exclusions>
+        <exclusion>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+```
+
+```xml
+<packaging>war</packaging> <!--在project标签下修改打包方式-->
+<finalName>springbootDeployTest</finalName><!--在build标签下写war的名字-->
+<!--注释掉下面代码 要不该插件会让我们重复打包-->
+<plugins>
+  <!--            <plugin>-->
+  <!--                <groupId>org.springframework.boot</groupId>-->
+  <!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
+  <!--            </plugin>-->
+</plugins>
+```
+
+```shell
+mvn package -Dmaven.skip.test=true # maven 打包成war
+```
+
+如果不注释掉插件的话会打包成内嵌服务器依赖的war包(没必要) 注释掉该插件使用原生打包
+
+然后在target/*.jar找到项目的路径扔到tomcat目录下就可以了,如果是单项目可以修改下路径
+
+```xml
+<Context path="" docBase="springbootDeployTest" debug="0" reloadable="true" />
+```
+
+#### springboot打包成jar包(推荐)
+
+由于内嵌了服务器 当然可以打包成jar包然后直接执行jar包去运行项目 这很springboot
+
+```xml
+<plugin>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-maven-plugin</artifactId>
+  <configuration>
+    <mainClass>com.example.mbttest.MbttestApplication</mainClass>
+  </configuration>
+</plugin>
+```
+
+打包的时候指定下主类
+
+```shell
+mvn clean package -Dmaven.test.skip=true
+```
+
+直接打包就行了 和war类似,打完之后再target会生成两个jar包 `*.jar` 和`*.jar.original` 两者的不同在于 jar.original 是不包含依赖只包含用户类的代码的 如果是想给其他项目使用则用original 
+
+```shell
+java -jar Demo.jar
+```
+
+这句话执行的时候会去找META-INF/MANIFEST.MF文件读取信息 在下文中有该文件简单格式
+
+我们会发现对于小型的项目来说 springboot尤为适合 微服务架构也是如此 大型的项目并非臃肿而庞大的 应该是分而治之的 拆分成不同的服务器可能会需要多个服务器软件可是相对而言其可用性和并发性是大幅度的提高 相比于大的线程池 分散的小线程池线显然会更加细粒度的使用内存和cpu的性能
+
+如果想后台运行用下面代码 nohup for no hang up
+
+```shell
+nohup java -jar target/spring-boot-scheduler-1.0.0.jar &
+```
+
+**我们这里展开说下jar包**
+
+```note
+ jar包一般有两类 普通的工具类的jar 可执行的有主类main方法的jar
+ 显然springboot打的jar包属于后者
+ 一般我们使用的jar都有不同的依赖 设有Lib.jar和Demo.jar其中Demo.jar主类叫DemoApp
+ 传统我们使用java -classpath 来运行jar
+```
+
+```shell
+ java -classpath Demo.jar:Lib.jar com.example.test.DemoApp
+ # 多个jar用:来分隔开 后面写的是主类的路径
+```
+
+```note
+我们还可以使用MANIFEST.MF文件来组织类
+```
+
+```MF
+Main-Class: com.example.test.DemoApp
+Class-Path: Lib.jar
+```
+
+#### 普通项目部署到docker
+
+其有两种方式 
+
+1.  项目打包成了.jar送到服务器上 docker打包.jar
+2.  项目在服务器上 docker打包的是工程目录
+
+docker已经成为现代服务体系的刚需了,虽然这个体系还未到达成熟,确是代表了未来
+
+1.Dockerfile 和打包好的jar同级目录
+
+```dockerfile
+FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+ADD springbootDeployTest.jar app.jar
+RUN sh -c 'touch /app.jar'
+ENV JAVA_OPTS=""
+ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app.jar" ]
+```
+
+在Dockerfile和jar的同级目录下
+
+```shell
+docker build -t docker .
+```
+
+2.打包整个项目
+
+${project.basedir}/src/main/docker/Dockerfile(对应上面pom的路径) 文件如下
+
+```dockerfile
+FROM openjdk:8-jdk-alpine
+VOLUME /tmp
+ADD springbootDeployTest.jar app.jar
+ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/app.jar"]
+```
+
+maven中配置插件
+
+```xml
+<properties>
+  <java.version>1.8</java.version>
+  <!--docker 镜像前缀-->
+  <docker.image.prefix>springboot</docker.image.prefix>
+</properties>
+<!-- Docker maven plugin -->
+<plugins>
+		<plugin>
+			<groupId>com.spotify</groupId>
+			<artifactId>docker-maven-plugin</artifactId>
+			<version>1.0.0</version>
+			<configuration>
+				<imageName>
+          ${docker.image.prefix}/${project.artifactId}
+        </imageName>
+        <!--dockerfile的路径-->
+				<dockerDirectory>
+          ${project.basedir}/src/main/docker
+        </dockerDirectory>
+				<resources>
+					<resource>
+						<targetPath>/</targetPath>
+						<directory>${project.build.directory}</directory>
+						<include>${project.build.finalName}.jar</include>
+					</resource>
+				</resources>
+			</configuration>
+		</plugin>
+</plugins>
+```
+
+执行maven打包插件
+
+```shell
+mvn package docker:build
+```
+
+### 部署带组件的复杂项目
+
+---
+
+springboot很多时候得用到各种各样的第三方组件 比如mysql rabbitmq
+
+所以在部署docker的时候得注意连接或者是组网这些组件
+
+docker-compose可以解决这个问题
+
+待定
 
 
 

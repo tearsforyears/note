@@ -2,6 +2,15 @@
 
 [TOC]
 
+## 重建docker安装的软件
+
+-   redis
+-   rabbitmq
+-   nginx
+-   mysql
+-   alpine(小型基础命令行)
+-   centos
+
 ## 概述
 
 ---
@@ -93,6 +102,19 @@ Container(docker特有): 所有容器会共享一个指定容器的ip和端口�
 host模式相对简单因为其网卡接口在运行docker的主机上
 
 ## demo
+
+配置镜像
+
+```json
+{
+ "registry-mirrors":
+  ["http://hub-mirror.c.163.com",
+   "https://3laho3y3.mirror.aliyuncs.com",
+   "https://reg-mirror.qiniu.com/"],
+  "experimental": false,
+  "debug": true
+}
+```
 
 安装mysql映射到3307端口 
 
@@ -230,4 +252,10 @@ docker run -d --hostname my-rabbit -p 5672:5672 -p 15672:15672 rabbitmq:manageme
 ```
 
 然后访问127.0.0.1:15672 用户名和密码都是guest 就可以使用队列了
+
+2.找到docker所有容器的ip
+
+```shell
+docker inspect --format='{{.Name}} - {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -aq)
+```
 

@@ -126,6 +126,8 @@ RPC协议是区域系统自治用的通信协议传输数据的格式等 SpringC
 
 ## Springcloud
 
+---
+
 springcloud是一系列原生框架的集合,依赖SpringBoot脚手架快速开发微服务应用
 
 其包含了**服务发现中心,配置中心,消息总线,负载均衡,熔断器,数据监控等**
@@ -135,6 +137,10 @@ springcloud并非重复造轮子而是把经得起考验的这些开源项目做
 springcloud只是代为管理这些项目去完成微服务架构
 
 其用在相对比较大的架构里面,小架构绝对不适合去使用springcloud
+
+下面这些组件为springcloud的组件架构
+
+![springcloud 组件架构](http://favorites.ren/assets/images/2017/springcloud/spring-cloud-architecture.png)
 
 ### springcloud技术汇总
 
