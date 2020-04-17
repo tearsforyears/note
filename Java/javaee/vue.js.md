@@ -512,15 +512,23 @@ cnpm install webpack -g 安装webpack
 
 ***基础环境准备完毕 开始创建项目***
 
-https://element.eleme.cn/2.0/#/zh-CN/component/quickstart
+[element-ui](https://element.eleme.cn/2.0/#/zh-CN/component/quickstart)
 
-***vue init webpack project_name 创建好vue项目***
+### ***1. vue init webpack project_name 创建好vue项目***
+
+这里创建的时候有一个坑ESLint不要选 这个会进行非常严格的检查
+
+然后其实按照README.md其实已经可以运行大部分功能了
 
 npm install babel-plugin-component -D 借助babel只要引入相应组件即可不用全部引入
 
 vue add element  直接引入组件
 
 npm install babel-preset-es2015 --save-dev  引入一个插件
+
+项目的各个目录作用如下
+
+![](https://img-blog.csdnimg.cn/20190611223319346.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MjYwMzAwOQ==,size_16,color_FFFFFF,t_70)
 
 ***npm install 可以用于安装依赖***
 
@@ -563,7 +571,7 @@ webpack是加入了混淆压缩之后的package的打包 减少了前端请求�
 下面说一些项目里面的文件
 
 -   package.json 第三包安装文件夹
--   dist 输出文件夹
+-   dist 输出文件夹 `npm run build可以创建`
 -   build webpack文件 配置
 -   src/main.js 开发目录和程序入口 里面import了组件和初始化设置
 
@@ -713,3 +721,8 @@ test.vue test_init.js 一定不要重名 debug3小时wdnmd
 
 暂告一段落 结合spirngboot调试的时候补充
 
+## 前后端整合
+
+对后端程序员而言vue用的相对没那么多,主要针对vue进行一系列部署讲解
+
+vue打包命令 `npm run build`

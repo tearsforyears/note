@@ -244,7 +244,7 @@ BeanFactory是个接口 所有管理对象的组件都实现了这个接口
 </bean>
 ```
 
-# Spring bean初始化流程
+# ***Spring bean初始化流程***
 
 bean的总的创建过程为：
 
@@ -256,7 +256,7 @@ bean的总的创建过程为：
 
  可以简化为：创建对象—> 注入依赖 —> init-method
 
-## 详细的初始化流程
+## 初始化流程
 
 @PreDestory bean销毁之前执行的方法 标注在方法上 下同
 
@@ -268,9 +268,7 @@ bean的总的创建过程为：
 
 ![bean初始化流程](https://images0.cnblogs.com/i/580631/201405/181454040628981.png)
 
-我们来解读上面这张流程图
-
-
+我们在后续文档中解读这张图
 
 # Spring基本注解
 
@@ -350,7 +348,7 @@ autodetect通过bean的自省机制决定用constructor还是byType,如果发现
 
 这个注解很特殊 标注的方法调用时相当于开启子线程去执行此种方法
 
-# Springweb启动
+# ***Springweb启动***
 
 <font color="red">spring的启动是建立在servlet启动之上的</font> web的启动过程是springmvc的前部分
 

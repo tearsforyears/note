@@ -282,10 +282,6 @@ servers: - dev.bar.com,- foo.bar.com # 单行这么写可以
 ```java
 @Configuration // 相当于一个独立的beans.xml注入整体的xml中
 public class WebConfiguration {
-    @Bean // 相当于bean标签 配置 原生的过滤器
-    public RemoteIpFilter remoteIpFilter() {
-        return new RemoteIpFilter();
-    }
     
     @Bean // 自己注册过滤器的生成方法
     public FilterRegistrationBean testFilterRegistration() {
@@ -447,6 +443,45 @@ JpaRepository的api前缀和方法命名规则 后续会进一步讲述
     // 如上就对应着userName
 
     findUserByUserNameAndPassWord // And 或者 Or 字段名和或者与查询
+
+### 重定向和转发
+
+转发和重定向在springboot中变得很简单
+
+```java
+@GetMapping("/redirect")
+String func(){
+  return "forward:/red.html"; // redirect:/red.html
+}
+```
+
+而且forward不能携带url参数
+
+另外需要注意 这些事在标注@Controller的类上而不是@RestController
+
+### 统一异常处理
+
+常规错误处理方式有很多种 基于spring各个层次的体系 而下面这个在前后端分离比较通用点
+
+使用 `@ControllerAdvice` + `@ExceptionHandler` 注解处理全局异常
+
+```java
+@ControllerAdvice
+public class GlobalExceptionController {
+		// 用来处理自己的运行时异常 或者有什么其他需要捕获的类型可以自己写
+    @ExceptionHandler(value = {RuntimeException.class})
+    public String runtimeExceptionHandle(ServletResponse response, Exception e) throws IOException, ServletException, InterruptedException {
+        response.setCharacterEncoding("UTF-8");
+        return "redirect:/error.html?msg="+e.getMessage();
+    }
+}
+```
+
+处理错误码
+
+/static/error/404.html 可以直接放置静态html页面进行处理
+
+---
 
 ## 集成redis
 
@@ -1012,6 +1047,8 @@ mybatis.mapper-locations=classpath:mybatis/mapper/*.xml
 
 是国人写的一个增强mybatis的工具 也就是增强使用 原生sql一样可以实现
 
+可以写入语句导入 后续在研究此插件
+
 ```xml
 <dependency>
   <groupId>com.baomidou</groupId>
@@ -1052,7 +1089,23 @@ public interface UserMapper extends BaseMapper<User> {
 
 ## 集成spring-security
 
-spring-security是一个准们用来处理安全的框架 和认证登录不一样 其专门用来处理XSS攻击,跨站伪造等,同时其具备集成相应登录框架授权框架的能力.
+spring-security是一个准们用来处理安全的框架 其处理XSS攻击,跨站伪造等,同时其具备集成相应登录框架授权框架的能力.
+
+总的来说spring-security的功能如下
+
+1.  简单的登录(自己携带)
+2.  RBAC授权给不同接口(这个很常用)
+3.  集成jwt 对token进行管理
+4.  集成OAuth2.0
+5.  csrf跨站攻击防御
+
+我们下面进行RBAC授权管理和OAuth2.0后面一些功能得开新坑去写
+
+至于spring-security有自己实现的一套登录机制 基于前后端分离加jwt而言 我们并不需要完成这些逻辑 代码也相对比较复杂 可以参考下面的blog
+
+-   [spring-security集成jwt鉴权](https://www.jianshu.com/p/54603b9933ca)
+
+---
 
 添加依赖即可使用 使用之后项目所有接口需要登录才能够访问和使用
 
@@ -1066,103 +1119,162 @@ spring-security是一个准们用来处理安全的框架 和认证登录不一�
 导入则连接到该站点都需要进行登录验证
 
 -   可以通过表单的形式post请求验证
--   可以通过HttpBasic Auth把信息放到请求头请求验证
+-   可以通过HttpBasic Auth把信息放到请求头请求验证 api测试工具都有
 
-配置用户名和密码
+配置用户名和密码,默认用户名是user,密码则是在启动时候生成打印在log里面
 
 ```properties
-spring.security.user.name=admin
-spring.security.user.password=123
+spring.security.user.name = admin
+spring.security.user.password = 123
+# 如果不想启动spring-security的话 可以把下面属性改成false
+spring.security.basic.enabled = true
 ```
 
-springboot-security提供了BCryptPasswordEncoder这个类供密码进行加密
+我们可以看到其有一个默认的提交窗口 被称为`httpBasicLogin`但绝大多数情况下我们需要自定定义登录的逻辑(这里有个坑就是同时自己定义登录界面和接口)
 
-我们不是所有接口都需要进行验证才能查看对应的信息 我们需要更改SpringSecurity的配置类
-
-该类继承WebSecurityConfigurerAdapter类,重写configure方法
+前后端分离的时候我们只选择定义一个页面 接口登录给隐藏了
 
 ```java
 @Configuration
-public class BrowserSecurityConfig extends WebSecurityConfigurerAdapter {
+public class BrowerSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    /**
+     * 配置认证登录方式等
+     * @param auth
+     * @throws Exception
+     */
+    @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        super.configure(auth);
+    }
+
+    /**
+     * 配置登入登出接口权限等
+     * @param http
+     * @throws Exception
+     */
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        //实现的效果：让它去表单登录，而不是alert框
         http.formLogin()
-          			.loginProcess("/doLogin") // 处理登录接口
-          			.loginPage("/login") // 没登录的用户前往此登录
+                .loginPage("/login.html")
+          			// 之前同时配置了页面和接口老出错 给前后端没分离的设计的
                 .and()
-                .authorizeRequests()//对请求进行授权
-                .anyRequest()//任何请求
-                .authenticated();
+                .authorizeRequests()
+                .antMatchers("/login.html","/login","/").permitAll()
+                // 初始暴露接口 任何人都可以访问 其他接口得需要权限
+                .antMatchers("/others").hasRole("admin")
+                .anyRequest()
+                .authenticated()
+                .and()
+                .csrf().disable();
     }
 }
 ```
 
-下面是一个稍微完整的例子
+
+
+### RBAC
+
+`Role Basic Access Control`是一种权限设计方式
+
+其是一种控制模式 我们数据库的设计一般也使用到了RBAC 就数据库而言我们讲一下RBAC权限设计 其本质上就是下面的对象 许可又作权限
+
+![权限架构图](https://upload-images.jianshu.io/upload_images/10215580-77adebfa6af4da13.png)
+
+总而言之呢 是多对多的关系维护,一个用户拥有多种角色,一个角色拥有多个权限
+
+### 基于RBAC的接口授权
+
+未完待续
+
+### 集成OAuth2.0
+
+我们来集成OAuth2.0实现QQ第三方登录(微信注册需要300/year)
+
+QQ登录OAuth2.0总体处理流程如下：
+
+```note
+QQ登录OAuth2.0总体处理流程如下：
+Step1：申请接入，获取appid和apikey；
+Step2：开发应用，并设置协作者帐号进行测试联调；
+Step3：放置QQ登录按钮；
+Step4：通过用户登录验证和授权，获取Access Token；
+Step5：通过Access Token获取用户的OpenID；
+Step6：调用OpenAPI，来请求访问或修改用户授权的资源。
+```
+
+未完待续
+
+### 一些不常用的功能简介
+
+---
+
+#### 登录的简单配置和csrf
+
+虽然是自定义登录逻辑 但其实后续处理相对麻烦 尤其是对于前后端分离项目而言 所以一般用的很少 我们是把后端当成api去完成token处理,登录错误提示等一般放在前端(client)去处理(App和h5的逻辑不同)
 
 ```java
 @Configuration
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
-    @Autowired
-    VerifyCodeFilter verifyCodeFilter;
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.addFilterBefore(verifyCodeFilter, UsernamePasswordAuthenticationFilter.class);
-        http.authorizeRequests()//开启登录配置
-        .antMatchers("/hello").hasRole("admin")//表示访问 /hello 这个接口，需要具备 admin 这个角色
-        .anyRequest().authenticated() //表示剩余的其他接口，登录之后就能访问
-        .and()
-        .formLogin()
-        //定义登录页面，未登录时，访问一个需要登录之后才能访问的接口，会自动跳转到该页面
-        .loginPage("/login_p")
-        //登录处理接口
-        .loginProcessingUrl("/doLogin")
-        //定义登录时，用户名的 key，默认为 username
-        .usernameParameter("uname")
-        //定义登录时，用户密码的 key，默认为 password
-        .passwordParameter("passwd")
-        //登录成功的处理器
-        .successHandler(new AuthenticationSuccessHandler() {
-            @Override
-            public void onAuthenticationSuccess(HttpServletRequest req, HttpServletResponse resp, Authentication authentication) throws IOException, ServletException {
-              // 这里一般操作是把user放session(redis)里面去 然后给出响应
-              // json登录成功的响应
-                }
-            })
-            .failureHandler(new AuthenticationFailureHandler() {
-                @Override
-                public void onAuthenticationFailure(HttpServletRequest req, HttpServletResponse resp, AuthenticationException exception) throws IOException, ServletException {
-                    // 一般是提示登录失败之后跳转到登录或者其他页面
-                  	// json提示失败和要跳转的连接
-                }
-            })
-            .permitAll()//和表单登录相关的接口统统都直接通过
-            .and()
-            .logout()
-            .logoutUrl("/logout")
-            .logoutSuccessHandler(new LogoutSuccessHandler() {
-                @Override
-                public void onLogoutSuccess(HttpServletRequest req, HttpServletResponse resp, Authentication authentication) throws IOException, ServletException {
-                    // 消除session授权或是置空
-                  	// 提示登出成功
-                }
-            })
-            .permitAll()
-            .and()
-            .httpBasic()
-            .and()
-            .csrf().disable();
-    }
+public class BrowerSecurityConfig extends WebSecurityConfigurerAdapter {
+
+   @Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.formLogin()  //  定义当需要用户登录时候，转到的登录页面。
+      .loginPage("/login.html") // 设置登录页面 所有login接口全部转发到
+      .loginProcessingUrl("/login")  // 自定义的登录接口
+      .and()
+      .authorizeRequests()  // 定义哪些URL需要被保护、哪些不需要被保护
+      .antMatchers("/login.html").permitAll() 
+      // 设置所有人都可以访问登录页面 前后端分离还要暴露接口给最开始的登录
+      .anyRequest() // 任何请求,登录后可以访问
+      .authenticated()
+      .csrf().disable() // 这里先关闭跨域请求 其实使用token就没必要了
+      ;
+	}
 }
 ```
 
+这个配置可以当你访问/user/login的时候给你forward到login.html
 
+`.and()`用于接力每一组链式编程,把所有其他类型的返回值变成HttpSecurity
 
-其认证流程如下
+>   ### csrf跨站请求防御
+>
+>   所谓的跨站请求 其实是别人在诱导你访问 比如钓鱼广告中重定向api C的浏览器中运行A转钱给B的api 携带C的session 自然而然的就悲剧了 虽然A没有C的session但是可以借用C浏览器的cookie 
+>
+>   1.  可以通过**HTTP Referer** 查看访问路径 如果不对直接refuse掉(现在比较少勇)
+>   2.  使用jwt(token)解决这个问题 在敏感请求上添加关键参数到payload(spring security利用token来实现csrf的防御)
+
+登录的跨站请求基本不需要防御 我们这里就直接关了 不关的话登录会失败 上面配置好之后就可以走登录的逻辑了 需要注意的是 端口的所有post请求都会最先被spring-security拦截下来 所以接口名字得另起 或者登录接口不用 `/login`
+
+我们在自己登陆页面没有spring的token如下 在spring自己的登录页面有这么一个字段
+
+`<input name="_csrf" type="hidden" value="635780a5-6853-4fcd-ba14-77db85dbd8bd" />`
+
+所以我们登录的时候就出错了
+
+#### 登录失败跳转
+
+实际上前后端分离登录成功不是跳转页面 而是返回用户信息(token) 在次请求页面附带token
+
+而失败的话我们如果在请求页面也可以 就是会消耗负载 因此我们一般可以做两种处理
+
+1.  把登录错误视为异常(后端直接统一错误页) 静态页带参数+js取出消息即可 或者统一后端返回页面(很小的负载压力)
+2.  前端弹出对话框说明登录失败(用的比较多)
+
+**注意:多端app处理一般是由前端去完成部分路由跳转 后端只负责返回参数而已**
+
+---
+
+### Spring-Security原理
+
+其是基于filter实现的 (先于springmvc的拦截器),其认证流程如下
 
 ![](https://upload-images.jianshu.io/upload_images/15200008-545f402fe2355967.png)
 
 可以看到其本质是拿filter链去实现的 先验证表单 在验证报文头
+
+---
 
 ## 功能实现相关
 
