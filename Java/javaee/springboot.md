@@ -318,6 +318,10 @@ public class WebConfiguration {
 }
 ```
 
+### springmvc拦截器的配置
+
+暂略
+
 ### JPA的简单使用
 
 ---
@@ -1794,7 +1798,7 @@ application.properties
 
 ```properties
 spring.application.name=Spring-boot-rabbitmq
-spring.rabbitmq.host=192.168.0.86
+spring.rabbitmq.host=127.0.0.1
 spring.rabbitmq.port=5672
 spring.rabbitmq.username=admin
 spring.rabbitmq.password=123456
@@ -1811,6 +1815,9 @@ rabbitmq-api
 ### 消息发送
 
 ```java
+@Autowired
+RabbitTemplate rabbitTemplate;
+
 @Test
 void test() throws Exception {
   String context = "this is time " + new Date() + " to send the msg";
@@ -2028,7 +2035,7 @@ mvn clean package -Dmaven.test.skip=true
 直接打包就行了 和war类似,打完之后再target会生成两个jar包 `*.jar` 和`*.jar.original` 两者的不同在于 jar.original 是不包含依赖只包含用户类的代码的 如果是想给其他项目使用则用original 
 
 ```shell
-java -jar Demo.jar
+java -jar Demo.jar --server.port=8080
 ```
 
 这句话执行的时候会去找META-INF/MANIFEST.MF文件读取信息 在下文中有该文件简单格式

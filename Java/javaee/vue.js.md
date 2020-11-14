@@ -361,6 +361,14 @@ new Vue({
 </script>
 ```
 
+## vue-router
+
+vue-router是vue路由,其能完成一些动态路由的操作而不用程序员去手动拼接出页面的地址.
+
+
+
+
+
 ## 组件
 
 高度复用html代码 模块化程度提高 是vue的核心技术 使其逐步脱离纯粹的页面渲染形成高效组件配置的代码模式
@@ -530,9 +538,9 @@ npm install babel-preset-es2015 --save-dev  引入一个插件
 
 ![](https://img-blog.csdnimg.cn/20190611223319346.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MjYwMzAwOQ==,size_16,color_FFFFFF,t_70)
 
-***npm install 可以用于安装依赖***
+### ***2. npm install 可以用于安装依赖***
 
-修改.babelrc
+修改.babelrc这个文件是为了
 
 ```js
 {
@@ -559,6 +567,12 @@ Vue.prototype.axios=axios // 可以全局用了 以后只用this.axios.get()就�
 配置好之后 ***npm run dev*** // 启动开发服务器 开发vue项目
 
 当写好了之后打包(***npm run build***) // 把/static换成./staitc 打开静态页面就可以了
+
+>   ### vue的启动过程
+>
+>   ![](https://img-blog.csdnimg.cn/20190611225607977.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MjYwMzAwOQ==,size_16,color_FFFFFF,t_70)
+>
+>   main.js中定位到App.vue里面有个`<router-view>`该组件直接去找router下面的main.js去找到相应的路由 `{path:"/",name:"HelloWorld",component:HellowWorld}` 那就去直接找到component当成单页面的vue组件去处理了 所以我们只用修改router的代码就可以重新定位url
 
 ## webpack-vue配置文件相关
 
@@ -725,4 +739,31 @@ test.vue test_init.js 一定不要重名 debug3小时wdnmd
 
 对后端程序员而言vue用的相对没那么多,主要针对vue进行一系列部署讲解
 
-vue打包命令 `npm run build`
+vue打包命令 `npm run build` 开发命令是 `npm run dev`
+
+1.  初始化项目`vue init webpack project_name`
+2.  npm install 等配置基本的环境依赖等
+3.  src/router/main.js配置前端路由
+4.  config/index.js配置proxyTable转发
+
+路由走向: 前端请求路由到main.js中匹配相应的路径 然后根据proxyTable的路径转发部分指定规则的请求到后端服务器上从而搭建开发环境
+
+我们约定 .vue结尾为前端页面 /api开头的路径全部到后端
+
+```json
+{
+  ...
+  proxyTable:{
+    '/api':{
+    	target:"http://127.0.0.1:8000",
+      pathRewrite:{"^/api":""}
+  	}
+  }
+  ...
+}
+```
+
+这里面的修改说明了/api开头的请求全部会以/形式转给后端 比如`/api/user/login`->`/user/login`  
+
+至于vue+springboot部署时后端路由可以给出前端ui的重定向地址由前端完成ui重定向,springboot只用专注于处理api的请求即可
+

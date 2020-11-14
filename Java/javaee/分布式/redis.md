@@ -32,7 +32,7 @@ nosql满足下列分布式定理 并基于此定理构建系统
 
 ## redis-cli
 
-```redis-cli
+```shell
 keys * # 查看所有key
 
 # stirng
@@ -55,6 +55,117 @@ sadd set value
 smembers
 ```
 
+## redis.conf
+
+```conf
+# ./redis-server /path/to/redis.conf
+# bind 127.0.0.1
+
+protected-mode yes # 限制bending访问
+port 6379
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+
+daemonize no # 不在这里开启守护线程
+
+supervised no
+
+pidfile /var/run/redis_6379.pid
+
+loglevel notice
+logfile ""
+
+databases 16
+always-show-logo yes
+
+
+#   save <seconds> <changes>
+save 900 1 # 900秒内改变1次就存
+save 300 10 # 300秒内改变10次就存
+save 60 10000 # 60秒内改变10000次就存
+
+
+stop-writes-on-bgsave-error yes
+# 压缩RBD文件
+rdbcompression yes
+
+# Since version 5 of RDB a CRC64 checksum is placed at the end of the file.
+rdbchecksum yes
+
+# The filename where to dump the DB
+dbfilename dump.rdb
+rdb-del-sync-files no
+# 工作目录,RDB文件在这
+dir ./
+
+
+replica-serve-stale-data yes
+replica-read-only yes
+repl-diskless-sync no
+repl-diskless-sync-delay 5
+repl-diskless-load disabled
+repl-disable-tcp-nodelay no
+replica-priority 100
+
+acllog-max-len 128
+
+lazyfree-lazy-eviction no
+lazyfree-lazy-expire no
+lazyfree-lazy-server-del no
+replica-lazy-flush no
+
+# AOF
+appendonly yes
+appendfilename "appendonly.aof"
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+aof-load-truncated yes
+aof-use-rdb-preamble yes
+
+
+lua-time-limit 5000
+
+slowlog-log-slower-than 10000
+slowlog-max-len 128
+
+latency-monitor-threshold 0
+notify-keyspace-events ""
+
+hash-max-ziplist-entries 512
+hash-max-ziplist-value 64
+
+list-max-ziplist-size -2
+list-compress-depth 0
+
+set-max-intset-entries 512
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+
+hll-sparse-max-bytes 3000
+
+stream-node-max-bytes 4096
+stream-node-max-entries 100
+
+activerehashing yes
+
+client-output-buffer-limit normal 0 0 0
+client-output-buffer-limit replica 256mb 64mb 60
+client-output-buffer-limit pubsub 32mb 8mb 60
+
+dynamic-hz yes
+aof-rewrite-incremental-fsync yes
+rdb-save-incremental-fsync yes
+```
+
+
+
+### 有待后续
+
+
+
 ## 使用场景
 
 ---
@@ -69,6 +180,8 @@ smembers
 
 也就是说对于临时高峰值业务(抢票 秒杀系统等) 我们直接存取redis集群 等待redis空闲时进行持久化
 
+
+
 ## redis持久化方式
 
 redis有两种持久化的方式 rdb和aof (redis database和append only file)
@@ -81,11 +194,57 @@ aof 是保存操作命令的  aof回复比较慢 适合保存增量数据
 
 redis默认开启rbd 要开启aof要在配置文件中写 appendonly yes
 
+### RDB
+
+以下两个指令可以完成RDB持久化
+
+-   `SAVE` 阻塞完成请求,这段时间服务器不能处理 `SAVE 60 10000`如果60秒内执行了10000次那么RDB持久化,如果有多条指令那么满足其中一个就会执行持久化,在redis.conf里面可以设置
+-   `BGSAVE` fork出一个子进程完成请求,执行的时候`SAVE`会被拒绝,`BGREWRITEAOF`指令会延后到`BGSAVE`之后执行,因为`BGSAVE`和`BGREWRITEAOF`都在同一子进程执行
+
+而RDB的载入方式是自动的只要有RDB文件就会载入redis,AOF因为更新成本比较低,所以同时开启的时候,优先会载入AOF来还原数据库状态。
+
+除此之外,服务器还维护着dirty计数器和lastsave属性.dirty记录了上一次SAVE之后进行了多少次修改(判定条件),lastsave是一个时间戳,记录着上一次SAVE的时间,用这两个数据结构去实现SAVE命令,多个save是利用链表结构去串成的,所以不宜写太多同样的SAVE
+
+### AOF
+
+aof持久化打开时,每当执行命令的时候,会以协议格式追加到服务器的aof_buf缓冲区.aof的文件写入分两部分
+
+-   WRITE 根据条件,aof_buf中的缓存写入到AOF文件
+-   SAVE 根据条件,调用 fsync 或 fdatasync 函数,将 AOF 文件保存到磁盘中
+
+AOF有三种模式
+
+-   AOF_FSYNC_NO 不保存
+
+    执行WRITE不执行SAVE,SAVE部分只有在redis关闭,写缓存刷新,AOF功能被关闭的时候才执行SAVE
+
+-   AOF_FSYNC_EVERYSEC 每秒存一次
+
+    这个SAVE是子进程执行的,所以不会引起主线程的阻塞,根据在执行的状态有以下的情况
+
+    ![](https://upload-images.jianshu.io/upload_images/11772383-e2517a5a90bfd170.png)
+
+    实际上其的停机状况可能会引起来超过两秒的数据丢失
+
+-   AOF_FSYNC_ALWAYS 每执行一个命令保存一次
+
+    这个SAVE是主进程执行的,并非子进程执行，所以服务器会阻塞一段时间
+
+AOF重写
+
+​	如果不加以控制,AOF文件的大小将会变得无法控制。所以对一些命令进行了重写,AOF的重写程序放到子进程中执行,如果在重写的时候有新的命令进来会遗漏,所以设置AOF缓冲区.我们可以用`BGREWRITEAOF`来进行AOF重写.这期间父进程主要完成的工作如下
+
+1.将AOF重写缓冲区中的所有内容写入新的AOF文件中，这时新AOF文件锁保存的数据库状态和服务器当前状态一致
+
+2.对新的AOF文件进行改名，原子性操作地覆盖现有的AOF文件，完成新旧AOF文件的替换。
+
 ## redis的线程模型
 
 redis是队列循环加单线程模型
 
 其利主要利用了IO复用(请求注册,注册操作)
+
+### 有待补充
 
 ## redis缓存击穿和缓存雪崩
 
@@ -96,6 +255,10 @@ redis是队列循环加单线程模型
 缓存雪崩: 在缓存层出现了错误 导致直接访问存储层 存储层调用量暴增
 
 解决方案: redis高可用集群 限流降级 数据预热
+
+### 有待补充
+
+
 
 ## 和memcached的对比
 
@@ -248,6 +411,10 @@ quorum和majority:(majority>quorum)
 如果有quorunm个哨兵认为主节点挂了,才可以选举出一个哨兵然后majority个哨兵授权才能让这个哨兵称为主节点
 
 ### 分布式锁
+
+### 有待后续
+
+
 
 ---
 

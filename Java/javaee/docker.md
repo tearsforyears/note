@@ -1,4 +1,4 @@
-# Docker
+Docker
 
 [TOC]
 
@@ -61,11 +61,49 @@ HYPERVISOR: 这是虚拟机管理系统工具.利用Hypervisor,可以在主操�
 
 ## network
 
+docker的网络是建立在Linux网路技术之上的,docker在启动时创建自己的虚拟网桥docker0,所有的容器可以通过该网桥和外部网络发生交互。
+
+### NameSpace
+
+linux内核提供,可以保证各个namespace就是各个沙箱,互相隔离
+
+`ip netns`可以完成对namespace的各种操作
+
+**对于每个namespace来说有自己独立的网卡、路由表、ARP 表、iptables**
+
+### veth
+
+veth属于可在namespace下转移的网络设备
+
+### veth pair
+
+这个是为了让两个veth在不同的namespace下完成通信的端口
+
+![](https://upload-images.jianshu.io/upload_images/13618762-2aa4565233659af8.png)
+
+如下可以在不同的命名空间下完成两个veth的通信
+
+### bridge
+
+veth pair只能完成两个端口间的通信，而bridge则是要完成两个namespace的通信
+
+这个技术类似于虚拟交换机位于网络第二层专门用于转发，其基于MAC地址进行转发
+
+`brctl` 该命令可以操作网桥
+
+---
+
 docker的网络在大规模使用docker的时候十分重要因为我们一般使用的是端口映射而真实的项目需要独立的ip地址(局域网也行) 容器内部都是由独立的虚拟网卡存在的
+
+docker在启动时会创建一个docker0的虚拟网桥(mac还多了层虚拟机),并给docker0分配IP地址称为`Container-IP`,容器间可以通过Container-IP所在的网桥进行通信，而外部设备是不能找到docker0这个虚拟网桥的，如果外界需要访问得开启端口映射`-p -P`来指定映射的端口
 
 ### 网络模式
 
-**host**:使用宿主机网络ip 端口等 如下我们可以看到主机网卡和虚拟机网卡平级
+### **host**
+
+使用宿主机网络ip 端口等 如下我们可以看到主机网卡和虚拟机网卡平级
+
+`本质上是和宿主机共享namespace` 
 
 ![](https://pic002.cnblogs.com/images/2012/355296/2012040618213770.png)
 
@@ -73,7 +111,11 @@ docker的网络在大规模使用docker的时候十分重要因为我们一般�
 
 ***在mac中docker运行在一个linux虚拟机上并没有docker0网桥(准确的说是连接到了虚拟机的docker0网桥上而外界无法对这个机子进行交互(docker-machine自己建的机子除外))所有不能使用host模式 一个大坑***
 
-**bridge**: 默认连接到的网络 桥接模式
+---
+
+### **bridge**
+
+默认连接到的网络 桥接模式
 
 桥接模式相当于使用一个虚拟网桥(交换机)去抽象虚拟设备的网卡到同一局域网下
 
@@ -85,7 +127,25 @@ none:关闭网络
 
 nat:网络地址转换模式(docker没有不多赘述)
 
-Container(docker特有): 所有容器会共享一个指定容器的ip和端口范围,并不会有自己的虚拟网卡
+---
+
+### Container(docker特有)
+
+所有容器会共享一个指定容器的ip和端口范围,并不会有自己的虚拟网卡.
+
+容器和另外一个容器共享Network namespace,kubernetes中的pod就是多个容器共享一个namespace.
+
+![](https://upload-images.jianshu.io/upload_images/13618762-790a69a562a5b358.png)
+
+这个作用就是共享容器的网段,即是说,k8s也是利用此特性去创建了一众容器
+
+---
+
+###  none(docker特有)
+
+容器拥有独立的namespace，但并没有进行其他的设置
+
+---
 
 ### docker网络内部转发
 
@@ -94,8 +154,6 @@ Container(docker特有): 所有容器会共享一个指定容器的ip和端口�
 桥接模式转发
 
 ![](https://upload-images.jianshu.io/upload_images/7298148-659bfb4ab12f7fdc.png)
-
-
 
 中间这个docker0是damon线程的虚拟交换机地址
 
