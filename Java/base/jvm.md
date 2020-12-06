@@ -80,6 +80,28 @@ heap是对象的存放区域也是管理最麻烦的一个区域,具体内容会
 
 ![](https://img-blog.csdn.net/20170419212953720?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvenF6X3pxeg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
 
+这里说明下klass这个数据结构
+
+#### klass-OOP model
+
+我们知道Hotspot是基于c++实现的,c++本身是门面向对象的语言,那java中的对象最简单的就是使用c++中的对象去一一对应,但是为了扩充一些功能,hotspot选择用klass这c++类来表示java中的类而oop用来表示java中的对象.klass和oop称为`OOP-Klass Model`即面向对象模型.其原因是Hotspot设计者不想让java中的每个对象都有`vtable`(虚函数表)
+
+关于C++和java多态实现方法
+
+>   在C++中通过虚函数表的方式实现多态，每个包含虚函数的类都具有一个**虚函数表（virtual table）**，在这个类对象的地址空间的最靠前的位置存有指向虚函数表的指针。在虚函数表中，按照声明顺序依次排列所有的虚函数。由于C++在运行时并不维护类型信息，所以在**编译时直接在子类的虚函数表中将被子类重写的方法替换掉**。
+>
+>   在Java中，在运行时会维持类型信息以及类的继承体系。每一个类会在**方法区中对应一个数据结构用于存放类的信息**，可以通过Class对象访问这个数据结构。其中，类型信息具有superclass属性指示了其超类，以及这个类对应的方法表（其中只包含这个类定义的方法，不包括从超类继承来的）。而每一个在堆上创建的对象，都具有一个指向方法区类型信息数据结构的指针，通过这个指针可以确定对象的类型。
+
+c++的类在java中的职责如下
+
+![](https://www.hollischuang.com/wp-content/uploads/2017/12/2579123-5b117a7c06e83d84.png)
+
+所以从这里我们可以看到**java的对象其实例数据保存在堆上,其本质是oop对象,其引用保存在栈上,其元信息保存在方法区,本质上是klassOop对象.**
+
+
+
+---
+
 对象的数据结构包括三个部分
 
 -   对象头 Header
@@ -144,9 +166,74 @@ Class A {
 
 
 
+#### 数组对象
+
+数组对象是对象里面比较特殊的,最简单的`int[]`其实是c++实现的比较特殊的类,其实例化方式更是和其他类不相同,其存储方式和对象却是一样的,首先其在堆内存上可以被new,其内部在对象头之后(markword,class指针,数组长度)有一段连续的空间存储基本类型的值,但是如果不是基本类型,(比如`Object[]`的实例,则是会存储这些实例的指针)
+
+```java
+new boolean[]{false,true,false};
+```
+
+```shell
+[Z object internals:
+ OFFSET  SIZE      TYPE DESCRIPTION   VALUE
+      0     4 (object header)  01 00 00 00 (00000001 00000000 00000000 00000000) (1)
+      4     4 (object header) 00 00 00 00 (00000000 00000000 00000000 00000000) (0)
+      8     4   (object header) 05 00 00 f8 (00000101 00000000 00000000 11111000) (-134217723)
+     12     4  (object header) 03 00 00 00 (00000011 00000000 00000000 00000000) (3)
+     16     3   boolean [Z.<elements>   N/A # 这里存储大小是3字节
+     19     5    (loss due to the next object alignment)
+Instance size: 24 bytes
+Space losses: 0 bytes internal + 5 bytes external = 5 bytes total
+```
+
+```java
+new Double[]{200.0d,200.0d,200.0d};
+new double[]{200.0d,200.0d,200.0d};
+```
+
+```shell
+[Ljava.lang.Double; object internals:
+ OFFSET  SIZE   TYPE DESCRIPTION   VALUE
+      0     4                    (object header)                           01 00 00 00 (00000001 00000000 00000000 00000000) (1)
+      4     4                    (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)
+      8     4                    (object header)                           9d 09 01 f8 (10011101 00001001 00000001 11111000) (-134149731)
+     12     4                    (object header)                           03 00 00 00 (00000011 00000000 00000000 00000000) (3)
+     16    12   java.lang.Double Double;.<elements> N/A # 12字节 3个引用
+     28     4                    (loss due to the next object alignment)
+Instance size: 32 bytes
+Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
+
+[D object internals:
+ OFFSET  SIZE     TYPE DESCRIPTION  VALUE
+      0     4 (object header) 01 00 00 00 (00000001 00000000 00000000 00000000) (1)
+      4     4  (object header) 00 00 00 00 (00000000 00000000 00000000 00000000) (0)
+      8     4 (object header) b9 00 00 f8 (10111001 00000000 00000000 11111000) (-134217543)
+     12     4  (object header) 03 00 00 00 (00000011 00000000 00000000 00000000) (3)
+     16    24   double [D.<elements> N/A # 24个字节 所以应该直接存了double的值
+Instance size: 40 bytes
+Space losses: 0 bytes internal + 0 bytes external = 0 bytes total
+
+```
+
+如此一来便能建立完整的对象存储体系
+
+
+
 ### 类加载与初始化过程
 
 ---
+
+总的来说类的编译执行包括以下阶段
+
+-   编译
+-   加载 (ClassLoader)
+-   验证
+-   准备 (static分配)
+-   解析 (常量池分配)
+-   初始化
+    -   类初始化\<clinit\>
+    -   实例初始化\<init\>
 
 #### 编译过程 javac
 
@@ -184,7 +271,7 @@ Class A {
 
     -   验证 Verification 验证字节码的准确性,final是否被覆盖,函数签名
     -   准备 Preparing 在**方法区**为static变量分配内存(注入默认值)
-    -   解析 Resolution 确定运行时常量池的引用
+    -   解析 Resolution 确定运行时**常量池**的引用
 
 -   装载 Initialization
 
@@ -426,11 +513,13 @@ gc指的是garage collection,即垃圾回收.
 
 ##### 弱引用:new Object();
 
-没有明确变量引用时jvm会考虑回收
+没有明确变量引用时,**除非是发生了内存溢出**否则该类对象也是不会被回收的
 
 ##### 软引用:obj=null;
 
-只有在内存不足的时候JVM才会回收该对象一般我们会配合ReferenceQueue去使用
+拥有弱引用的对象都活不过下一次GC之前,也就是说**无论内存溢出与否下一次都会被回收**.
+
+一般我们会配合ReferenceQueue去使用,其作用就是回收的时候这个对象加入软引用的队列,如果还没发生GC可以重新获得,如果发生了GC获得null
 
 ```java
 import java.lang.ref.SoftReference; 
@@ -454,7 +543,7 @@ class Obj{
 
 ##### 虚引用:finalize
 
-finalize时会用到的一种引用,使用较少,在任何时候都可能被垃圾回收器回收
+finalize时会用到的一种引用,使用较少,在任何时候都可能被垃圾回收器回收,其存在只是gc后对象能够收到通知执行finalize方法的一个引用
 
 ```java
 import java.lang.ref.PhantomReference;
@@ -685,6 +774,8 @@ g1将一组或多组区域中存活对象以增量并行的方式复制到不同
 
 ```shell
 java -verbose:class 即可查看加载了哪些类
+java -verbose:jni 即可查看本地方法
+java -verbose:gc 即可查看gc
 java -Xmx 堆内存的最大大小
 java -Xms 堆内存的最小大小
 java -Xmn 新生代大小 (max new)
@@ -967,6 +1058,12 @@ ClassLayout.parseInstance(obj).toPrintable(); // 打印对象内部的结构和�
 | 20     | 4    | int                  | HashMap.size       | 2           |
 
 ......还有hashmap的其他成员变量
+
+-   无论在32位虚拟机上还是在64位虚拟机上,对象引用的大小都是4Byte和int一样大小.
+
+-   所以对于线程切换来讲64位虚拟机是不会被中断掉的,也就是说赋值(引用和基本类型)在32位虚拟机上double和long等超过32位的是有可能被中断掉的
+
+    
 
 ##### jconsole/VisualVM
 
