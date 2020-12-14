@@ -105,6 +105,7 @@ double...dbarray //封装成数组自己遍历吧
 		类型通配符?
 		<?>代替所有类
 ## lambda表达式
+
 		(,)->{} //瞬间想起箭头函数
 		(String s)->System.out.println(s);
 		//可以不写类型,但不能直接这么写
@@ -114,7 +115,38 @@ double...dbarray //封装成数组自己遍历吧
 			void func(params...);
 		}
 		TypeF t=()->{};//可以用来实现一些匿名内部类干的事
+## try-with-resource
+
+```java
+// try catch 的语法糖,能对autocloseable进行实现 jdk1.8语法
+try(InputStream is = new FileInputStream("...");){
+  
+}catch(Exception e){
+  e.printStackTrace();
+}
+// 这里本来要实现close的,java8实现了
+```
+
+## 多重循环的跳转
+
+for和while都可以使用
+
+```java
+begin:
+for (int i = 0; i < 10; i++) {
+  inner:
+  for (int j = 0; j < 10; j++) {
+    if (j < 5) {
+      System.out.print(j);
+    } else {
+      break begin; // 执行4次直接跳出最外面
+    }
+  }
+}
+```
+
 ## 默认方法
+
 		interface it{
 			default void func(){
 	
@@ -495,18 +527,18 @@ double...dbarray //封装成数组自己遍历吧
 ​	//文件读写
 ​		InputStream,OutputStream,Writer,Reader都是抽象类
 ​		
-		###bytes
-		InputStream fis = new FileInputStream("path");
-			//InputStream主要方法
-			read(int)//读指定字节
-			read(byte[])//读入byte所有
-		OutputStream os = new FileOutputStream("path");
-			//OutputStream主要方法
-			FileOutputStream("path",true);
-			//第二个参数是否覆盖前面文件
-			write(int)//写入指定字节
-			write(byte[])//str.getBytes()进行字符数组转换
-		
+​		###bytes
+​		InputStream fis = new FileInputStream("path");
+​			//InputStream主要方法
+​			read(int)//读指定字节
+​			read(byte[])//读入byte所有
+​		OutputStream os = new FileOutputStream("path");
+​			//OutputStream主要方法
+​			FileOutputStream("path",true);
+​			//第二个参数是否覆盖前面文件
+​			write(int)//写入指定字节
+​			write(byte[])//str.getBytes()进行字符数组转换
+​		
 		###chars
 		Writer w=FileWriter(new File("path"));
 			FileWriter的第二个参数指定为true和Stream类似
