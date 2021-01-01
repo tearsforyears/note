@@ -24,16 +24,12 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
 ---
 
-用的就两字 顺滑 不用过多乱七八糟的配置服务器 专注于业务逻辑的编写
-
-真的是约定大于配置的典型 默认的配置可以更改 但是默认的配置会使得项目顺滑程度提高了很多倍
-
 其主要优点如下
 
 -   不用配置乱七八糟的beans.xml/web.xml 改用配置更好的properties和yaml并行配置
 -   配置上还采用了一堆默认配置 使得开箱即用非常厉害 spring.io直接集成文件速度起飞
 -   集成服务器debug速度和只用运行jar速度快如闪电的boot
--   集成服务器 部署微服务简直不要太开心
+-   集成服务器 部署微服务更快
 -   集成各种各样的组件 却没有提高耦合度 从某种意义上讲配置的另一个好处
 -   集成监控并有springboot-admin等开源监控实现(微服务和单项目监控)
 -   和docker无缝贴合,springcloud的基础环境
@@ -64,7 +60,7 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
     默认的name为方法名字本身
 
--   **@Scope @Description** // 用于指定bean的作用范围和描述
+-   **@Scope ** 用于指定bean的作用范围
 
 -   **@Transactional** 事务注解 此注解标注在方法上(不要标记在接口上) 用于事务处理 发生异常时回滚 因为是 基于类代理和接口代理实现的 所以标注在接口上基本会在别的组件代理接口时失去效果 另外类内调用该方法也是不起作用的 只有当创建类的时候 该注解才会注入事务
 
@@ -1047,6 +1043,12 @@ mybatis.config-location=classpath:mybatis/mybatis-config.xml
 mybatis.mapper-locations=classpath:mybatis/mapper/*.xml
 ```
 
+开启某个包的mybatis的日志
+
+```properties
+logging.level.com.fourspring.springtest.mapper=debug
+```
+
 ### mybatis plus
 
 是国人写的一个增强mybatis的工具 也就是增强使用 原生sql一样可以实现
@@ -1072,10 +1074,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @MapperScan("com.example.mbttest.mapper")
 public class MybatisPlusConfig {
-
-    /**
-     * 注册分页插件
-     */
+  
     @Bean
     public PaginationInterceptor paginationInterceptor() {
         return new PaginationInterceptor();
@@ -1774,6 +1773,20 @@ management:
       show-details: ALWAYS
 ```
 
+### 编写文档 japidocs
+
+japidocs属于一个无需用注解编写的api文档生成工具,参考[官方文档](https://japidocs.agilestudio.cn/#/zh-cn/)
+
+```xml
+<dependency>
+  <groupId>io.github.yedaxia</groupId>
+  <artifactId>japidocs</artifactId>
+  <version>1.4.3</version>
+</dependency>
+```
+
+-   未完待续
+
 
 
 ---
@@ -2148,31 +2161,349 @@ maven中配置插件
 mvn package docker:build
 ```
 
-### 部署带组件的复杂项目
+### 热部署
+
+热部署原理,好多web服务器都支持热部署,对于重新部署一个大型应用来说,这是灾难级别的,Java中热部署一致是一个难以解决的问题,Java虚拟机只能实现**方法修改**的热部署,如果要改变整个类的结构,仍然需要重启虚拟机.对于生产环境而言我们可以通过集群的兼容代码一部分一部分替换,直至新系统上限,所以springboot的热部署一般是用在测试环境.仅作为一个可选择的知识点,后续重点请参考集群操控.
+
+这里介绍一种简单的热部署工具,在创建springboot项目的时候我们就可以选择devtools
+
+devtools会监听classpath下的文件变动,并且会立即重启应用.配置了true之后java文件支持热启动.
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-devtools</artifactId>
+  <scope>runtime</scope>
+  <optional>true</optional>
+</dependency>
+```
+
+我们还要开启自动编译
+
+-   Preference->Compiler->Build Project Automatically 勾选
+-   command+alt+shift+’/’ ->Registry->compiler.automake.allow.when.app.running 勾选
+
+此时修改了代码就可以自动编译新文件了.
+
+不过需要注意的是此种热部署属于项目重启,所以在一些情况下并不是特别好用,所以也会发生清空session等情况,务必要注意.
+
+
+
+## springboot高级特性与实现原理
+
+这一章节我们来剖析springboot的一些机制性的问题,以及完成一些高级的功能,这些特性大多都涉及内存分配与多线程,关于java的多线程基础请参考另一文档.本章节内容偏向原理性,包括web原理和spring原理多线程等知识的结合,本章的主要目的是提高springboot的系统性能,属于单springboot应用的优化,涉及基本功能的实现以及api的部分如上.
 
 ---
 
-springboot很多时候得用到各种各样的第三方组件 比如mysql rabbitmq
+### websocket协议扩展springboot服务
 
-所以在部署docker的时候得注意连接或者是组网这些组件
+我们都知道springboot是个优秀的rest请求处理库,其是基于http/https协议的请求处理,耦合tomcat/jetty等服务器可以完成处理http请求的功能.如果知道tomcat的线程结构和网络请求就会知道,springboot通常是用来完成一次请求一次应答的一锤子买卖,而分布式系统中有需要完全保持连接自己释放连接的需求.这些需求就用socket io去完成.我们可以自己写ServerSocket,但spring有其自己的封装就是WebSocket.这还可以实现一些特殊需求,比如客服在线聊天等.
 
-docker-compose可以解决这个问题
+WebSocket不但使用了新的api,其还使用了新的协议,由HTML5定义,其基于TCP协议建立可以理解为一种带连接的http协议,一般的socket工具`nc`或者是java自带的socket都无法连接上,我们在后文用的是html作为其测试.在分布式系统中,可以采用更加通用的TCP/Netty作为底层.
 
-待定
+#### websocket协议
+
+因为其基于tcp协议实现,所以三次握手都是必经
+
+![](https://img2020.cnblogs.com/blog/1721320/202003/1721320-20200319084859071-1530751486.png)
+
+如上,只需要经过一次http阶段的握手,两者就可以进行数据交流了,这样可以省去不断接受处理http请求的麻烦,其特点就是长连接的特点,且全双工通信.所以其相比更加原始的TCP,其要处理的信息就变少了
+
+![](https://img2018.cnblogs.com/blog/722072/201905/722072-20190530002436087-2075657243.png)
+
+我们只需要关注message的处理就可以实现我们自己想要的功能了.websocket使用80和443端口进行工作.其handshanke阶段发的报文和http基本一致.
+
+HttpStreaming虽然也可以维持长时间连接但是Http建立通道的话就违背了Http的语义,且代理等会缓存数据流这很不利于响应.所以长轮询的ajax就成为了websocket以前的轮询数据,或者少部分客户端能够使用原生TCP进行数据交换.
+
+#### 使用websocket
+
+springboot对websocket协议进行了支持,进行配置之后就可以使用
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-websocket</artifactId>
+</dependency>
+```
+
+```java
+@Component
+public class WebSocketConfiguration {
+    @Bean
+    public ServerEndpointExporter serverEndpointExporter() {
+        return new ServerEndpointExporter();
+    }
+}
+```
+
+我们实现下websocket类
+
+```java
+@Component
+@ServerEndpoint("/websocket/{name}")
+public class WebSocket {
+
+
+    private Session session;
+
+    private String name;
+
+    /**
+     * 用于存所有的连接服务的客户端，这个对象存储是安全的
+     */
+    private static ConcurrentHashMap<String, WebSocket> webSocketSet = new ConcurrentHashMap<>();
+
+
+    @OnOpen
+    public void onOpen(Session session, @PathParam(value = "name") String name) {
+        this.session = session;
+        this.name = name;
+        // name是用来表示唯一客户端，如果需要指定发送，需要指定发送通过name来区分
+        webSocketSet.put(name, this);
+        System.out.println("[WebSocket] 连接成功，当前连接人数为：" + webSocketSet.size());
+    }
+
+
+    @OnClose
+    public void onClose() {
+        webSocketSet.remove(this.name);
+        System.out.println("[WebSocket] 退出成功，当前连接人数为：" + webSocketSet.size());
+    }
+
+    @OnMessage
+    public void onMessage(String message) {
+        System.out.println("[WebSocket] 收到消息：" + message);
+
+        //判断是否需要指定发送，具体规则自定义
+        String reg = "user ";
+        if (message.indexOf(reg) == 0) {
+            String name = message.substring(reg.length(), message.indexOf(";"));
+            appointSending(name, "[" + this.name + " only says to you] =>" + message.substring(message.indexOf(";") + 1));
+        } else {
+            groupSending("[" + this.name + " says to all] => " + message);
+        }
+
+    }
+
+
+    public void groupSending(String message) {
+        for (String name : webSocketSet.keySet()) {
+            try {
+                webSocketSet.get(name).session.getBasicRemote().sendText(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    public void appointSending(String name, String message) {
+        try {
+            webSocketSet.get(name).session.getBasicRemote().sendText(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+我们利用服务端写好一个程序非自动连接应为登录后才有,此处只做通信部分的演示
+
+```html
+<body>
+  用户名:<input id="name" type="text"/><br>
+  发送内容:<input id="text" type="text"/>
+  <button onclick="send()">发送消息</button>
+  <br/>
+  <button onclick="closeWebSocket()">关闭WebSocket连接</button>
+  <br/>
+  <div id="message"></div>
+  <script>
+    var websocket = null;
+    
+    // 将消息显示在网页上
+    function setMessageInnerHTML(innerHTML) {
+      document.getElementById('message').innerHTML += innerHTML + '<br/>';
+    }
+
+    // 关闭WebSocket连接
+    function closeWebSocket() {
+      websocket.close();
+    }
+    // 发送消息
+    function send() {
+      if(websocket==null){
+        if('WebSocket' in window) {
+          websocket = new WebSocket("ws://localhost:8000/websocket/"+document.getElementById('name').value);
+        } else if('MozWebSocket' in window) {
+          websocket = new MozWebSocket("ws://localhost:8000/websocket/"+document.getElementById('name').value);
+        } else {
+          websocket = new SockJS("localhost:8000/websocket/"+document.getElementById('name').value);
+        }
+
+        //连接发生错误的回调方法
+        websocket.onerror = function () {
+          setMessageInnerHTML("WebSocket连接发生错误");
+        };
+
+        //连接成功建立的回调方法
+        websocket.onopen = function () {
+          setMessageInnerHTML("WebSocket连接成功,在次点击发送消息");
+        }
+
+        //接收到消息的回调方法
+        websocket.onmessage = function (event) {
+          setMessageInnerHTML(event.data);
+        }
+
+        //连接关闭的回调方法
+        websocket.onclose = function () {
+          setMessageInnerHTML("WebSocket连接关闭");
+        }
+
+        //监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+        window.onbeforeunload = function () {
+          closeWebSocket();
+        }
+      }
+      var message = document.getElementById('text').value;
+      websocket.send(message);
+    }
+
+  </script>
+</body>
+```
+
+这样我们就能实现基本的在线聊天程序,而前端只需要渲染出交换的数据即可
 
 
 
-## springboot-spring web原理相关
+### springboot异步任务与线程池
+
+开启异步任务有三种方式
+
+-   自定义线程,直接开启`new Thread(()->{}).start();` 
+-   自定义线程池,利用线程池的execute和submit方法
+-   @Async 通过Spring定义的线程池进行任务开启
+
+自定义线程和自定义线程池都是JDK给我们提供的方法,让我们在java中能够直接的调度线程,但这两种方法都十分不推荐,自定义线程的缺点是垃圾回收成谜,ThreadExecutor可以使用,但是就springboot的运行来看(要交由tomcat去执行),在组件中使用ThreadExecutor可能会带来线程池滥用.如果真的要使用的话需要在特定服务中指定static区域妥善存放保管.但如果存在多个服务需要使用到此线程池就不如使用spring来管理线程池,也就是我们说的注解方法@Async开启异步任务.
+
+关于springboot管理线程池的方法,其实本质上就是spring管理线程池.其中就要利用到@Async注解和@EnableAsync注解
+
+```java
+@Configuration
+@EnableAsync
+public class ThreadPoolConfig {
+    @Bean("pool")
+    public TaskExecutor taskExecutor() {
+        System.out.println(Thread.currentThread().getName());
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(20);
+        executor.setKeepAliveSeconds(60);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        return executor;
+    }
+}
+```
+
+如上我们配置自己的线程池,然后`@EnableAsync`会告诉Spring这是我们创建的线程池,遇到`@Async`的时候就去开启相应的线程池.而`@Async`是另一方法调用的异步注解,该方法仅能通过调用(实际上是增强了代理类的方式调用代理类)才可以发挥出其异步性能.
+
+```java
+@Service
+public class AsyncService {
+    @Async("pool")
+    public void aynscTest(){
+        System.out.println(Thread.currentThread().getName());
+        // 相当于runnable接口的方法了
+    }
+    @Async("pool")
+    public void aynscTest2(){
+        System.out.println(Thread.currentThread().getName());
+    }
+    public void normalTest(){
+        System.out.println(Thread.currentThread().getName());
+    }
+}
+```
+
+调用部分
+
+```java
+@Autowired
+AsyncService asyncService;
+
+@RequestMapping("/")
+public String index(){
+  System.out.println(Thread.currentThread().getName());
+  asyncService.aynscTest();
+  return "hello";
+}
+```
+
+
+
+### springboot运行过程
 
 ---
 
-组件/服务/实体类的单例和多例 首先毫无疑问的web处理请求是多例实现的(NIO) 因为要复用各种请求加速访问进度 其次服务是单例的 因为都是用相同的函数 不存在同时执行会有线程安全的问题 实体类是多例的 (难道你实体类就一个?) 其实是多个实体类 不会存在线程安全问题 单例则会有线程安全问题**单例和多例和线程同步是基于状态进行分类的 也就是说 单例是类中没有可改变的状态则不会引发安全问题 多例是类中有可改变的状态避免线程安全问题 而线程同步则是当多例会额外分配内存(或者有些功能无法实现) 的时候 用单例去实现制约的一种方式** 
+整体的原理需要理解tomcat的nio以及tomcat的线程池架构才行,参考多线程文档中对tomcat的叙述.
+
+通过对tomcat的理解我们可以知道,springboot的本质就是写servlet/socketProcessor,那么一个@Contoller对象就是被tomcat放到jvm堆内存中的.此时,因为tomcat启动时装载了spring(web.xml),所以spring的aop在此时动态代理的类的某些方法对其进行了增强,使得tomcat可以调用这些方法去处理相应的事件.tomcat在处理的时候找到了对应的路径,就把方法的执行封装成Runnable扔到线程池里.线程池再去执行我们的方法,封装成socket响应发送给服务端.所以我们看到了springboot的多线程模式,
+
+
+
+#### 代理发生时机
+
+tomcat启动的时候根据applicationContext启动了spring,spring就开始创建自己的对象池,并维护这些spring创建的对象,此时对他们进行代理.此时http请求还未到达,处于服务器初始阶段,但要注意的是自己new的话就不会发生这种代理,好多对象是创建的时候(服务器初始化)发生的值注入.
+
+
+
+#### 实例对象
+
+几乎所有有注解的对象都是无状态的单例程序.不会引发线程安全问题.
+
+
+
+#### 线程安全
+
+spring中如果会发生线程安全问题,一定是上述单例对象拥有了状态,比如servlet的成员变量(无论是普通还是static)被方法引用自增然后去打印,或者是要访问一些共有的数据结构.
+
+解决方案有三个
+
+-   加锁,但是这种方法一般会带来巨大锁开销,对于绝大多数不需要状态的controller性能下降
+-   方法内分配使用状态的对象,这种方法如果在某一接口被调用过多的情况下对象就OOM了
+-   ThreadLocal为每个线程的状态部分进行单独的处理
+
+综上,如果是状态类的可以通过ThreadLocal进行处理,如果是要访问共有的数据建议直接JUC加锁
 
 为什么要使用redis来保存会话参数 那是因为session本质上要开启磁盘IO 放redis中服务器关闭的时候进行初始化 设置销毁时间会比存内存来的更加实际 redis里存放的对性能要求十分高的数据(热点数据) 尤其是dict型的数据 会很高 访问数据库相当于访问文件效率不会高
 
-## springboot启动原理
 
-web的启动原理不必多说,下面大致讲述springboot配置构成ApplicationContext初始化的过程
+
+### springboot启动原理
+
+springboot整个启动过程还要包括tomcat的启动,部署的时候如果运行的jar那么首先启动的则是springcontext内部的东西,其内部在启动内嵌的tomcat服务器,这一过程在自动装配的时候完成
+
+如果是运行的war,那么毫无疑问tomcat是优先启动的,那么在上面springcontext启动的过程中,忽略掉了tomcat启动的部分.
+
+---
+
+![](https://upload-images.jianshu.io/upload_images/6912735-51aa162747fcdc3d.png?imageMogr2/auto-orient/strip)
+
+其初始化有三个部分
+
+-   SpringApplication 配置一些基本的环境变量,资源,构造器,监听器
+-   实现了具体的应用方案,包括启动流程的监听模块,加载环境配置模块,创建上下文模块
+-   第三模块是自动化配置模块,为springboot自动配置的核心,
+
+springboot的启动包括如下内容
+
+-   配置环境(environment)
+-   事件监听(listeners)
+-   应用上下文(applicationContext)
+-   并基于以上条件，在容器中开始实例化我们需要的Bean
 
 @SpringBootApplication 是springboot应用的起点 其为以组合注解如下
 
@@ -2184,23 +2515,422 @@ web的启动原理不必多说,下面大致讲述springboot配置构成Applicati
 @SpringBootConfiguration // 配置到IOC容器中
 @EnableAutoConfiguration // 自动添加mvc和tomcat等基础依赖
 @ComponentScan(excludeFilters = { // 扫描符合条件的注解
-        @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
-        @Filter(type = FilterType.CUSTOM, classes = AutoConfigurationExcludeFilter.class) })
+@Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+@Filter(type = FilterType.CUSTOM, classes = AutoConfigurationExcludeFilter.class) })
+public @interface SpringBootApplication {}
+
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Inherited
+@AutoConfigurationPackage
+@Import(AutoConfigurationImportSelector.class) // 这个是重点
+public @interface EnableAutoConfiguration {}
 ```
 
-@EnableAutoConfiguration里面@Import(EnableAutoConfigurationImportSelector.class)
+-   @EnableAutoConfiguration spring根据所声明的依赖对spring框架进行自动配置
+-   @SpringBootConfiguration 装配所有的bean,提供spring上下文环境
+-   @CompontentScan 组件扫描可以自动装配bean,默认扫描该.class文件所在的根目录
 
-是Configuration的加载器 这个加载器加载如下资源 
+```java
+public static ConfigurableApplicationContext run(Class<?>[] primarySources, String[] args) {
+  return new SpringApplication(primarySources).run(args);
+  // new SpringApplication的构造函数就有使用层级调用loadFactoriesNames
+  // 装载的有三个类,Bootstrapper.class ApplicationContextInitializer.class
+  // 和ApplicationListener.class 这三个类告诉了我们其功能启动spring
+}
+// 其run方法
+public ConfigurableApplicationContext run(String... args) {
+  StopWatch stopWatch = new StopWatch();
+  stopWatch.start();
+  // 创建bootstrapContext,启动spring
+  DefaultBootstrapContext bootstrapContext = createBootstrapContext();
+  
+  // 设置headless模式(无头模式)
+  ConfigurableApplicationContext context = null;
+  configureHeadlessProperty();
+  
+  // 启动listener
+  SpringApplicationRunListeners listeners = getRunListeners(args);
+  listeners.starting(bootstrapContext, this.mainApplicationClass);
+  
+  try {
+    ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+    // 配置环境模块,这里就开始创建配置环境,加载属性文件资源
+    ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
+    configureIgnoreBeanInfo(environment);
+    
+    // 创建Banner,这个banner就是那个springboot的logo
+    Banner printedBanner = printBanner(environment);
+    
+    // 创建上下文对象,中间是加载配置环境
+    context = createApplicationContext(); 
+    context.setApplicationStartup(this.applicationStartup);
+    prepareContext(bootstrapContext, context, environment, listeners, applicationArguments, printedBanner);
+    
+    // 更新上下文对象
+    refreshContext(context);
+    afterRefresh(context, applicationArguments);
+    stopWatch.stop(); // 计时完毕结束监听
+    
+    // 日志启动
+    if (this.logStartupInfo) {
+      new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+    }
+    // 启动项目
+    listeners.started(context);
+    callRunners(context, applicationArguments);
+  }
+  catch (Throwable ex) {
+    handleRunFailure(context, ex, listeners);
+    throw new IllegalStateException(ex);
+  }
 
-![springboot加载资源](https://images2017.cnblogs.com/blog/249993/201712/249993-20171207162607144-677920507.png)
+  try {
+    listeners.running(context);
+  }
+  catch (Throwable ex) {
+    handleRunFailure(context, ex, null);
+    throw new IllegalStateException(ex);
+  }
+  return context;
+}
+```
 
-另一提@Configuration标注的类都会被加载到IOC(前提要被包扫描到)
+```java
+// 其构造器
+public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
+  this.resourceLoader = resourceLoader;
+  Assert.notNull(primarySources, "PrimarySources must not be null");
+  
+  this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+  
+  this.webApplicationType = WebApplicationType.deduceFromClasspath();
+  
+  this.bootstrappers = new ArrayList<>(getSpringFactoriesInstances(Bootstrapper.class));
+  
+  // 设置初始化
+  setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+  // 设置listener
+  setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+  // 设置主类
+  this.mainApplicationClass = deduceMainApplicationClass();
+}
+```
 
-也就是说这边的初始化流程是先初始化包扫描器去扫描bean和configuration
+其run方法中有几个关键
 
-然后由SpringFactoriesLoader去加载配置到IOC(此时还未到ApplicationContext初始化)
+1.  SpringApplicationRunListeners创建了应用监听器
+2.  加载springboot配置环境ConfigurableEnvironment
+3.  应用配置上下文ConfigurableApplicationContext
+4.  prepareContext方法将listeners、environment、applicationArguments、banner等重要组件与上下文对象关联
+5.  refreshContext 实现自动装配,即spring-boot-starter-*的配置
 
-SpringFactoriesLoader是EnableAutoConfigurationImportSelector.class的核心加载器这是spring框架原有的工具类 之后会从 springboot(.*?).jar/META-INF/spring.factories 加载配置文件
+### springboot自动装载
 
-全部注入完成之后ApplicationContext就初始化完成交给web容器处理
+根据上面的图,如下,我们看到spring自己的启动也需要依赖自动配置的模块
+
+![](https://upload-images.jianshu.io/upload_images/6912735-51aa162747fcdc3d.png?imageMogr2/auto-orient/strip)
+
+自动配置的模块如下,我们从上图知其需要传入构造器工厂对象的集合.无论是在初始化还是在自动装配的过程中都有用到下面的模块结构.
+
+![](https://upload-images.jianshu.io/upload_images/6912735-8f2374a500b07c6d.png?imageMogr2/auto-orient/strip)
+
+该模块主要是用了Spring工厂加载器`SpringFactoriesLoader`其内部有一个字段表明了要去哪加载类,其有一方法loadFactoryNames加载所有springFactory名字,该方法在run里面被调用过
+
+```java
+public final class SpringFactoriesLoader {
+	public static final String FACTORIES_RESOURCE_LOCATION = 
+    "META-INF/spring.factories";
+  // 该方法通过类和classloader加载所有的SpringFactories的名字
+  public static List<String> loadFactoryNames(Class<?> factoryType, @Nullable ClassLoader classLoader) {
+		ClassLoader classLoaderToUse = classLoader;
+		if (classLoaderToUse == null) {
+			classLoaderToUse = SpringFactoriesLoader.class.getClassLoader();
+		}
+		String factoryTypeName = factoryType.getName();
+		return loadSpringFactories(classLoaderToUse).getOrDefault(factoryTypeName, Collections.emptyList());
+	}
+  
+}
+```
+
+如上最开始对@EnableAutoConfiguration的分析我们知道其import了一个类,@EnableAutoConfiguration只对实现了ImportSelector接口的类有效
+
+```java
+public class AutoConfigurationImportSelector implements DeferredImportSelector, BeanClassLoaderAware,
+ResourceLoaderAware, BeanFactoryAware, EnvironmentAware, Ordered {
+  // 其内部方法如下selectImports等
+} 
+// 通过判断注解来加载类
+@Override
+public String[] selectImports(AnnotationMetadata annotationMetadata) {
+  if (!isEnabled(annotationMetadata)) {
+    return NO_IMPORTS;
+  }
+  AutoConfigurationEntry autoConfigurationEntry = getAutoConfigurationEntry(annotationMetadata);
+  return StringUtils.toStringArray(autoConfigurationEntry.getConfigurations());
+}
+
+// 自动配置类的实例
+protected AutoConfigurationEntry getAutoConfigurationEntry(AnnotationMetadata annotationMetadata) {
+  if (!isEnabled(annotationMetadata)) {
+    return EMPTY_ENTRY;
+  }
+  
+  AnnotationAttributes attributes = getAttributes(annotationMetadata);
+  // 这个方法 完成了自己定义类的加载,可以直接往下跳转
+  List<String> configurations = getCandidateConfigurations(annotationMetadata, attributes);
+  
+  configurations = removeDuplicates(configurations);
+  Set<String> exclusions = getExclusions(annotationMetadata, attributes);
+  checkExcludedClasses(configurations, exclusions);
+  
+  // 排除类
+  configurations.removeAll(exclusions);
+  configurations = getConfigurationClassFilter().filter(configurations);
+  fireAutoConfigurationImportEvents(configurations, exclusions);
+  return new AutoConfigurationEntry(configurations, exclusions);
+  // 返回这里,然后就交付给spring加载,所以到头来我们在这只需要自己准备类名就好
+}
+
+// 获得候选的配置
+protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
+  // 加载META-INF/spring.factories文件
+  List<String> configurations = SpringFactoriesLoader
+    .loadFactoryNames(
+    getSpringFactoriesLoaderFactoryClass(),getBeanClassLoader()
+  );
+  
+  
+  // 断言报错
+  Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring.factories. If you "
+                  + "are using a custom packaging, make sure that file is correct.");
+  return configurations;
+}
+
+// 这里反悔了一个注解对象
+protected Class<?> getSpringFactoriesLoaderFactoryClass() {
+		return EnableAutoConfiguration.class;
+}
+```
+
+看下该文件,这些事默认加载的类,最终通过反射去创建出实例给spring
+
+```properties
+# Logging Systems
+org.springframework.boot.logging.LoggingSystemFactory=\
+org.springframework.boot.logging.logback.LogbackLoggingSystem.Factory,\
+org.springframework.boot.logging.log4j2.Log4J2LoggingSystem.Factory,\
+org.springframework.boot.logging.java.JavaLoggingSystem.Factory
+
+# PropertySource Loaders
+org.springframework.boot.env.PropertySourceLoader=\
+org.springframework.boot.env.PropertiesPropertySourceLoader,\
+org.springframework.boot.env.YamlPropertySourceLoader
+
+# ConfigData Location Resolvers
+org.springframework.boot.context.config.ConfigDataLocationResolver=\
+org.springframework.boot.context.config.ConfigTreeConfigDataLocationResolver,\
+org.springframework.boot.context.config.StandardConfigDataLocationResolver
+
+# ConfigData Loaders
+org.springframework.boot.context.config.ConfigDataLoader=\
+org.springframework.boot.context.config.ConfigTreeConfigDataLoader,\
+org.springframework.boot.context.config.StandardConfigDataLoader
+
+# Run Listeners
+org.springframework.boot.SpringApplicationRunListener=\
+org.springframework.boot.context.event.EventPublishingRunListener
+
+# Error Reporters
+org.springframework.boot.SpringBootExceptionReporter=\
+org.springframework.boot.diagnostics.FailureAnalyzers
+
+# Application Context Initializers
+org.springframework.context.ApplicationContextInitializer=\
+org.springframework.boot.context.ConfigurationWarningsApplicationContextInitializer,\
+org.springframework.boot.context.ContextIdApplicationContextInitializer,\
+org.springframework.boot.context.config.DelegatingApplicationContextInitializer,\
+org.springframework.boot.rsocket.context.RSocketPortInfoApplicationContextInitializer,\
+org.springframework.boot.web.context.ServerPortInfoApplicationContextInitializer
+
+# Application Listeners
+org.springframework.context.ApplicationListener=\
+org.springframework.boot.ClearCachesApplicationListener,\
+org.springframework.boot.builder.ParentContextCloserApplicationListener,\
+org.springframework.boot.context.FileEncodingApplicationListener,\
+org.springframework.boot.context.config.AnsiOutputApplicationListener,\
+org.springframework.boot.context.config.DelegatingApplicationListener,\
+org.springframework.boot.context.logging.LoggingApplicationListener,\
+org.springframework.boot.env.EnvironmentPostProcessorApplicationListener,\
+org.springframework.boot.liquibase.LiquibaseServiceLocatorApplicationListener
+
+# Environment Post Processors
+org.springframework.boot.env.EnvironmentPostProcessor=\
+org.springframework.boot.cloud.CloudFoundryVcapEnvironmentPostProcessor,\
+org.springframework.boot.context.config.ConfigDataEnvironmentPostProcessor,\
+org.springframework.boot.env.RandomValuePropertySourceEnvironmentPostProcessor,\
+org.springframework.boot.env.SpringApplicationJsonEnvironmentPostProcessor,\
+org.springframework.boot.env.SystemEnvironmentPropertySourceEnvironmentPostProcessor,\
+org.springframework.boot.reactor.DebugAgentEnvironmentPostProcessor
+
+# Failure Analyzers
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+org.springframework.boot.context.config.ConfigDataNotFoundFailureAnalyzer,\
+org.springframework.boot.context.properties.IncompatibleConfigurationFailureAnalyzer,\
+org.springframework.boot.context.properties.NotConstructorBoundInjectionFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.BeanCurrentlyInCreationFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.BeanDefinitionOverrideFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.BeanNotOfRequiredTypeFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.BindFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.BindValidationFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.UnboundConfigurationPropertyFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.ConnectorStartFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.NoSuchMethodFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.NoUniqueBeanDefinitionFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.PortInUseFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.ValidationExceptionFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.InvalidConfigurationPropertyNameFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.InvalidConfigurationPropertyValueFailureAnalyzer,\
+org.springframework.boot.diagnostics.analyzer.PatternParseFailureAnalyzer,\
+org.springframework.boot.liquibase.LiquibaseChangelogMissingFailureAnalyzer
+
+# Failure Analysis Reporters
+org.springframework.boot.diagnostics.FailureAnalysisReporter=\
+org.springframework.boot.diagnostics.LoggingFailureAnalysisReporter
+
+```
+
+其他组件只需要在jar包里面定义一份该文件,在通过调用loadFactoriesNames加载该文件就可以了
+
+![](https://upload-images.jianshu.io/upload_images/6912735-95d1af756cee57ad.png?imageMogr2/auto-orient/strip)
+
+很显然如上图,springboot通过该种约定,定义了spring-web,spring-jdbc等一系列组件包,其可由springboot完成加载.仔细观察上图,各组件包还利用了@EnableAutoConfigurationImportSelector组件去自动收集配置文件的进行工厂类的加载.
+
+![](https://upload-images.jianshu.io/upload_images/6912735-577bc78a48cea9ef.png?imageMogr2/auto-orient/strip)
+
+从上面的关键代码中我们也能看到就是由`loadFactoryNames`去完成加载各个组件的配置文件.
+
+自动装配的意义就是减少使用代码自己完成装配.我们看下其执行流程
+
+![](https://img2018.cnblogs.com/blog/1216484/201907/1216484-20190715220743499-35910177.png)
+
+
+
+
+
+#### spring.factories实现装配普通类
+
+springboot利用了@EnableAutoConfiguration,完成了对其基本文件的装配,期间就会读取到reasources/META-INF/spring.factories文件,如果没有读到就是无类名,而在springboot-stater中也是利用了同样的方法加载了
+
+所以我们可以直接在resources下创建一个spring.factories文件,直接指定我们想要装配的类就行
+
+```properties
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=com.fourspring.springtest.conf.Hello1,\
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=com.fourspring.springtest.conf.Hello2
+```
+
+这样子就会自动装配到springcontext里面.需要注意的是这个和注解@Component的装配顺序时,@Component会优先装入,这是在所有对象都装入之后才会去装入的其他对象,根据架构图我们可以知道其是更新上下文的时候实现的,而@Component则是在spring的bootstrap中启动的.
+
+这个装配类可以是原本在spring中的对象即注有@Component注解,这个时候依然会发生装配但是类的初始化在spring初始化对象时就已经完成.
+
+
+
+#### 自定义注解实现装配启动器
+
+实现思路如下
+
+-   @EnableAutoConfiguration标注在启动类,我们就可以使用spring.factories装配普通类
+-   定义普通类xxxAutoConfiguration,定义普通类注解@EnablexxxAutoConfiguration
+-   在@EnablexxxAutoConfiguration使用@Import其他configuration类
+-   把xxxAutoConfiguration配置到spring.factories
+
+```java
+@EnableTestAutoConfiguration
+public class TestAutoConfiguration {
+  // 这个类配置在spring.factories中,由AutoConfiguration装载入spring
+}
+
+@Target({ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Import({SubTestConfiguration.class})
+public @interface EnableTestAutoConfiguration {
+  // 注解上用了@Import的方法成功导入了SubTestConfiguration等其他子配置
+}
+
+public class SubTestConfiguration {
+    static {
+        System.out.println("子配置已经加载完毕");
+    }
+}
+```
+
+我们可以看到从@EnableAutoConfiguration开始时如何加载spring.factories到加载子配置最终完成自动装配的整个过程的.
+
+
+
+#### 自定义启动器
+
+有了前面的技术实现我们就可以实现启动器了.我们来实现下在yml的配置结构,用的是@ConfigurationProperties指定prefix,带着这前缀的yml里面的值全部值会注入.
+
+```java
+@ConfigurationProperties(prefix = "spring.userdef.model")
+public class UserDefProperties {
+    private String userName;
+    private Integer age;
+    private Double height;
+  // getter setter
+}
+```
+
+配置自动启动类,上面除了这么写之外,也可以利用注解@Import.
+
+```java
+@Configuration
+@EnableConfigurationProperties(value = UserDefProperties.class) // 把上面的类加入到springcontext
+public class UserDefAutoConfiguration {
+
+    @Autowired
+    private UserDefProperties userDefProperties;
+
+  	@ConditionalOnMissingBean // 如果springcontext没有才需要加载
+    @Bean
+    public User user(){
+        log.info("自定义自动装配UserDefAutoConfiguration.....");
+        User user = new User();
+        user.setAge(userDefProperties.getAge());
+        user.setUserName(userDefProperties.getUserName());
+        user.setHeight(userDefProperties.getHeight());
+        return user;
+    }
+}
+```
+
+引入spring-boot-starter依赖
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-configuration-processor</artifactId>
+  <!--为编译器配置的,可以配置直接配置里的类跳转-->
+  <optional>true</optional>
+</dependency>
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-autoconfigure</artifactId>
+  <!--自动配置的依赖-->
+</dependency>
+```
+
+这样子只要我们发布自己的maven启动项目,在springboot中导入,那么我们就可以在springboot中写我们自己的类,并且可以在yml文件中完成一些属性的注入.
+
+我们可以在application.yml或者application.properties中覆盖值,就可以快速配置合适的依赖了.从这就能知道springboot是如何加载如此繁杂的jar包了,其实就是spring-boot-start内去寻找其他spring-boot-autoconfigure的jar包的spring.factories然后去加载各种的类而已.这样子我们引入了jar包就相当于导入了依赖,甚至可以延迟加载(即判断yml中某一属性是否为空来看要不要给自己实现的组件初始化,除此之外还可用注解判断是否有自定义的某些类才进行注册)
+
+
+
+
+
+
 

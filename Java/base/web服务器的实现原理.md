@@ -281,6 +281,18 @@ selector在监听着数据socket的请求一旦有I/O请求,就会调用select�
 
 select和poll都实现了上面的模型,不同的是select实现的年代比较早,select不是线程安全的,且只能支持1024个连接,poll在其基础上进行了改进,不过poll依然不是线程安全的.线程安全的问题直到epoll才被解决.epoll改进了read请求这点,变成通知从而使得其效率提高.且epoll是线程安全的
 
+>   poll和epoll的不同
+>
+>   poll基于轮序去访问selector这样一来就会导致某些线程是要空轮询去响应事件的就消耗资源复杂度是O(n)
+>
+>   epoll对其进行了改进poll使用的是pollfd结构.epoll有三个函数epoll_ctl,epoll_wait,epoll_create
+>
+>   其没有使用轮询,在epoll_ctl函数中注册新事件到epoll句柄,epoll拷贝进用户空间的数据只用一次.而poll需要拷贝多次.epoll为每个fd指定一个回调函数,当设备就绪唤醒waiter时就会调用回调函数.这样一来就避免了轮序.其利用回调函数的机制解决了poll的轮询问题,epoll只需要判断一下selecor为不为空就行,而poll和select需要时刻轮序事件的发生并去相应,epoll的事件响应由回调函数执行,其线程多半在睡眠中,多线程的特性就体现了出来
+
+很显然我们看出来java的nio是基于poll去进行实现的.且java的nio不支持多线程
+
+
+
 
 
 #### java.nio

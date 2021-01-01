@@ -485,34 +485,19 @@ order by column desc
 
 ### mybatis缓存
 
-mybatis有两种缓存机制称一级缓存和二级缓存
+mybatis有两种缓存机制称一级缓存和二级缓存,一级缓存默认开启
 
-一级缓存默认开启
+一级缓存在同一个sqlSession里面Mapper的方法一次只会执行一次SQL,但sqlSession中执行了写操作就会清空缓存类似volitate的机制,其本质上是通过关闭sqlSession来实现的,其内部代码是用了一个代理类代理了sqlSession,在sqlSession非事务就用commit提交并且提交之后关闭连接.只有写操作才会触发清空缓存的操作.
 
-​	在同一个sqlSession里面Mapper的方法一次只会执行一次SQL
-
-​	但sqlSession中执行了写操作就会清空缓存类似volitate的机制
-
-​	一样的查询(SQL和传入Preparestatement的参数相同)则会利用一级缓存
-
-​	一级缓存通过Client-CachingExcutor-Excutor-DB的形式作为主要机制
-
-​	Excutor是用于保存一级缓存的也叫Local Cache
+一样的查询(SQL和传入Preparestatement的参数相同)则会利用一级缓存,一级缓存通过Client-CachingExcutor-Excutor-DB的形式作为主要机制,Excutor是用于保存一级缓存的也叫Local Cache,其cache对象保存在sqlSession的对象里面,
 
 二级缓存需要开启<cache>
 
-​	默认使用LRU算法作为替换机制
+二级缓存解决的问题是跨会话共享缓存共享问题(尤其是在分布式系统中),其生命周期比起一级缓存要更长.如果配置了二级缓存就先从二级缓存中先读取.即这个二级缓存和L2L1缓存的顺序恰好反过来.其结构如下,二级缓存处于更外面的区域.
 
-​	CachingExcutor-Configuration(存放二级缓存)
+![](https://img2018.cnblogs.com/blog/1383365/201906/1383365-20190628180149776-546074458.png)
 
-​	需要Pojo实现可序列化接口Serilizable
-
-二级缓存特性
-
--   所有读(select)的语句全部被缓存
--   在写语句的时候刷新缓存
--   缓存被存储成列表集合
--   二级缓存有可能不存到对象而存到memcache等第三方缓存系统中
+默认使用LRU算法作为替换机制,CachingExcutor-Configuration(存放二级缓存),需要Pojo实现可序列化接口Serilizable(可能存在网络传输到第三方缓存),二级缓存存在的意义就是为了让大量的查询操作可以存在的一个缓存结构.
 
 ```xml
 <cache eviction="LRU" flushInterval="100000" readOnly="true" size="1024"/>
@@ -525,12 +510,43 @@ mybatis有两种缓存机制称一级缓存和二级缓存
 -->
 <select useCache="false" flushCache="true"></select>
 <!--规定单独不能使用缓存 而且使用之后要立即刷新二级缓存-->
+
+<!--type可以指定为第三方缓存或者是我们自己实现缓存-->
+<cache type="org.apache.ibatis.cache.impl.PerpetualCache"
+    size="1024"
+eviction="LRU"
+flushInterval="120000"
+readOnly="false"/>
 ```
+
+利用二级缓存解决跨域问题
+
+引用别的命名空间的cache即操作的是同一份cache
+
+```xml
+<!--要让多个namespace共享一个二级缓存可以用下面的标签-->
+<cache-ref namespace="com.test.dao.DepartmentMapper" />
+```
+
+
+
+
+
+二级缓存特性
+
+-   所有读(select)的语句全部被缓存
+-   在写语句的时候刷新缓存
+-   缓存被存储成列表集合
+-   二级缓存有可能不存到对象而存到memcache等第三方缓存系统中
 
 ```xml
 <setting name="cacheEnabled" value="true" /> 
 <!--还要在mybatis-config.xml中开启缓存-->
 ```
+
+
+
+
 
 ### 整合spring和mybatis
 

@@ -20,6 +20,8 @@ Java virtual machine
 
 heap是对象的存放区域也是管理最麻烦的一个区域,具体内容会在gc更加详细描述,这一区域在jdk1.8前后发生了很大的变化谨慎起见下面的结构都是1.8以前的
 
+但是new出来的对象有可能在栈上分配内存以及TLAB
+
 **stack 存放thread/function级别数据** 局部变量操作数栈动态链接方法出口
 
 -   vm stack虚拟机栈 线程私有,即对应thread级别的数据,一个线程的局部变量等
@@ -65,6 +67,8 @@ heap是对象的存放区域也是管理最麻烦的一个区域,具体内容会
 最大的变化就是方法区(准确的说是永久代)已经变成了元数据区,而元数据区的数据已经不再是jvm而是直接写进了本地内存中,关于Class的Meta信息在虚拟机中,但是关于static变量,常量池的信息是直接由本地内存的元数据区管理的.
 
 -   **jdk1.8后字符串常量从常量池中变成了堆中,关于此中的验证可以查看intern方法**
+
+其他常量池还是在永久代或者元空间中.
 
 
 
@@ -721,7 +725,7 @@ Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对
 
 
 
-#### 触发gc的情况
+#### 触发Full gc的情况
 
 -   Minor GC 年轻代满的时候
 
@@ -1385,7 +1389,7 @@ public class JvmInfo {
 
 
 
-### java编译优化JIT
+### JIT与其他优化
 
 java的编译在早期的时候是由`javac`完成的,内存分配的工作也基本上由传统的JVM完成.
 
@@ -1418,7 +1422,19 @@ public static StringBuffer craeteStringBuffer(String s1, String s2) {
 
 `-XX:+DoEscapeAnalysis`和`-XX:-DoEscapeAnalysis`可以打开和关闭逃逸分析,JDK1.7以上默认打开逃逸分析.
 
+#### 栈上分配内存
 
+栈上分配内存的思路就是即每个线程如果没有逃逸出方法本身的话,都向堆请求内存的话就太浪费.但其有前提就是需要逃逸分析作为此技术的实现基础,在栈中如果没有逃逸出方法体的话,就有可能在栈上分配内存,而不是用堆空间进行内存分配.
+
+
+
+#### TLAB
+
+TLAB(Thread Local Allocation Buffer)即栈上分配内存,默认是开启状态,可以用`-XX:+UseTLAB`即每个线程都向堆请求内存的话就需要大量的调度开销,所以就向JVM申请一段连续的内存(在堆空间上)称为TLAB去给这些对象分配内存.
+
+同时TLAB还解决了指针碰撞问题,即两个线程并发new的时候指针的修改顺序的安全性.所以虚拟机在线程栈初始化的时候会分配一块内存(这块内存位于Eden区),这块内存的大小很小仅有Eden区的1%,专门用于分配局部变量的内存.
+
+![](https://img-blog.csdnimg.cn/20190809191201695.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2p1XzM2MjIwNDgwMQ==,size_16,color_FFFFFF,t_70)
 
 
 
