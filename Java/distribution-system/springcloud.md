@@ -152,69 +152,53 @@ Spring Cloud Config、Spring Cloud Netflix（Eureka、Hystrix、Zuul、Archaius�
 
 
 
-## Spring Cloud Netflix
+## SpringCloud-Netflix 基本组件
 
 ---
 
 Netflix是网飞公司(就是那家纪录片的)用来实现内部自治的一个框架 其为微服务的核心
 
-整个微服务的管理构建由此模块提供支持 其有一些小组件 下面一一介绍
+整个微服务的管理构建由此模块提供支持 其有一些基本组件
 
-### **Netflix Eureka**
+### **Spring Cloud Eureka**
 
 /尤里卡/-服务中心,用于注册和调度微服务,基于restful进行微服务之间的通信,以及心跳等机制保持对于注册服务的监测,基于java-servlet实现,调度管理框架
 
-### **Netflix Hystrix**
+### **Spring Cloud Hystrix**
 
 /high-stress/-熔断器 提供对延迟和故障的容错能力 不稳定下线 或者直接熔断该服务直接调用失败防止过度阻塞
 
-### **Netflix Zuul**
+### **Spring Cloud Zuul**
 
 Zuul是提供动态路由,监控,弹性,安全等边缘服务框架.后端请求的门户可以拦截一些非法请求.
 
-### **Netflix Archaius**
+### **Spring Cloud Ribbon**
 
-配置管理api,轮询获取配置的一个框架,有线程安全操作,实现热部署,修改配置不需要重启服务
+客户端负载均衡
 
-
-
-## Spring Cloud Config
-
----
+### Spring Cloud Config
 
 配置中心,把配置放到远程服务器,集中化管理集群,支持本地git,Subversion.
 
 
 
-## Spring Cloud Bus
+## SpringCloud 高级组件
 
----
+### Spring Cloud Bus
 
 消息总线,和SpringCloud Config可以实现热部署
 
-
-
-## Spring Cloud for Cloud Foundry
-
----
-
-VMware出品,开源PaaS平台,云平台的基础环境,PaaS(Platform-as-a-Service)即开发环境和生产环境一致
-
-
-
-## Spring Cloud Cluster
-
----
+### Spring Cloud Cluster
 
 代替Spring Integration,提供分布式集群的基础功能例如选举,分布式锁,集群状态的一致性,token等提供协调性服务
 
+### Spring Cloud Stream
 
+消息驱动的微服务
 
-## Spring Cloud Consul
+### Spring Cloud Sleuth
 
----
-
-consul是一个服务发现与配置工具,与Docker无缝集成,也即是用Go去集成,一个分布式调度管理框架
+分布式服务跟踪
 
 
 
@@ -233,43 +217,7 @@ consul是一个服务发现与配置工具,与Docker无缝集成,也即是用Go�
 | 安全                 | acl /https             | acl                   | https支持（弱）   | —                            |
 | spring cloud集成     | 已支持                 | 已支持                | 已支持            | 已支持                       |
 
-## 其他一些支持性框架
 
-### **Spring Cloud Security**
-
-用于解决安全问题
-
-### **Spring Cloud Sleuth**
-
-分布式日志追踪框架
-
-### **Spring Cloud Data Flow**
-
-开发和执行大范围的数据处理(相当于Hadoop了),可以做实时和离线的处理通过data pipeline的编写可以完成类似MapReduce的计算任务
-
-### **Spring Cloud Stream**
-
-使用spring integration提供消息之间的代理,封装了redis,rabbitmq,kalfka等的操作
-
-### **Spring Cloud Task**
-
-用于解决短时间的,临时任务
-
-### **Spring Cloud Zookeeper**
-
-操作Zookeeper的工具包,可以使用zookeeper的服务发现和配置管理
-
-### **Spring Cloud Starters**
-
-springboot开箱即用的依赖支持
-
-### **Spring Cloud Connectors**
-
-简化连接到云平台的操作
-
-### **Spring Cloud CLI**
-
-命令行客户端,以命令行方式快速建立云组件
 
 
 
