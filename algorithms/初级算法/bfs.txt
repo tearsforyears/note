@@ -1,6 +1,0 @@
-breadth First Search
-利用队列维护层级关系的一种搜索关系
-Queue FIFO
-把状态压入队列 
-然后取出来 拓展点 压入队列
-
