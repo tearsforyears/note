@@ -334,59 +334,6 @@ System.out.println(s3 == s4);
 
     
 
--   ClassLoader
-
-    ClassLoader只负责加载Loding,除了顶级的Bootstrap用C++实现以外其他都用java实现
-
-    除了隐式或者显示的new以外 形如Class.forName
-
-    和ClassInstace.staticMethod都不进行对象初始化只加载到jvm
-
-    机制主要是三种
-
-    -   全盘负责 该类依赖的所有类都由该类的classloader加载
-
-    -   缓存机制 先去缓存区域找 找不到了在去.class文件中加载
-
-    -   双亲委派模型(主要) 
-
-        用户加载器->应用加载器/系统加载器/上下文加载器->扩展加载器->根加载器
-
-        按照此方式往上加载类
-        
-        好处是父类加载了就没必要自己加载一次
-        
-        平时默认是使用系统加载器的 也可以自己制自己的加载器
-        
-        ```java
-        Class.forName(); 
-        // 用当前类加载器
-        Classloader.getSystemClassLoader().loadClass();
-        // 用系统加载器
-        Thread.currentThread().getContextClassLoader().loadClass();
-        // 用上下文加载器
-        ```
-        
-    
-
-ClassLoader的代码结构
-
--   **defineClass** 
-  
-    byte流解析成jvm能够识别的对象
-    
--    **findClass** 
-  
-    通过类名去加载对象,通常我们定义自己的类加载器用该方法实现
-    
--    **loadClass** 
-  
-    加载类到JVM
-    
--    **resolveClass**
-  
-    动调用这个使得被加到JVM的类被链接
-    
 
 #### 双亲委派模型
 
@@ -400,7 +347,107 @@ ClassLoader的代码结构
 
 ![](https://img-blog.csdn.net/20150702112329327?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvb3BlbnN1cmU=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
 
-上图为不同的classloader用来加载不同路径的类
+上图为不同的classloader用来加载不同路径的类,
+
+
+
+#### ClassLoader
+
+ClassLoader只负责加载Loding,除了顶级的Bootstrap用C++实现以外其他都用java实现,除了隐式或者显示的new以外 形如Class.forName和ClassInstace.staticMethod都不进行对象初始化只加载到jvm
+
+加载机制主要是三种
+
+-   全盘负责 该类依赖的所有类都由该类的classloader加载
+
+-   缓存机制 先去缓存区域找 找不到了在去.class文件中加载
+
+-   双亲委派模型(主要) 
+
+    用户加载器->应用加载器/系统加载器/上下文加载器->扩展加载器->根加载器
+
+    按照此方式往上加载类
+
+    好处是父类加载了就没必要自己加载一次
+
+    平时默认是使用系统加载器的 也可以自己制自己的加载器
+
+    ```java
+    Class.forName(); 
+    // 用当前类加载器
+    Classloader.getSystemClassLoader().loadClass();
+    // 用系统加载器
+    Thread.currentThread().getContextClassLoader().loadClass();
+    // 用上下文加载器
+    ```
+
+ClassLoader的主要方法
+
+-   **defineClass** 
+
+    byte流解析成jvm能够识别的对象,即把.class转化为Class
+
+-    **findClass** 
+
+     通过类名去加载对象,通常我们定义自己的类加载器用该方法实现
+
+-    **loadClass** 
+
+     加载类到JVM,双亲委派机制在这
+
+-    **resolveClass**
+
+     调用这个使得被加到JVM的类被链接
+
+```java
+protected Class<?> loadClass(String name, boolean resolve)
+  throws ClassNotFoundException{
+  
+  synchronized (getClassLoadingLock(name)) {
+    // First, check if the class has already been loaded
+    Class<?> c = findLoadedClass(name);
+    if (c == null) {
+      long t0 = System.nanoTime();
+      try {
+        if (parent != null) {
+          c = parent.loadClass(name, false); // 利用父类加载
+        } else {
+          c = findBootstrapClassOrNull(name); // 没有父类直接扔到顶
+        }
+      } catch (ClassNotFoundException e) {
+        // ClassNotFoundException thrown if class not found
+        // from the non-null parent class loader
+      }
+
+      if (c == null) {
+        // If still not found, then invoke findClass in order
+        // to find the class.
+        long t1 = System.nanoTime();
+        c = findClass(name); // 父类加载失败就调用自己的findClasss
+
+        // this is the defining class loader; record the stats
+        sun.misc.PerfCounter.getParentDelegationTime().addTime(t1 - t0);
+        sun.misc.PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
+        sun.misc.PerfCounter.getFindClasses().increment();
+      }
+    }
+    if (resolve) {
+      resolveClass(c); // 解析
+    }
+    return c;
+  }
+}
+```
+
+父子加载器之间的关系不是继承,类加载器会使用组合(**Composition**)而不是使用继承来复用父类加载器的代码.
+
+```java
+public abstract class ClassLoader {
+    // The parent class loader for delegation
+    private final ClassLoader parent;
+}
+```
+
+破坏双亲委派机制,就直接重写loadClass,不委派就是了.破坏双亲委派模型一般是要来实现一些特殊的功能,比如JDBC,JNDI加载SPI接口.或者是实现热拔插.Tomcat等web容器也破坏了双亲委派模型(多个web项目的全限定类名可能是一样的,又不能让顶层加载器去加载,就只能自己实现了).
 
 
 

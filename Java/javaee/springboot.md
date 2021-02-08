@@ -13,7 +13,7 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 -   快速创建独立的Spring项目
 -   嵌入式servlet 无需war即可运行
 -   大量自动配置
--   无需配置xml
+-   无需配置xml(也可以使用)
 -   准生产环境 运行时监控
 -   天然适合云计算环境
 -   在微服务下 天生适合与SpringCloud等RPC框架结合
@@ -64,7 +64,9 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
 -   **@Transactional** 事务注解 此注解标注在方法上(不要标记在接口上) 用于事务处理 发生异常时回滚 因为是 基于类代理和接口代理实现的 所以标注在接口上基本会在别的组件代理接口时失去效果 另外类内调用该方法也是不起作用的 只有当创建类的时候 该注解才会注入事务
 
--   **@Autowired @Resource** 根据类型 根据名字注入资源 
+-   **@Autowired @Resource** 根据类型 根据名字给Bean注入spring中创建好的对象
+
+-   @ImportResource @Import 导入类或者资源文件
 
 ## ***springboot重要注解***
 
@@ -2927,6 +2929,34 @@ public class UserDefAutoConfiguration {
 这样子只要我们发布自己的maven启动项目,在springboot中导入,那么我们就可以在springboot中写我们自己的类,并且可以在yml文件中完成一些属性的注入.
 
 我们可以在application.yml或者application.properties中覆盖值,就可以快速配置合适的依赖了.从这就能知道springboot是如何加载如此繁杂的jar包了,其实就是spring-boot-start内去寻找其他spring-boot-autoconfigure的jar包的spring.factories然后去加载各种的类而已.这样子我们引入了jar包就相当于导入了依赖,甚至可以延迟加载(即判断yml中某一属性是否为空来看要不要给自己实现的组件初始化,除此之外还可用注解判断是否有自定义的某些类才进行注册)
+
+### springboot与spring配置
+
+我们很多时候会载入配置文件,而不全是使用配置类去解决问题,这个时候就用到以下部分的知识,创建一个配置类
+
+```java
+/**
+ * ImportResource引入资源文件有三种方式：
+ * 1.直接引入，该路径就是src/resources/下面的文件：file
+ * 2.classpath引入：该路径就是src/java下面的配置文件：classpath:类的文件全路径
+ * 3.引入本地文件：该路径是一种绝对路径：file:D://....
+ */
+@Configuration
+@ImportResource(locations = {"spring.xml"}) // spinrg.xml为beans配置
+public class ConfigClass {
+}
+```
+
+如果是mybatis的配置可以从application.yml中读取
+
+```yml
+mybatis:
+  config-location: classpath:mybatis/mybatis-config.xml
+  mapper-locations: classpath:mybatis/mapper/*.xml
+  type-aliases-package: com.mybatis.springboot_mybatis.model
+```
+
+
 
 
 

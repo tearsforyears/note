@@ -356,10 +356,6 @@ public static void main(String[] args) throws Expection{
 
 ---
 
-### 不使用事务出现的结果
-
----
-
 -   脏读 select到其他程序update的数据但未commit的数据
 
     脏读就是读到的数据不对
@@ -398,21 +394,160 @@ serializable 把所有操作序列化 所有事物按顺序执行 开销最大
 
 **所谓的当前有事务指的是另一个事务调用了本事务**
 
-REQUIRED(默认):本事物默认加入其它事务中去执行,如果没有其他事务则重新开启事务
+```java
+public void methodA(){
+  methodB();
+  // doSomething
+}
 
-要求一定要有事务来供本方法的代码去执行
+@Transaction(Propagation=Propagation.REQUIRED)
+public void methodB(){
+  // doSomething
+}
 
-SUPPORTS:支持事务顾名思义就是说没有事务其可执行 如果其他方法调用则加入事务
+@Transaction(Propagation=Propagation.REQUIRED)
+public void methodC(){
+  // doSomething
+}
+```
 
-MANDATORY:强制要求事务执行 如果当前有事务加入当前事务 没有就抛异常
+methodA调用了调用了methodB,但是在methodA中并没有开启事务(由AOP的机制就可以知道).我们一般在springboot中的service层使用@Transaction.且在一原子性Service中描述集体调用的方法
+
+```java
+@Service
+class TransactionService{
+  @Autowired
+  XXXService s;
+  
+  public void invoke(){
+  	s.methodB(); // 在自己的事务中独立运行
+    s.methodC(); // 如果出现问题就回滚,不出现就在两个独立事务中巡行
+  }
+  
+  @Transaction(Propagation=Propagation.REQUIRED) // 这里开启事务
+  public void invokeTransaction(){
+  	// 如果调用了该方法,该方法失败了比如可以1/0,那么该方法要回滚
+    // 且methodB和methodC也要发生回滚,如果methodB或methodC发生异常
+    // 那么所有方法都要进行回滚
+    
+    s.methodB();
+    try{
+    	s.methodC();
+    }catch(Exception e){
+    	// catch exception  
+    }
+    // 即是手动抓住了异常,invokeTransaction还是要进行回滚
+    // 如果想要自己抓住部分异常的话选择NESTED,不过使用场景少意义不大
+  }
+}
+```
+
+例如把上面方法改成如下,我们来研究下其传播行为
+
+```java
+@Transaction(Propagation=Propagation.REQUIRED)
+public void methodB(){
+  // doSomething
+}
+
+@Transaction(Propagation=Propagation.New)
+public void methodC(){
+  // doSomething
+}
+
+@Transaction(Propagation=Propagation.New)
+public void methodD(){
+  // doSomething
+}
+```
+
+```java
+@Service
+class TransactionService{
+  @Autowired
+  XXXService s;
+  
+  @Transaction(Propagation=Propagation.REQUIRED) // 这里开启事务
+  public void invokeTransaction(){
+    s.methodB();
+    s.methodC();
+    int i = 0/1; // 制造异常
+  }
+  // 上面会执行methodC而methodB会被回滚
+  
+  @Transaction(Propagation=Propagation.REQUIRED) // 这里开启事务
+  public void invokeTransaction(){
+    s.methodB();
+    s.methodC(); // 如果C出现了异常那么两者会回滚
+    s.methodD(); // 然后D因为开启了新事务则不会回滚
+  }
+}
+```
+
+我们可以总结出以下规律,事务是按照@Transaction的最外部方法区决定事务在哪开启的,然后出现了异常,所有该事务执行过的方法都要进行回滚,但用了Propagation.NEW的事务不需要进行回滚,除非该子事务本身出异常.其和下面行为一致
+
+-   REQUIRED(默认):本事物默认加入其它事务中去执行,如果没有其他事务则重新开启事务
+-   NEW:要求一定要有事务来供本方法的代码去执行,回去开启新事务异常同样整体回滚
+-   NEST:本事物默认加入其它事务中去执行,如果没有其他事务则重新开启事务(可以被抓住异常)
+-   MANDATORY:如果当前有事务加入当前事务,没有就抛异常
 
 ---
 
-NOT_SUPPORTED:不支持事务 当前有事务不加入事务挂起事务 执行完之后执行事务
+-   SUPPORTS:支持事务有事务按照事务运行,但如果没有事务就按没有事务的运行
+-   NOT_SUPPORTED:不支持事务,有事务就暂停事务
+-   NEVER:不能在事务中运行,有事务就抛出异常
 
-NEVER: 当前有事务则抛出异常
+### spring对事务管理器的配置
 
-NESTED:如果有活动事务存在就运行在活动事务中没有就按REQUIRED执行
+需要在配置文件中加入控制管理器
+
+```xml
+<!--  Transaction begin  -->
+<tx:annotation-driven transaction-manager="transactionManager" />
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+  <property name="dataSource" ref="tddlGroupDataSource" />
+</bean>
+<!-- transaction end -->
+```
+
+或者是利用注解
+
+```java
+@EnableTransactionManagement
+@SpringBootApplication
+// 加载启动类上
+public class ProfiledemoApplication{
+  public static void main(String[] args) {
+    SpringApplication.run(ProfiledemoApplication.class, args);
+  }
+}
+
+// 创建配置类
+@Configuration
+public class TransactionConfig implements TransactionManagementConfigurer{
+  	@Resource(name="txManager2")
+    private PlatformTransactionManager txManager2;
+
+    // 创建事务管理器1
+    @Bean(name = "txManager1")
+    public PlatformTransactionManager txManager(DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+
+    // 创建事务管理器2
+    @Bean(name = "txManager2")
+    public PlatformTransactionManager txManager2(EntityManagerFactory factory) {
+        return new JpaTransactionManager(factory);
+    }
+
+    // 实现接口 TransactionManagementConfigurer 方法，其返回值代表在拥有多个事务管理器的情况下默认使用的事务管理器
+    @Override
+    public PlatformTransactionManager annotationDrivenTransactionManager()
+    {
+        return txManager2;
+    }
+}
+```
 
 
 

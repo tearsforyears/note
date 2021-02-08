@@ -4,6 +4,8 @@
 
 优化的方向有两个sql结构优化,索引,存储过程(因数据库迁移问题等已经弃用)
 
+
+
 ## 索引
 
 ---
@@ -15,6 +17,8 @@
 索引是根据表来的而不是根据数据库 引擎也是根据表来的 引擎决定了表的结构
 
 建立索引意味着可以通过数据结构去找到相应的节点
+
+
 
 ## 索引覆盖(Using index)
 
@@ -109,28 +113,248 @@ DROP INDEX `combine_index`;
 EXPLAIN select * from users
 ```
 
-## mysql的锁
 
-在sql字段后面加上个for update 这是排它锁 这个排它锁其他事务可以读但是不可以写
 
-这是innodb在事务中可以使用的锁 for update nowait也可以 区别在于如果没有nowait其他事务会等待 如果有的话 其他事务会断开链接
+## mysql的并发控制
 
-### 乐观锁(mysql默认使用)
+---
 
-认为所有的操作不一定会修改数据 有点类似CAS操作 如果数据操作冲突了 让用户决定如何去做
+### 事务实现原理
+
+#### 事务
+
+事务是一种控制读写的并发机制,事务的特性就是ACID
+
+-   原子性Atomicity,即不可分割,发生错误会回滚
+-   一致性Consistency,即所有读写的数据能够保持一致
+-   隔离性Isolation,即事务之间隔离不互相依赖
+-   持久性Durability,顾名思义一次性变化序列化到磁盘上
+
+使用事务系统,就有可能会遇到三种现象
+
+-   脏读,指其他事务在修改数据,本事务读到了其他事务的数据
+-   幻读,即读到不存在的数据,其他事务增加或是删除数据,本事务读到了这些数据
+-   不可重复读,本事务在事务途中进行两次相同的读取,却读到了不同的数据
+
+四种事务隔离级别
+
+-   READ_UNCOMMIT 读不提交,即不做任何操作,可能会
+-   READ_COMMIT 读操作要在提交了之后才能执行,避免脏读
+-   REPETABLE_READ 可重复读,可以避免脏读,幻读
+-   SERIALIZABLE 序列化,可以避免脏读幻读不可重复读
+
+#### JDBC事务
+
+```java
+try{
+conn.setAutoCommit(false);
+stmt = conn.createStatement(); 
+// 将 A 账户中的金额减少 500 
+stmt.execute("update t_account set amount = amount - 500 where account_id = 'A'");
+// 将 B 账户中的金额增加 500 
+stmt.execute("update t_account set amount = amount + 500 where account_id = 'B'");
+// 提交事务
+conn.commit();
+}catch(SQLException sqle){
+  conn.rollback();
+  // close
+}
+```
+
+可以看到JDBC事务是以Connection为基础进行回滚的.JDBC的特点是不能跨数据库进行,多数据或者分布式的话.JDBC事务就没啥用处了.
+
+
+
+#### 日志
+
+redo-log重做日志 / undo-log 回滚日志
+
+redo-log分为两部分,在内存中的redo-log-buffer和磁盘中的redo-log,事务的提交之后所有修改信息会保存在日志中.例如有表
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2ff3e4c3b8b46?w=2368&h=788&f=png&s=226339)
+
+```sql
+start transaction;
+select balance from bank where name="zhangsan";
+// 生成 重做日志 balance=600
+update bank set balance = balance - 400; 
+// 生成 重做日志 amount=400
+update finance set amount = amount + 400;
+commit;
+```
+
+其执行方式如下
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2fdae04c7dc6f?w=4016&h=1892&f=png&s=1010471)
+
+redo-log的作用是用来恢复数据的,在宕机的时候我们丢掉的只是红色部分的信息.这一日志用来保证系统的持久性.
+
+---
+
+undo-log 又叫回滚日志,顾名思义是用来回滚记录的.和redo-log记录数据不同,undo-log是用来记录对数据的操作的操作.
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2fe552145e2c1?w=4652&h=1848&f=png&s=867671)
+
+undo-log用来保证事务的原子性.
+
+#### MVCC
+
+MVCC(MultiVersion Concurrency Control)多版本并发控制.
+
+>   InnoDB的 MVCC ,是通过在每行记录的后面保存两个隐藏的列来实现的.这两个列,一个保存了行的创建时间,一个保存了行的过期时间,存储的并不是实际的时间值,而是系统版本号.
+
+#### 事务的实现
+
+-   事务的原子性是通过 undo log 来实现的
+-   事务的持久性性是通过 redo log 来实现的
+-   事务的隔离性是通过(读写锁+MVCC)来实现的
+-   事务的一致性是通过上面三个特性实现的
+
+原子性由undo-log实现,显然是通过回滚操作去实现,每条写操作都要写入undo-log,我们可以通过相应操作的逆向操作rollback,那么对应的insert语句就是delete,delete是insert,update是update,即可以逆向操作.
+
+持久性的实现是通过redo-log,一旦事务提交,所有的修改都会被持久化到数据库上,此时系统即使崩溃也不会丢失数据.显然我们看到了redo-buffer的作用,在持久化区域起到缓冲,所有的读写都会经过这个缓冲区.这种缓冲区虽然极大地提高了速度,但本身没有持久化的功能即redo-log解决了这一问题,记录操作和记录操作的数据显然操作需要的I/O更小,也能被接受.
+
+隔离性的实现,我们平常看到的四种隔离级别
+
+-   READ_UNCOMMIT
+-   READ_COMMIT
+-   REPEATABLE_READ
+-   SERILIAZABLE
+
+隔离性的重点就在于并发控制,我们可以看到其是用读写锁和MVCC实现的充满了Concurrent的味道.
+
+READ_UNCOMMIT
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2ed4dbd348a68?w=4284&h=1288&f=png&s=731191)
+
+读未提交仅有写会加上锁,读不加锁所以就能够看到写到一半的数据就发生了脏读.
+
+READ_COMMIT
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2f05d63f388d0?w=3612&h=1512&f=png&s=816439)
+
+InnoDB采用了此种机制,写的时候加上锁,读的时候通过MVCC来确定字段的修改,这种操作从读上来讲就相当于读没有修改的副本自然不会出现中间的状态,不会出现幻读,但是仍有可能出现不可重复读的现象(有点类似Copy-On-Write的设计思路).可以看到其读的不是并不是同一个副本.
+
+REPEATABLE_READ (默认)
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2c351eb03fc24?w=1082&h=290&f=png&s=120400)
+
+这种默认的级别用两种方式可以实现,读写锁和MVCC,上面就是采用读写锁,即读共享锁,只要没有释放锁就可以读一样的数据,这样一来并发性能下降严重.一般是使用下面的方法实现,InnoDB就是利用下面方法实现的.
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2f054474b394b?w=3584&h=1512&f=png&s=756027)
+
+如上面和COW类似的机制,读取修改前的副本即可保证读不重复,即通过读副本的方式.其可以用空间换并发效率.该版本的实现依然会存在幻读问题.但能从另外的方式解决.
+
+SERILIZABLE
+
+![](https://user-gold-cdn.xitu.io/2019/4/18/16a2f56d34ff739e?w=3528&h=1060&f=png&s=414467)
+
+即全部串行来读.全部采用独占锁.
+
+
+
+### 锁定方式
+
+-   表级锁定table-level
+
+    表级别的锁定是mysql中粒度最大的锁定,使用表级MyISAM,csv,memory等引擎
+
+-   行级锁定row-level
+
+    行级锁定在并发处理上有最小的粒度,行级锁最容易发生死锁,在InnoDB上使用
+
+-   页级锁定page-level
+
+    这个级别是Mysql中特有的级别,其介于行级锁和表级锁之间,主要用于BerkeleyDB
+
+他们的适用范围
+
+表级锁适合于带有少量条件的查询,行级锁更适合有大量索引条件,且并发更新不同的数据,如在线处理事务系统.
+
+### sql加锁
+
+**在MyISAM中**,表级锁有两种共享读锁和独占写锁.其互斥形式和ReentrantReadWriteLock一致即读中不能写,写中不能读写.这个锁是**表级的锁**,MyISAM使用的是隐式加锁,即自动加锁,在select前面加读锁,在update,delete,insert之间加的是写锁.我们需要让MyISAM加锁的时间尽可能的小,其锁定级别不可轻易改变.我们也能看出来**MyISAM是写优先的**
+
+mysql里面有专门两组变量计算锁的争用情况,分别表示锁定的次数和等待的次数.
+
+```shell
+mysql> show status like 'table%';
++----------------------------+---------+
+| Variable_name              | Value   |
++----------------------------+---------+
+| Table_locks_immediate      | 100     |
+| Table_locks_waited         | 11      |
++----------------------------+---------+
+```
+
+而在其他引擎中,例如**NDBCluster(分布式)和InnoDB**中他们自己实现了行级锁,下面主要介绍InnoDB的控制方式.InnoDB是目前广泛使用的事务存储引擎.InnoDB的行级锁也分为共享锁和排他锁.中还要涉及到一个概念叫意向锁如下.
+
+![](https://images2015.cnblogs.com/blog/1033231/201701/1033231-20170118181153984-1417117507.png)
+
+如果是兼容的,那么InnoDB会给请求的事务授予锁,否则,则会等待前一把锁释放.加锁逻辑是
+
+-   如果该资源没被加锁,可以加共享锁和排它锁
+-   如果该资源被加共享锁,可以加共享锁但不能加排它锁
+-   如果该资源被加了排他锁,就不能加共享锁,也不能加排它锁,但可以加意向锁
+
+仅当被加资源排它锁之后,才会加意向锁,根据后续进程想要加的锁,分为共享意向锁,排他意向锁.意向共享锁可以存在多个,意向排他锁只能存在一个.意向锁是InnoDB自己加的,不需要用户干预.
+
+-   **对于Select,InnoDB不会加共享锁**,在事务中利用MVCC(类似COW)机制控制并发
+-   对于Update,Delete,Insert等,InnoDB会给加排它锁
+
+我们可以利用下面的sql语句实现加锁
+
+```sql
+SELECT * FROM table_name WHERE ... LOCK IN SHARE MODE # 加共享锁
+SELECT * FROM table_name WHERE ... FOR UPDATE # 加排它锁
+```
+
+select加排他锁的语义是为了确保没有其他线程对其修改,InnoDB是通过给索引项加锁来实现行级锁的,只有索引索引条件才能使用行级锁,否则就相当于使用表锁.如果是**相同的索引键**就可能会发生冲突.且用EXPLAIN我们可以知道在一些小的表里面,mysql是会使用全表扫描的,必须通过索引才会触发行级锁,否则使用的都是表锁.
+
+除此之外mysql还有一种间隙锁(Next Key).例如
+
+```shell
+mysql> select * from emp where empid > 100 for update;
+```
+
+mysql会对大于100的所有记录加锁,即如果只有101条记录,也会对不存在的其他记录加锁.这个锁的目的
+
+-   防止幻读,如果其他事务插入了>100以上的数据,那么就会读到本不存在的数据,破坏事务的原子性,在下面我们会详细介绍事务
+
+除此之外需要注意的是间隙锁可能会对性能造成很大的影响,当Query无法利用索引时就会使用全表锁,Query的过滤条件会导致某些数据无法正确插入
+
+### 死锁
+
+MyISAM是不会发生死锁的,因为他每次就用那一把锁,用完就释放,不存在其他行为,缺点就是性能低下.即deadlock free,显然InnoDB中获取到了对面事务资源需要的锁就会造成死锁.InnoDB自身可以检测到自己的死锁,并且回滚掉带较小的事务
+
+>   但是有一点需要注意的就是，当产生死锁的场景中涉及到不止InnoDB存储引擎的时候，InnoDB是没办法检测到该死锁的，这时候就只能通过锁定超时限制参数InnoDB_lock_wait_timeout来解决。
+>   需要说明的是，这个参数并不是只用来解决死锁问题，在并发访问比较高的情况下，如果大量事务因无法立即获得所需的锁而挂起，会占用大量计算机资源，造成严重性能问题，甚至拖跨数据库。我们通过设置合适的锁等待超时阈值，可以避免这种情况发生。
+
+这也告诉了我们在JUC包中获得锁设置等待事件的意义,如果没获取到锁尽早进入异常处理,提示系统繁忙是比直接傻等着获取锁要好很多,哪怕JDK1.8对synchronized做出了相应的优化,其在系统的可靠性上远远不及JUC工具中自己实现的可中断的等待队列.
+
+我们可以使用如下方法来避免死锁
+
+>-   在应用中，如果不同的程序会并发存取多个表，应尽量约定以相同的顺序来访问表，这样可以大大降低产生死锁的机会。
+>-   在程序以批量方式处理数据的时候，如果事先对数据排序，保证每个线程按固定的顺序来处理记录，也可以大大降低出现死锁的可能。
+>-   在事务中，如果要更新记录，应该**直接申请足够级别的锁**，即排他锁，而不应先申请共享锁，更新时再申请排他锁，因为当用户申请排他锁时，其他事务可能又已经获得了相同记录的共享锁，从而造成锁冲突，甚至死锁。
+>-   在REPEATABLE-READ隔离级别下，如果两个线程同时对相同条件记录用SELECT...FOR UPDATE加排他锁，在没有符合该条件记录情况下，两个线程都会加锁成功。程序发现记录尚不存在，就试图插入一条新记录，如果两个线程都这么做，就会出现死锁。这种情况下，将隔离级别改成READ COMMITTED，就可避免问题。
+>-   当隔离级别为READ COMMITTED时，如果两个线程都先执行SELECT...FOR UPDATE，判断是否存在符合条件的记录，如果没有，就插入记录。此时，只有一个线程能插入成功，另一个线程会出现锁等待，当第1个线程提交后，第2个线程会因主键重出错，但虽然这个线程出错了，却会获得一个排他锁。这时如果有第3个线程又来申请排他锁，也会出现死锁。对于这种情况，可以直接做插入操作，然后再捕获主键重异常，或者在遇到主键重错误时，总是执行ROLLBACK释放获得的排他锁。
+
+
+
+### 乐观锁
+
+这是一种加锁的方式,即CAS-loop的lock-free,可以参考AtomicInteger的设计思想.
 
 mysql使用数据库版本号来控制
 
 ![mysql版本控制](https://upload-images.jianshu.io/upload_images/4461377-d7472568e615e335.png)
 
 ```sql
-# step1: 查询出商品信息 把version存起来
-select (quantity,version) from items where id=100;
-# step2: 根据商品信息生成订单
+# 订单系统的基本cas加锁逻辑,但
+select (quantity,version) from items where id=100; # 存version
 insert into orders(id,item_id) values(null,100);
-# step3: 修改商品的库存
-update items set quantity=quantity-1,version=version+1 where id=100 and version=#{version};
-# 最后这句也是修改只有一个线程能成功的原因 多了个版本控制字段version
+update items set quantity=quantity-1,version=version+1 where id=100 and version=#{version}; # 典型的CAS,失败就回滚
 ```
 
 如果是主从分离的数据库select一般是用于访问从数据库的 但是如果把select放在了事务中 访问的是主数据库 另外 如果并发操作很高的时候 从数据库同步可能不及时也会导致查询失败
@@ -138,19 +362,20 @@ update items set quantity=quantity-1,version=version+1 where id=100 and version=
 秒杀系统的核心代码(细粒度的乐观锁)
 
 ```sql
-# 仍挑选以库存数作为乐观锁
 # step1: 查询出商品信息
 select (inventory) from items where id=100;
 # step2: 根据商品信息生成订单
 insert into orders(id,item_id) values(null,100);
 # step3: 修改商品的库存
 update items set inventory=inventory-1 where id=100 and inventory-1>0;
-# 这个操作就会失败了
+# 如果库存数量不够就会失败,失败进行回滚的时候就可以通知用户下单失败
 ```
 
-这种如果对行操作version字段保持着相当高的冲突
+这种如果对行操作version字段保持着相当高的冲突,如果竞争强烈的话建议直接换成悲观锁.
 
 我们可以采用更加细粒度的直接对字段加锁 一般数据库有类似quantity这样的高并发的字段的时候 我们可以命名quantity_cc 单独控制一个字段的高并发
+
+
 
 ### 悲观锁
 
@@ -161,11 +386,11 @@ mysql想使用悲观锁得 set autocommit=0;
 然后sql语句得写成这样
 
 ```sql
-//step1: 查出商品状态
+# step1: 查出商品状态
 select quantity from items where id=100 for update;
-//step2: 根据商品信息生成订单
+# step2: 根据商品信息生成订单
 insert into orders(id,item_id) values(null,100);
-//step3: 修改商品的库存
+# step3: 修改商品的库存
 update Items set quantity=quantity-2 where id=100;
 ```
 
@@ -173,8 +398,3 @@ update Items set quantity=quantity-2 where id=100;
 
 这个锁的是扫描过的所有字段 如果不加索引 相当于全表锁
 
----
-
-## 集群搭建
-
-主从数据库 master-slave 读写分离模式
