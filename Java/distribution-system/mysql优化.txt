@@ -6,6 +6,405 @@
 
 
 
+## JDBC的读取细节
+
+---
+
+我们先从JDBC的优化开始说起,要清楚JDBC的读取细节,先看下面代码
+
+### PrepareStatement和Statement
+
+```java
+Connection conn=null;
+PrepareStatement ps=null;
+
+Class.forName(driver);
+conn = DriverManager.getConnection(url, user, password);
+
+String sql="insert into users_info values(?,?,?)";
+ps=conn.prepareStatement(sql); // 预编译sql,防止sql注入
+
+ps.setInt(1,id);
+ps.setString(2,username);
+ps.setDate(3, new java.sql.Date(java.util.Date().getTime()));
+
+Boolean res = ps.executeUpdate() > 0;
+// 注意Statement是能获取结果集的
+// 如果想要获取结果集且用的是查询语句可以使用下面的代码
+// ResultSet rs = ps.executeQuery(); 
+// 这里不需要再写语句通过statement预编译传入sql,如果是普通的statement对象每次都要写
+```
+
+PrepareStatement承自Statement接口.处理任务时候效率更高,因为采用预编译的手段处理sql,PrepareStatement也叫**JDBC存储过程**,Statment用于一次性存取.PrepareStatement对象开销比Statement大,
+
+我们平时用的比较多的是PrepareStatement,因为其除了执行固定化sql的功能之外,还能够防止sql注入,预编译能判断参数是否合法.
+
+另外需要注意在JDBC存储过程中,应当尽量使用`executeUpdate`和`executeQuery`来完成系统的判别,execute有其他语义.
+
+
+
+### 自动提交问题与setAutoCommit
+
+在提及之前我们先看下下面两个性质
+
+-   **默认情况下setAutoCommit的值为1(true)**
+-   **MyISAM不支持事务,该属性针对InnoDB**
+-   MyISAM只要执行sql就是锁全表
+
+顾名思义我们能从api中看到其设置让session自动提交,下面介绍的都是基于InnoDB的锁.因为只有InnoDB有基于事务的特征
+
+
+
+#### setAutoCommit(true) 不开启事务
+
+其语义为**不使用事务**,每一句写sql使用表的时候都要加锁.默认情况,自动提交,每次执行sql的时候都会让数据库执行操作.所以也可以理解为**每一句sql都执行事务**.
+
+自然我们知道不使用事务的mysql针对于每一句执行的sql而言是线程安全的,但是对于整体的sql块不是线程安全的.对于每一句sql,根据sql内容的不同InnoDB可能会采用表锁或者行级锁(需要索引).
+
+不使用事务对于语句块来讲可能会发生**脏读幻读不可重复读**.下面有更为详细的介绍这三种形式,避免方式自然是开启事务,另外就算在MyISAM引擎中开启事务也没有作用,因为MyISAM不支持事务.
+
+另外根据mysql的特性,**不使用for update InnoDB只会对写操作加锁**
+
+
+
+#### setAutoCommit(false) 开启事务
+
+单单用这一句无法完成事务,但其语义表明是**开启事务**即**关闭自动提交/手动提交**.
+
+其逻辑如下
+
+```java
+try{
+  conn.setAutoCommit(false);
+  
+  stmt = conn.createStatement(); 
+  stmt.execute(sql1);
+  stmt.execute(sql2);
+  
+  // 提交事务
+  conn.commit();
+}catch(SQLException sqle){
+  conn.rollback();
+}finally{
+  // close
+}
+```
+
+可以看到其使用了`.commit()`此种api,我们即可知道,其把每一句执行的sql都当成事务的不同不同,整体一次性提交保证了这些操作执行的数据一致性,根据mysql的事务级别,这里一般是不可重复读,并且使用了`.rollback()`进行回滚.一方面是要保证**数据的一致性**,另一方面回滚是**解除锁**.
+
+一般来讲关掉conn即可释放锁,但是在采用数据库连接池的环境下,就可能会造成大规模的死锁,故一定要记得回滚.
+
+
+
+### mysql实现的锁
+
+所谓的锁,同步信息本质上一些数据.依照CAS抢占字段的逻辑,所谓的字段就是同步信息.mysql实现锁的思路就是利用mysql这个数据系统本身的数据一致性.我们只需要利用JDBC对数据库操作,就可以实现锁了.
+
+我们借助InnoDB的执行引擎对数据行进行加锁,MyISAM不支持事务且不能单独对行进行加锁粒度大.我们借助JDBC事务实现锁.
+
+我们看下加锁和解锁的逻辑
+
+```sql
+INSERT INTO database_lock(resource, description) VALUES (1, 'lock')
+```
+
+```sql
+DELETE FROM database_lock WHERE resource=1
+```
+
+这两个逻辑加锁不能重复加,因为插入不止一次的话会报错,这里可以不用选择主键,主键只是一个展示可以加锁的逻辑字段.
+
+我们利用JDBC把其变成应用程序,首先我们开启事务把操作变成原子性.
+
+```java
+static class MysqlLock {
+  public static String url = "jdbc:mysql://127.0.0.1:3306/test?characterEncoding=UTF-8";
+  public static String user = "root";
+  public static String pass = "root";
+  public static Connection conn = null;
+
+  static {
+    try {
+      Class.forName("com.mysql.jdbc.Driver");
+      conn = DriverManager.getConnection(url, user, pass);
+    } catch (SQLException | ClassNotFoundException throwables) {
+      throwables.printStackTrace();
+    }
+  }
+
+  private final String method;
+
+  MysqlLock(String method) {
+    this.method = method;
+  }
+
+  MysqlLock() {
+    this.method = "testLock";
+  }
+
+  public boolean tryLock() throws SQLException {
+    PreparedStatement st = conn.prepareStatement("select * from `lock` where method_name = ? for update");
+    st.setString(1, method);
+    ResultSet rs = st.executeQuery();
+    return !rs.next();
+
+  }
+
+  public void lock() {
+    try {
+      conn.setAutoCommit(false);
+      while (true) {
+        try {
+          PreparedStatement statement = conn.prepareStatement("insert into `lock` (method_name,description) values (?,?)");
+          statement.setString(1, method);
+          statement.setString(2, "a lock for test");
+          if (!tryLock()) {
+            // 尝试获取锁失败(数据库有记录)就一直等待获取
+            Thread.sleep(100);
+            continue;
+          }
+          statement.executeUpdate(); // 写上锁记录
+          conn.commit();
+          break;
+        } catch (SQLException | InterruptedException e) {
+        }
+      }
+    } catch (SQLException e) {
+      System.out.println("系统出错");
+      e.printStackTrace();
+    }
+  }
+
+  public void unlock() {
+    // 逆向操作删除记录
+    try {
+      conn.setAutoCommit(false);
+      PreparedStatement statement = conn.prepareStatement("delete from `lock` where method_name = ?");
+      statement.setString(1, method);
+      if (statement.executeUpdate() == 1) {
+
+      } else { // equals 0
+        throw new RuntimeException("没上锁不能解锁");
+      }
+      conn.commit();
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+}
+
+public static final ExecutorService pool = Executors.newFixedThreadPool(4);
+static int i = 0;
+static final MysqlLock lock = new MysqlLock("test");
+static final int n = 10000;
+static final CountDownLatch latch = new CountDownLatch(n);
+
+@Test
+public void test() throws InterruptedException {
+  for (int j = 0; j < n; j++) {
+    pool.submit(() -> {
+      lock.lock();
+      try {
+        //                    System.out.println(Thread.currentThread().getName() + "获取了锁");
+        i++;
+      } finally {
+        //                    System.out.println(Thread.currentThread().getName() + "释放了锁");
+        lock.unlock();
+      }
+      latch.countDown();
+    });
+  }
+  latch.await();
+  System.out.println(i);
+}
+```
+
+上面的锁可以实现,但是由于其存储位置,效率比较低,加上存储于数据库我们更倾向于用zookeeper或者redis实现更高效更好用的分布式锁,但道理想通,下面介绍另一种设计方式,乐观锁设计.
+
+```sql
+CREATE TABLE `optimistic_lock` (
+	`id` BIGINT NOT NULL AUTO_INCREMENT,
+	`resource` int NOT NULL COMMENT '锁定的资源',
+	`version` int NOT NULL COMMENT '版本信息',
+	`created_at` datetime COMMENT '创建时间',
+	`updated_at` datetime COMMENT '更新时间',
+	`deleted_at` datetime COMMENT '删除时间', 
+	PRIMARY KEY (`id`),
+	UNIQUE KEY `uiq_idx_resource` (`resource`) 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据库分布式锁表';
+```
+
+加锁和解锁的逻辑
+
+```sql
+INSERT INTO optimistic_lock(resource, version, created_at, updated_at) VALUES(20, 1, CURTIME(), CURTIME());
+```
+
+-   STEP1 - 获取资源:
+
+    ```sql
+    SELECT resource, version FROM optimistic_lock WHERE id = 1
+    ```
+
+-   STEP2 - 执行业务逻辑
+
+-   STEP3 - 更新资源:
+
+    ```sql
+    UPDATE optimistic_lock SET 
+    resource = resource -1, 
+    version = version + 1 
+    WHERE id = 1 AND version = oldVersion
+    ```
+
+我们看到这个逻辑和CAS加锁逻辑一致,只有一个线程能修改成功,修改不成功的没有任何反应,或者说在java端要判断,我们利用该锁,把mysql当成缓冲池,做一个生产者消费者模型
+
+```java
+static class MysqlLock {
+  public static String url = "jdbc:mysql://127.0.0.1:3306/test?characterEncoding=UTF-8";
+  public static String user = "root";
+  public static String pass = "root";
+  public static Connection conn = null;
+
+  static {
+    try {
+      Class.forName("com.mysql.jdbc.Driver");
+      conn = DriverManager.getConnection(url, user, pass);
+    } catch (SQLException | ClassNotFoundException throwables) {
+      throwables.printStackTrace();
+    }
+  }
+
+  private final Integer id;
+
+  MysqlLock(Integer resourse) {
+    this.id = resourse;
+  }
+
+  MysqlLock() {
+    this.id = 1;
+  }
+
+  /**
+         * 这里表的结构,id全局标识了唯一的锁
+         * version表示该字段的更改版本,也是CAS修改依据之一
+         */
+  static final String sql1 = "SELECT resource, version FROM optimistic_lock WHERE id = ?";
+  static final String sql2 = "" +
+    "UPDATE optimistic_lock " +
+    "SET resource = resource - 1,version = version + 1 " +
+    "WHERE id = ? AND version = ?";
+
+  public boolean tryLock() throws SQLException {
+    PreparedStatement statement = conn.prepareStatement(sql1);
+    statement.setInt(1, id);
+    ResultSet rs = statement.executeQuery();
+    rs.next();
+    int oldVersion = rs.getInt("version");
+    int resource = rs.getInt("resource");
+    PreparedStatement st = conn.prepareStatement(sql2);
+    st.setInt(1, id);
+    st.setInt(2, oldVersion);
+    if (resource > 0) {
+      // compute (in this case reduce resource) resource-=1
+      return st.executeUpdate() > 0;
+    } else {
+      return false;
+    }
+  }
+
+  private void safeSleep(long time) {
+    try {
+      Thread.sleep(time);
+    } catch (InterruptedException ex) {
+      ex.printStackTrace();
+    }
+  }
+
+  public void consumer() {
+    for (; ; ) {
+      try {
+        if (tryLock()) { // cas
+          // 执行想要的操作
+          break;
+        } else {
+          // 其他锁修改了资源,重新尝试
+          safeSleep(10);
+        }
+      } catch (SQLException e) {
+        // 上锁失败,有概率资源不够,wait
+        safeSleep(100);
+      }
+    }
+  }
+
+  static final String sql3 = "" +
+    "UPDATE optimistic_lock " +
+    "SET resource = resource + 1,version = version + 1 " +
+    "WHERE id = ? AND version = ?";
+
+  public boolean tryUnlock() throws SQLException {
+    PreparedStatement statement = conn.prepareStatement(sql1);
+    statement.setInt(1, id);
+    ResultSet rs = statement.executeQuery();
+    rs.next();
+    int oldVersion = rs.getInt("version");
+    int resource = rs.getInt("resource");
+    PreparedStatement st = conn.prepareStatement(sql3);
+    st.setInt(1, id);
+    st.setInt(2, oldVersion);
+    // compute (resource++)
+    return st.executeUpdate() > 0;
+  }
+
+  public void produce() {
+    for (; ; ) {
+      try {
+        if (tryUnlock()) { // cas
+          // 执行想要的操作
+          break;
+        } else {
+          // 其他锁修改了资源,重新尝试
+          safeSleep(10);
+        }
+      } catch (SQLException e) {
+        // 上锁失败,有概率资源不够,wait
+        safeSleep(100);
+      }
+    }
+  }
+
+
+}
+
+public static final ExecutorService pool1 = Executors.newFixedThreadPool(4);
+public static final ExecutorService pool2 = Executors.newFixedThreadPool(4);
+static final int n = 1000;
+static final CountDownLatch latch = new CountDownLatch(n);
+public static final MysqlLock lock = new MysqlLock();
+
+@Test
+public void test() throws InterruptedException {
+  for (int j = 0; j < 100; j++) {
+    pool1.submit(() -> {
+      System.out.println(Thread.currentThread().getName()+"消费");
+      lock.consumer();
+    });
+  }
+  for (int j = 0; j < 200; j++) {
+    pool2.submit(() -> {
+      System.out.println(Thread.currentThread().getName()+"生产");
+      lock.produce();
+    });
+  }
+  Thread.sleep(1000);
+}
+```
+
+
+
+
+
 ## 索引
 
 ---
@@ -147,14 +546,14 @@ EXPLAIN select * from users
 
 ```java
 try{
-conn.setAutoCommit(false);
-stmt = conn.createStatement(); 
-// 将 A 账户中的金额减少 500 
-stmt.execute("update t_account set amount = amount - 500 where account_id = 'A'");
-// 将 B 账户中的金额增加 500 
-stmt.execute("update t_account set amount = amount + 500 where account_id = 'B'");
-// 提交事务
-conn.commit();
+  conn.setAutoCommit(false);
+  stmt = conn.createStatement(); 
+  // 将 A 账户中的金额减少 500 
+  stmt.execute("update t_account set amount = amount - 500 where account_id = 'A'");
+  // 将 B 账户中的金额增加 500 
+  stmt.execute("update t_account set amount = amount + 500 where account_id = 'B'");
+  // 提交事务
+  conn.commit();
 }catch(SQLException sqle){
   conn.rollback();
   // close
@@ -197,6 +596,8 @@ undo-log 又叫回滚日志,顾名思义是用来回滚记录的.和redo-log记�
 
 undo-log用来保证事务的原子性.
 
+
+
 #### MVCC
 
 MVCC(MultiVersion Concurrency Control)多版本并发控制.
@@ -235,7 +636,7 @@ READ_COMMIT
 
 InnoDB采用了此种机制,写的时候加上锁,读的时候通过MVCC来确定字段的修改,这种操作从读上来讲就相当于读没有修改的副本自然不会出现中间的状态,不会出现幻读,但是仍有可能出现不可重复读的现象(有点类似Copy-On-Write的设计思路).可以看到其读的不是并不是同一个副本.
 
-REPEATABLE_READ (默认)
+REPEATABLE_READ (Mysql默认)
 
 ![](https://user-gold-cdn.xitu.io/2019/4/18/16a2c351eb03fc24?w=1082&h=290&f=png&s=120400)
 
@@ -396,5 +797,7 @@ update Items set quantity=quantity-2 where id=100;
 
 这个for update 是mysql使用悲观锁的方式 其他事务得等到该事务提交之后才能使用
 
-这个锁的是扫描过的所有字段 如果不加索引 相当于全表锁
+这个锁的是扫描过的所有字段 如果不加索引 相当于全表锁,
+
+
 
