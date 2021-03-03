@@ -111,27 +111,73 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 
 ### 项目目录结构
 
-是准的web项目结构 有SpringMVC javaweb任意一知识理解此架构不难
+是准的web项目结构 有SpringMVC javaweb任意一知识理解此架构不难.
 
 ```tree
+.
 ├── HELP.md
+├── mansystem.iml
 ├── mvnw
 ├── mvnw.cmd
 ├── pom.xml
-├── spboottest.iml
 ├── src
 │   ├── main
 │   │   ├── java
 │   │   │   └── com
-│   │   │       └── example 典型的web结构目录
-│   │   │           ├── Application.java 项目的启动配置,在其同级下的包才会被扫描
-│   │   │           ├── controller
-│   │   │           │   └── IndexController.java 典型的controller
-|   |   |           ├── DAO 放接口
-│   │   │           ├── model
-│   │   │           └── service
+│   │   │       └── example
+│   │   │           └── demo
+│   │   │               ├── DemoApplication.java
+│   │   │               ├── configs # 存放配置
+│   │   │               │   ├── AspectConfig.java
+│   │   │               │   ├── RabbitConfig.java
+│   │   │               │   ├── RedisConfig.java
+│   │   │               │   ├── SessionConfig.java
+│   │   │               │   └── WebConfiguration.java
+│   │   │               ├── controller # 存放控制器
+│   │   │               │   ├── GlobalExceptionController.java
+│   │   │               │   ├── InfoController.java
+│   │   │               │   ├── LoginController.java
+│   │   │               │   ├── ManageController.java
+│   │   │               │   ├── RegisterController.java
+│   │   │               │   ├── StatisticsController.java
+│   │   │               │   └── TestController.java
+│   │   │               ├── handler # 存放异步处理任务
+│   │   │               │   ├── AlertSchedulerTaskHandler.java
+│   │   │               │   ├── SqlHandler.java
+│   │   │               │   └── StatisticsSchedulerTaskHandler.java
+│   │   │               ├── mapper # 存放mapper由mybatis/jpa实现
+│   │   │               │   ├── CommunityMapper.java
+│   │   │               │   ├── InOutMapper.java
+│   │   │               │   ├── MessageMapper.java
+│   │   │               │   └── UserMapper.java
+│   │   │               ├── repositroy # 存放数据实体类
+│   │   │               │   ├── AlertInfo.java
+│   │   │               │   ├── Community.java
+│   │   │               │   ├── In.java
+│   │   │               │   ├── InOut.java
+│   │   │               │   ├── InOutInfo.java
+│   │   │               │   ├── Message.java
+│   │   │               │   ├── Out.java
+│   │   │               │   ├── Permission.java
+│   │   │               │   ├── TPSInfo.java
+│   │   │               │   └── User.java
+│   │   │               ├── service # 存放service
+│   │   │               │   ├── CommunityService.java
+│   │   │               │   ├── InOutService.java
+│   │   │               │   ├── MessageService.java
+│   │   │               │   ├── NoticeService.java
+│   │   │               │   └── UserService.java
+│   │   │               └── utils # 存放常用的工具类
+│   │   │                   ├── HttpUtils.java
+│   │   │                   ├── IOUtils.java
+│   │   │                   ├── JsonReponseBuilder.java
+│   │   │                   ├── JwtUtil.java
+│   │   │                   ├── MD5.java
+│   │   │                   ├── PhoneCodeUtil.java
+│   │   │                   └── SpringContextUtil.java
 │   │   └── resources
-│   │       ├── application.properties 全局配置文件
+│   │       ├── application.properties
+│   │       ├── application.yml
 │   │       ├── static
 │   │       └── templates
 │   └── test
@@ -140,6 +186,84 @@ springboot其解决了spring大部分配置的问题 解放了spring需要大量
 │               └── example
 │                   └── demo
 │                       └── DemoApplicationTests.java
+├── startup-dependences.sh
+└── target
+    ├── classes
+    │   ├── application.properties
+    │   ├── application.yml
+    │   └── com
+    │       └── example
+    │           └── demo
+    │               ├── DemoApplication.class
+    │               ├── configs
+    │               │   ├── AspectConfig.class
+    │               │   ├── RabbitConfig.class
+    │               │   ├── RedisConfig.class
+    │               │   ├── SessionConfig.class
+    │               │   ├── WebConfiguration$TokenFilter.class
+    │               │   └── WebConfiguration.class
+    │               ├── controller
+    │               │   ├── GlobalExceptionController.class
+    │               │   ├── InfoController.class
+    │               │   ├── LoginController.class
+    │               │   ├── ManageController.class
+    │               │   ├── RegisterController.class
+    │               │   ├── StatisticsController.class
+    │               │   └── TestController.class
+    │               ├── handler
+    │               │   ├── AlertSchedulerTaskHandler.class
+    │               │   ├── SqlHandler.class
+    │               │   └── StatisticsSchedulerTaskHandler.class
+    │               ├── mapper
+    │               │   ├── CommunityMapper.class
+    │               │   ├── InOutMapper.class
+    │               │   ├── MessageMapper.class
+    │               │   └── UserMapper.class
+    │               ├── repositroy
+    │               │   ├── AlertInfo.class
+    │               │   ├── Community.class
+    │               │   ├── In.class
+    │               │   ├── InOut.class
+    │               │   ├── InOutInfo.class
+    │               │   ├── Message.class
+    │               │   ├── Out.class
+    │               │   ├── Permission.class
+    │               │   ├── TPSInfo.class
+    │               │   └── User.class
+    │               ├── service
+    │               │   ├── CommunityService.class
+    │               │   ├── InOutService.class
+    │               │   ├── MessageService.class
+    │               │   ├── NoticeService.class
+    │               │   └── UserService.class
+    │               └── utils 
+    │                   ├── HttpUtils.class
+    │                   ├── IOUtils.class
+    │                   ├── JsonReponseBuilder.class
+    │                   ├── JwtUtil.class
+    │                   ├── MD5.class
+    │                   ├── PhoneCodeUtil.class
+    │                   └── SpringContextUtil.class
+    ├── generated-sources
+    │   └── annotations
+    ├── generated-test-sources
+    │   └── test-annotations
+    ├── mansystem.jar
+    ├── mansystem.jar.original
+    ├── maven-archiver
+    │   └── pom.properties
+    ├── maven-status
+    │   └── maven-compiler-plugin
+    │       └── compile
+    │           └── default-compile
+    │               ├── createdFiles.lst
+    │               └── inputFiles.lst
+    └── test-classes
+        └── com
+            └── example
+                └── demo
+                    └── DemoApplicationTests.class
+
 
 ```
 
@@ -274,6 +398,58 @@ servers: - dev.bar.com,- foo.bar.com # 单行这么写可以
 这个map解析老出问题可以使用spel解决问题
 
 解决的思路是 把集合存成python的字符串#{${map}} 让spel来解决解析问题
+
+
+
+### springboot配置文件加载顺序
+
+-   先去项目根目录(./)再去资源文件目录(./resources)下寻找
+-   文件类型properties > xml > yml > yaml
+-   文件名application > application-default
+
+```note
+file:./config/application.properties
+file:./config/application.xml
+file:./config/application.yml
+file:./config/application.yaml
+
+file:./application.properties
+file:./application.xml
+file:./application.yml
+file:./application.yaml
+
+classpath:/config/application.properties
+classpath:/config/application.xml
+classpath:/config/application.yml
+classpath:/config/application.yaml
+
+classpath:/application.properties
+classpath:/application.xml
+classpath:/application.yml
+classpath:/application.yaml
+
+file:./config/application-default.properties
+file:./config/application-default.xml
+file:./config/application-default.yml
+file:./config/application-default.yaml
+
+file:./application-default.properties
+file:./application-default.xml
+file:./application-default.yml
+file:./application-default.yaml
+
+classpath:/config/application-default.properties
+classpath:/config/application-default.xml
+classpath:/config/application-default.yml
+classpath:/config/application-default.yaml
+
+classpath:/application-default.properties
+classpath:/application-default.xml
+classpath:/application-default.yml
+classpath:/application-default.yaml
+```
+
+
 
 ### 自定义Filter的配置类
 

@@ -402,6 +402,8 @@ server.3=server3:2888:3888
 
 zookeeper中数据是以类似linux目录形式进行存储的.每个存储的数据叫Znode,每个Znode都有唯一的路径标识,每个节点中可以存储信息,每个节点**可以配置Watcher(监视器)**用于监听节点中数据的变化,节点不支持部分读写.
 
+#### 节点类型
+
 Znode有四种类型
 
 -   PERSISTENT 持久节点
@@ -427,9 +429,34 @@ Znode在创建时就确定类型,并且之后不能修改.我们一般使用提�
 
 
 
-ACL列表
+### ACL列表
 
 每个节点都会带一个ACL列表用于决定每个节点的访问权限.
+
+
+
+### 节点信息
+
+根据Zab原子广播
+
+```note
+zxid用来标识事务,zxid小的肯定是先于大的发生,任何创建节点,删除节点都会让zookeeper状态发生改变,从而让zxid增大.zxid是一个64位的数字,高32位是epoch用来标识leader关系是否改变,低32位是个递增计数.
+```
+
+在每个节点有如下的信息
+
+-   czxid. 节点创建时的zxid.
+-   mzxid. 节点最新一次更新发生时的zxid.
+-   ctime. 节点创建时的时间戳.
+-   mtime. 节点最新一次更新发生时的时间戳.
+-   dataVersion. 节点数据的更新次数.
+-   cversion. 其子节点的更新次数.
+-   aclVersion. 节点ACL(授权信息)的更新次数.
+-   ephemeralOwner. 如果该节点为ephemeral节点, ephemeralOwner值表示与该节点绑定的session id. 如果该节点不是ephemeral节点, ephemeralOwner值为0. 至于什么是ephemeral节点, 请看后面的讲述.
+-   dataLength. 节点数据的字节数.
+-   numChildren. 子节点个数.
+
+在ZookeeperClient中可以查看到上面的节点信息用于算法或者监测
 
 
 
@@ -440,9 +467,30 @@ watcher是zookeeper一个核心功能,其本质是个listener,可以监控某一
 -   可以设置观察的操作 exists,getChildren,getData 
 -   可以触发观察的操作 create,delete,setData
 
+我们先来看其应用场景,用到的就是订阅发布模式
+
+-   统一配置文件修改,集群所有节点生效
+-   集群节点宕机通知其他节点
+
+watcher的通知机制如下,我们先要去zookeeper集群注册一个watcher建立tcp长连接,接收订阅.
+
+![](https://img-blog.csdn.net/20180915152334373?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3prcF9qYXZh/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+关于其具体操作在下面介绍,主要使用Javaapi来进行操作.在这里介绍下Zookeeper的Watcher机制.主要是以下过程,其客户端的源码有Java实现,可以直接看到其处理过程
+
+-   客户端注册 Watcher
+-   服务器处理 Watcher 
+-   客户端回调 Watcher客户端
+
+![](https://img2018.cnblogs.com/blog/1383365/201908/1383365-20190820101928955-908505489.png)
 
 
-## 操控
+
+
+
+## api
+
+### zkClient
 
 用zkClient的操作方式需要先进入命令行,该程序在/bin下
 
@@ -499,7 +547,7 @@ delete /tmp
 
 但其实我们不用删除在会话结束时该临时节点也会被删除,因为其是临时节点,另外如果该节点下还有子节点是不能够删除的.必须先把子节点全删光才能产出其父节点.
 
-
+### Javaapi
 
 我们再来看javaapi如何操作其
 
@@ -511,9 +559,192 @@ delete /tmp
 </dependency>
 ```
 
+```java
+DataWatcher watcher = new DataWatcher();
+ZooKeeper zoo = new ZooKeeper(url, 100000, watcher); // 默认的watcher
+
+@Test
+public void test() throws Exception{
+  try {
+    
+    // 获取所有子节点的名字
+    List<String> ls = zoo.getChildren("/", true);
+    
+    // 创建节点
+    zoo.create("/test", "test".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    
+    // 设置监听事件
+    zoo.exists("/test", new DataWatcher("/test")); 
+
+    // 获取节点的值
+		System.out.println(new String(zoo.getData("/test", false, null)));
+    
+    // 更新节点值
+    zoo.setData("/test","modify test".getBytes(),-1);
+    // 这里第三个参数-1是无所谓,其他表示只有version对上的时候才更新
+    
+    // 删除节点
+    zoo.delete("/test",-1);
+    
+    Thread.sleep(1000000);
+  } finally {
+    zoo.close();
+  }
+}
+
+/**
+	zookeeper实现cas操作
+	
+	以zookeeper的数据一致性实现的CAS乐观锁.中间可以嵌入真正计算部分的代码,然后把计算的结果传入给setData,如果版本号不对就会报错一直等下次可修改
+	如下我们就可实现一个标准CAS的原子性操作,想要实现基于CAS的锁还得需要AQS队列,对此在另一节中说明
+*/
+@Test
+public void cas() throws Exception {
+  while (true) {
+    try {
+      Stat s = zoo.setData("/test", zoo.getData("/test", false, null), -1);
+      int ver = s.getVersion();
+
+      // compute
+      System.out.println("compute");
+      
+      // 根据版本更新节点值
+      zoo.setData("/test", "modify test".getBytes(), ver);
+      break;
+    } catch (KeeperException.BadVersionException e) {
+    }
+  }
+  zoo.close();
+}
+```
 
 
 
+## 应用
 
+zookeeper的最佳应用场景就是协调了,对此hadoop等都是用了zookeeper作为其组件去使用,zookeeper的主要应用有几个
 
+-   集中同步配置文件(配置中心)
+-   分布式锁
+-   分布式队列
+-   分布式通知/协调
+-   负载均衡
+
+### 基于zookeeper实现分布式锁
+
+我们可以基于zookeeper的临时有序节点实现分布式锁.其实现思想为
+
+每个客户端对某个方法加锁时,在zookeeper上的与该方法对应的指定节点的目录下,生成一个唯一的瞬时有序节点.判断是否获取锁的方式很简单,只需要判断有序节点中序号最小的一个.当释放锁的时候,只需将这个瞬时节点删除即可.同时,其可以避免服务宕机导致的锁无法释放,而产生的死锁问题.
+
+-   关于释放锁,对于使用锁的线程,如果挂掉,那么session断掉zookeeper就会回收临时节点
+-   关于阻塞锁,因为有watcher的存在,zk绑上节点之后可以监听该节点是不是最小的.一旦是最小的,那么变可以获取锁
+-   可重入和不可重入锁,把当前客户端的主机信息和线程信息直接写入到节点中,下次想要获取锁的时候和当前最小的节点中的数据比对一下就可以了.如果一样,那么自己直接获取锁,如果不一样就再创建一个临时的顺序节点,参与排队
+-   单点问题,zookeeper集群基于AP和Zab的设计最多容忍N个节点出错,在现实环境中这种概率微乎其微
+
+zookeeper锁的性能其实并不高,因为分发到各个节点上且只能在Leader节点上操作导致.我们平时使用的时候使用的是zookeeper第三方库[Curator](https://curator.apache.org/)客户端，这个客户端中封装了一个可重入的锁服务.
+
+![](https://img-blog.csdn.net/201808261653399?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmdtaW5fMTIz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+![](https://img-blog.csdn.net/20180826165357971?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmdtaW5fMTIz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+![](https://img-blog.csdn.net/20180826165415677?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmdtaW5fMTIz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+![](https://img-blog.csdn.net/20180826165440394?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmdtaW5fMTIz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+![](https://img-blog.csdn.net/20180826165455142?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmdtaW5fMTIz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+![](https://img-blog.csdn.net/20180826165509543?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmdtaW5fMTIz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+下面我们来用zookeeper实现分布式锁
+
+```java
+class ZooLock {
+  Watcher watcher;
+  ZooKeeper zoo;
+  String path = "/lock";
+
+  ZooLock() throws IOException {
+    watcher = new zktest.DataWatcher();
+    String url = "127.0.0.1:2181";
+    zoo = new ZooKeeper(url, 3000, watcher);
+    name = "/normal";
+  }
+
+  ZooLock(Watcher watcher, ZooKeeper zoo, String name) {
+    this.watcher = watcher;
+    this.zoo = zoo;
+    this.name = name;
+  }
+
+  private ThreadLocal<String> nodeId = new ThreadLocal<>();
+  private String name;
+
+  public void lock() {
+    lock(name);
+  }
+
+  static class DeleteWatcher implements Watcher {
+    private CountDownLatch latch = null;
+
+    public DeleteWatcher(CountDownLatch latch) {
+      this.latch = latch;
+    }
+
+    @Override
+    public void process(WatchedEvent event) {
+      if (event.getType() == Event.EventType.NodeDeleted) {
+        latch.countDown();
+      }
+    }
+  }
+
+  private void lock(String lock) {
+    try {
+      String curNode = zoo.create(path + lock, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+      List<String> subNodes = zoo.getChildren(path, false);
+
+      TreeSet<String> sortedNodes = new TreeSet<>();
+      for (String node : subNodes) {
+        sortedNodes.add(path + "/" + node);
+      }
+      String minNode = sortedNodes.first();
+      String preNode = sortedNodes.lower(curNode);
+
+      this.nodeId.set(curNode); // 这句之前是有bug的,无论获得锁与否都得注册
+      // 如果获得了锁就执行下面代码
+      // 如果没有获得锁就等着,由CountDownLatch内部的AQS阻塞
+      // 然后把前置节点注册上,
+      if (minNode != null && minNode.equals(curNode)) {
+        // 获得锁
+        return;
+      }
+
+      // 没有获得锁的情况下,阻塞
+      CountDownLatch latch = new CountDownLatch(1);
+      Stat stat = zoo.exists(preNode, new DeleteWatcher(latch));
+
+      if (stat != null) { // 如果前置节点不存在就直接走,销毁latch
+        latch.await();// 等待，这里应该一直等待其他线程释放
+        latch = null;
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  public void unlock() {
+    try {
+      if (null != nodeId) {
+        zoo.delete(nodeId.get(), -1);
+        nodeId.remove();
+      }
+
+    } catch (Exception e) {
+      throw new RuntimeException("解锁失败");
+    }
+  }
+}
+```
+
+其实通过上面的程序,我们也可以知道分布式的消息队列是如何去做的,入队操作即添加顺序节点,出队操作即删除最小的节点,
 
