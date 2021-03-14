@@ -2,6 +2,10 @@
 
 ---
 
+这是第三次大规模重新理解spring,这次除了高级应用方式web,我们开始探究其源码.探究其实现思想
+
+[TOC]
+
 ## 基础
 
 -   反射
@@ -11,7 +15,7 @@
     -   bean的创建方式 (构造器,实例工厂,静态工厂)
     -   bean的状态模式 单例,原型(多例),Session,Request(每个会话或者请求创建一个实例)
 
-## spring加载过程
+## springweb加载过程
 
 <font color="red">spring的启动是建立在servlet启动之上的</font> 
 
@@ -41,6 +45,8 @@ bean初始化
 >
 >3.Bean的实例化,注入属性,init-method
 
+
+
 ## spring的设计模式
 
 ---
@@ -52,54 +58,311 @@ bean初始化
 -   装饰者模式(wrapper)
 -   适配器模式(Adapter)
 
-## aop实现底层原理
 
----
-
-aop几乎是spring中最强大的部分了IOC和spring本身也提供了AOP基础的实现
-
--   cglib (继承代理)
--   jdk动态代理 (公共接口代理)
--   ASM框架修改字节码
--   springAOP(运行时增强 基于代理)和AspectJ(编译时增强 基于字节码)的异同
--   AOP和自定义注解 这个其实多数要基于IOC的实现
-
-### cglib
-
-
-
-### jdk动态代理
-
-
-
-### ASM修改字节码
-
-
-
-### AspectJ和springAOP的异同
-
-
-
-### 自定义注解和使用
-
-一般我们实现自己的注解有两种思路
-
--   借助AOP拦截特定方法检查有无我们的注解获取注解属性进行增强
--   借助IOC的三个类进行上下文级别的全局增强
-
-我们这里说AOP拦截特定方法和自己检查注解
 
 ## ioc
 
-### ioc创建过程
+### IOC & DI
 
--   整个bean对象产生的整个过程 从spring容器开始(ApplicationContext初始化成功)
+ioc容器是整个spring-core的核心,ioc容器负责实例化对象,并且管理装配bean.以下两个包管理这部分源码.
+
+-   org.springframework.beans
+-   org.springframework.context
+
+简单的理解来说,springbean就是一个map,我们通过name或者id作为key就能获取到对应的对象.
+
+
+
+### BeanFactory 对象工厂接口
+
+IOC的核心是**BeanFactory**,对象工厂,他是一个**工厂**.BeanFactory是IOC容器的抽象.其能提供IOC容器的基本功能,单个bean的获取,对bean的作用域判断,获取bean的类型.根据名字BeanFactory是对象工厂,即生产对象的工厂,在spring有很多类都实现了这个接口,两个主要的实现如下
+
+-   **DefaultListableBeanFactory类**
+
+-   **ApplicationContext接口**
+
+    
+
+#### DefaultListableBeanFactory类(IOC容器)
+
+是BeanFactory的一种原始实现,也是默认实现.通常也作为自定义IOC容器的父类.其功能实现大致如下
+
+-   通过resource加载spring的xml配置信息,通过XmlBeanDefinitionReader解析xml
+-   然后通过DefaultListableBeanFactory进行加载.
+
+我们可以按照如下方式使用
+
+```java
+@Test
+public void test() {
+    // 懒加载
+    Resource res = new ClassPathResource("spring-config.xml");
+    DefaultListableBeanFactory factory = 
+      new DefaultListableBeanFactory();
+    XmlBeanDefinitionReader xmlReader = 
+      new XmlBeanDefinitionReader(defaultListableBeanFactory);
+    xmlReader.loadBeanDefinitions(res);
+    
+  	// 将这两行getBean代码注释掉再运行，IoC容器将不会真正的创建对象
+  	// 这种方式我们称为lazy-init,只有真正需要对象的时候才去创建
+    HelloSpring helloSpring = factory.getBean("helloSpring", HelloSpring.class);
+    HelloSpring helloSpring2 = factory.getBean("helloSpring", HelloSpring.class);
+    System.out.println(helloSpring);
+    System.out.println(helloSpring2);
+}
+```
+
+我们看下其接口定义,可以看到都是我们对bean常用的一些方法.
+
+```java
+public interface BeanFactory {
+
+	String FACTORY_BEAN_PREFIX = "&"; // 获取对象而非对象工厂的前缀符号
+
+	Object getBean(String name) throws BeansException;
+	<T> T getBean(String name, Class<T> requiredType) throws BeansException;
+	<T> T getBean(Class<T> requiredType) throws BeansException;
+	Object getBean(String name, Object... args) throws BeansException;
+	<T> T getBean(Class<T> requiredType, Object... args) throws BeansException;
+	boolean containsBean(String name);
+  
+	boolean isSingleton(String name) throws NoSuchBeanDefinitionException;
+	boolean isPrototype(String name) throws NoSuchBeanDefinitionException;
+	boolean isTypeMatch(String name, ResolvableType typeToMatch) throws NoSuchBeanDefinitionException;
+	boolean isTypeMatch(String name, Class<?> typeToMatch) throws NoSuchBeanDefinitionException;
+	Class<?> getType(String name) throws NoSuchBeanDefinitionException;
+  
+	String[] getAliases(String name);
+}
+```
+
+```java
+public interface ListableBeanFactory extends BeanFactory {
+
+	/**
+	 * @param beanName the name of the bean to look for
+	 * @return if this bean factory contains a bean definition with the given name
+	 */
+	boolean containsBeanDefinition(String beanName);
+
+	/**
+	 * @return the number of beans defined in the factory
+	 */
+	int getBeanDefinitionCount();
+
+	String[] getBeanDefinitionNames();
+	String[] getBeanNamesForType(ResolvableType type);
+	String[] getBeanNamesForType(Class<?> type);
+	String[] getBeanNamesForType(Class<?> type, boolean includeNonSingletons, boolean allowEagerInit);
+	<T> Map<String, T> getBeansOfType(Class<T> type) throws BeansException;
+	<T> Map<String, T> getBeansOfType(Class<T> type, boolean includeNonSingletons, boolean allowEagerInit)
+			throws BeansException;
+
+	// 获得持有该注解(或子注解)的对象名字
+	String[] getBeanNamesForAnnotation(Class<? extends Annotation> annotationType);
+	Map<String, Object> getBeansWithAnnotation(Class<? extends Annotation> annotationType) throws BeansException;
+
+	/**
+	 * @return the annotation of the given type if found, or {@code null}
+	 */
+	<A extends Annotation> A findAnnotationOnBean(String beanName, Class<A> annotationType)
+			throws NoSuchBeanDefinitionException;
+
+}
+```
+
+
+
+#### ApplicationContext 接口
+
+org.springframework.context.ApplicationContext是BeanFactory的子接口.该接口添加的功能定义如下,根据他继承的其他接口,添加了
+
+-   Spring AOP集成
+-   消息资源处理（用于国际化）
+-   事件发布
+-   应用层特定的上下文WebApplicationContext等新功能
+
+```java
+public interface ApplicationContext extends EnvironmentCapable, ListableBeanFactory, HierarchicalBeanFactory,
+		MessageSource, ApplicationEventPublisher, ResourcePatternResolver {
+
+	String getId();
+	String getApplicationName();
+
+	/**
+	 * Return a friendly name for this context.
+	 * @return a display name for this context (never {@code null})
+	 */
+	String getDisplayName();
+
+	/**
+	 * Return the timestamp when this context was first loaded.
+	 * @return the timestamp (ms) when this context was first loaded
+	 */
+	long getStartupDate();
+      
+	ApplicationContext getParent();
+	
+	AutowireCapableBeanFactory getAutowireCapableBeanFactory() throws IllegalStateException;
+
+}
+```
+
+可以看到了其包含了BeanFactory接口功能的更高级的抽象.上下文对象是用来管理spring中所有的bean.看下其实现,主要如下
+
+-   ClassPathXmlApplicationContext 从classpath去解析类
+-   FileSystemXMLApplicationContext 从文件系统去解析类
+-   XmlWebApplicationContext 从web.xml中解析类
+
+**ApplicationContext是直接加载调用一次构造方法加载所有的普通bean,而lazy-init的对象都是默认单例的**.
+
+我们定义的bean以及他们的依赖关系信息称为元数据(configuration meta).配置元数据可以以xml,java注释,java代码来表示.一般配置元数据有几种常见的方式
+
+-   传统xml
+-   基于Spring注解:@Autowired,@PostConstruct,@PreDestroy
+-   基于Java注解:@Configuration,@Bean,@Import,@DependsOn
+
+我们配置的元数据信息变成了**BeanDefinition**.这样就不用每次都去配置信息中在解析一次.BeanDefinition包含以下信息
+
+-   bean的实现类全限定类名
+-   bean的实现类型的全限定类型
+-   bean在容器的作用范围,生命周期的回调函数
+-   bean的依赖项
+
+启动IOC容器的时候,IOC容器会借助**BeanDefinition**开始进行依赖注入过程.引入多个ApplicationContext的时候,我们可以直接在代码层面利用多个配置文件的引入方法,或者是在xml文件中用import标签
+
+```xml
+<import resource="spring-config2.xml"/>
+```
+
+
+
+### 循环依赖问题
+
+spring中避不开的一个问题就是循环依赖,当A依赖B创建,B依赖A创建的时候就会出现这种现象而产生BeanCurrentlyCreationException.
+
+解决方案是,我们依赖注入(DI)的时间发生在创建对象之后,等对象完全创建好了在根据setter或者setter进行依赖注入.在很多情况下我们使用构造器注入是更加安全的注入方式.
+
+
+
+### FactoryBean 工厂对象
+
+首先,他只是辅助实现,和IOC的过程没有任何关系.
+
+和上面顶级接口长得很像,特别容易搞混,但本质上,FactoryBean是个对象的接口.而不是工厂的接口.他对工厂对象进行抽象,规定了一个正常的工厂应该有什么样的方法.定义如下
+
+```java
+public interface FactoryBean<T> {  
+    T getObject() throws Exception;  
+    Class<?> getObjectType();  
+    boolean isSingleton();  
+}
+```
+
+其可以用以下方式,来实现这个接口
+
+```java
+public class FactoryBeanPojo implements FactoryBean{
+	private String type;
+ 
+	@Override
+	public Object getObject() throws Exception {
+		if("student".equals(type)){
+			return new Student();			
+		}else{
+			return new School();
+		}	
+	}
+  
+	@Override
+	public Class getObjectType() {
+		return School.class;
+	}
+ 
+	@Override
+	public boolean isSingleton() {
+		return true;
+	}
+ 
+	public String getType() {
+		return type;
+	}
+ 
+	public void setType(String type) {
+		this.type = type;
+	}
+}
+```
+
+两者毫无可比性,只是长得像而已,但是非常易混淆在此声明.
+
+
+
+### ioc创建过程(bean生命周期)
+
+整个bean对象产生的整个过程 从spring容器开始(ApplicationContext初始化成功)
 
 ![创建过程2](https://images2017.cnblogs.com/blog/256554/201709/256554-20170919234704353-487869759.png)
 
+上面的图虽然相对复杂,但都是利用回调函数的机制,在以下几个时间发生的前后都预留了回调函数供给监测或者增强bean.所以其生命周期分为以下几个过程
+
+-   根据BeanDefinition去加载类进入虚拟机`<clinit>`,static初始化等
+-   执行Bean的构造器.(解决循环依赖)
+-   给Bean注入属性.
+-   服务其他类 (getBean) 此过程属于我们使用spring写的代码
+-   销毁
+
+而上面的过程前后,都有预留回调函数,可以通过实现某些类,经过配置进行bean的增强.
+
 ![时序图](https://images2018.cnblogs.com/blog/717817/201805/717817-20180522141553606-1691095215.png)
 
-#### spring容器流程总结
+我们可以通过下面一些方法为一个对象的生命周期设置回调函数(listener模式)
+
+```java
+@Test
+public void lifecycleCallback() {
+    // 开启ioc容器
+    ClassPathXmlApplicationContext ac = new ClassPathXmlApplicationContext("DI.xml");
+    
+  	// 主动获取bean才会回调,第二个参数指定的是回调的类,回调的类由我们自己实现方法监测
+  	// 对象的生命周期,但这个生命周期和ioc容器的生命周期一致
+    ac.getBean("lifecycleCallbackPro", LifecycleCallbackPro.class);
+    ac.getBean("lifecycleCallbackPro", LifecycleCallbackPro.class);
+    
+  	// close关闭容器，一定是close才会触发
+    ac.close();
+    // gc不一定发生，对象不一定被彻底销毁
+    System.gc();
+}
+
+@Component // 或者是在某一方法上利用@Bean注册,得加入SpringContext才行.
+public class LifecycleCallbackPro {
+  public LifecycleCallbackPro() {}
+
+  @PostConstruct // 利用注解指定回收周期
+  public void afterPropertiesSet() {
+    System.out.println("prototype LifecycleCallbackPro初始化回调");
+  }
+
+  @PreDestroy
+  public void destroy() {
+    System.out.println("prototype LifecycleCallbackPro销毁回调");
+  }
+
+  @Override
+  protected void finalize() {
+    System.out.println("prototype LifecycleCallbackPro销毁");
+  }
+}
+```
+
+
+
+
+
+
+
+### spring容器流程总结
 
 ---
 
@@ -165,7 +428,7 @@ bean的生命周期中涉及到了4类方法
 </bean>
 ```
 
-#### BeanPostProcessor
+### BeanPostProcessor
 
 该过程对应spring使用时候的相关注解
 
@@ -206,7 +469,7 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
 }
 ```
 
-#### InstantiationAwareBeanPostProcessor
+### InstantiationAwareBeanPostProcessor
 
 这个切入点有三个 构造函数执行之前 属性注入之前(构造器执行之后) init方式执行之后
 
@@ -275,11 +538,67 @@ public class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
 }
 ```
 
+
+
 ### ioc中循环依赖问题的解决
 
-循环依赖类似死锁,指的是A类中有B类的成员变量,B类中有A类的成员变量 这样依赖就编程循环依赖了
+循环依赖类似死锁,指的是A类中有B类的成员变量,B类中有A类的成员变量 这样依赖就编程循环依赖了.需要声明的一点是,如果是依赖注入的循环依赖,spring是有解决档案的,但**构造器**的循环依赖是无法解决的.
 
-spring对此的解决方式其实十分简单 因为**构造和注入是分开的**等待构造完全之后再从构造完后的对象中填充到相应的依赖中去
+```java
+public class A {  
+    private B b ;  
+    public void setB(B b) {  
+        this.b = b;  
+    }  
+    public A() {  
+    }  
+    public A(B b) {  
+        this.b = b;  
+    }  
+}
+public class B {  
+    private C c ;  
+    public void setC(C c) {  
+        this.c = c;  
+    }  
+    public B() {  
+    }  
+    public B(C studentC) {  
+        this.c = c;  
+    }  
+}
+public class C {
+    private A a; 
+    public void setA(A a) {  
+        this.a = a;  
+    }  
+    public C() {  
+    }
+    public C(A a) {  
+        this.a = a;  
+    }  
+} 
+```
+
+```xml
+<bean id="a" class="com.example.A">  
+    <constructor-arg index="0" ref="b"></constructor-arg>  
+</bean>  
+<bean id="b" class="com.example.B">  
+    <constructor-arg index="0" ref="c"></constructor-arg>  
+</bean>  
+<bean id="c" class="com.example.C">  
+    <constructor-arg index="0" ref="a"></constructor-arg>  
+</bean>
+```
+
+这样一来,就会出现构造器依赖,即会发生错误.
+
+spring对此其他循环依赖的解决方式其实十分简单 因为**构造和注入是分开的**等待构造完全之后再从构造完后的对象中填充到相应的依赖中去.我们看下bean的调用过程设置对象属性
+
+![](https://img-blog.csdn.net/20180331212327518?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM2MzgxODU1/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+spring先调用构造器实例化对象,把实例化对象放到一个Map中(这个Map是线程安全的).像这样的缓存spring有三级.
 
 DefaultSingletonBeanRegistry 类中有声明缓存结构
 
@@ -287,21 +606,37 @@ DefaultSingletonBeanRegistry 类中有声明缓存结构
 private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256); // 一级缓存 已经被实例化好的对象
 // 单例对象的cache就是这个
 
-private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);  // 三级缓存 实例生产时候使用的工厂 单例工厂的cache
-
 private final Map<String, Object> earlySingletonObjects = new HashMap<>(16); // 二级缓存 提前曝光的单例对象
 // 用于循环监测
+
+private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);  // 三级缓存 实例生产时候使用的工厂 单例工厂的cache
 ```
 
-我们可以看到 基于工厂建造的单例类spring是可以解决循环依赖的 但是基于构造函数注入的类spring是无法解决循环依赖问题的
+我们可以看到 基于工厂建造的单例类spring是可以解决循环依赖的 但是基于构造器注入的类spring是无法解决循环依赖问题的.
 
-spring从一级缓存获取不到会去访问二级缓存进而访问三级缓存,如果获取到了则移除三级缓存放入二级缓存中
+spring从一级缓存获取不到会去访问二级缓存进而访问三级缓存,如果获取到了则移除三级缓存放入二级缓存中.
+
+这三级缓存对应对象创建的不同阶段
+
+-   singletonObjects 
+-   earlySingletonObjects 如果其他线程在三级缓存获取到了对象,对象就会被移入二级缓存
+-   singletonFactories 三级缓存,可能是正在被工厂创建的类.我们先要去获取
+
+这里就是遇到循环依赖问题时候会进行的处理逻辑
+
+![](https://pic1.zhimg.com/80/v2-abe8d96f198a33fcfd51bb2108b00004_1440w.jpg)
+
+处理完之后在进行值的注入.
+
+
 
 ### ioc线程安全问题
 
-spring并不会保证单例模式线程安全,这得需要自己的机制去给线程加锁,但spring推荐使用ThreadLocal来解决线程安全问题.
+spring并不会保证单例自己模式线程安全,**但是会保证自己添加对象缓存依赖的时候是线程安全的.(利用了java原生的synchronized机制)**,这得需要自己的机制去给线程加锁,但spring推荐使用ThreadLocal来解决线程安全问题.
 
-ThreadLocal使用的好处就是线程内部有一个副本,不用像多例模式一样存储大量对象的开销,只需要类似{thread_id,value}的形式去存储相应的副本变量,
+ThreadLocal使用的好处就是线程内部有一个副本,不用像多例模式一样存储大量对象的开销,只需要类似{thread_id,value}的形式去存储相应的副本变量.
+
+
 
 ### 包扫描器
 
@@ -352,9 +687,57 @@ public static void main(String[] args) throws Expection{
 
 
 
+## aop实现底层原理
+
+---
+
+aop几乎是spring中最强大的部分了IOC和spring本身也提供了AOP基础的实现
+
+-   cglib (继承代理)
+-   jdk动态代理 (公共接口代理)
+-   ASM框架修改字节码
+-   springAOP(运行时增强 基于代理)和AspectJ(编译时增强 基于字节码)的异同
+-   AOP和自定义注解 这个其实多数要基于IOC的实现
+
+### cglib
+
+
+
+### jdk动态代理
+
+
+
+### ASM修改字节码
+
+
+
+### AspectJ和springAOP的异同
+
+
+
+### 自定义注解和使用
+
+一般我们实现自己的注解有两种思路
+
+-   借助AOP拦截特定方法检查有无我们的注解获取注解属性进行增强
+-   借助IOC的三个类进行上下文级别的全局增强
+
+我们这里说AOP拦截特定方法和自己检查注解
+
+
+
 ## 事务
 
 ---
+
+事务是一种控制读写的并发机制,事务的特性就是ACID
+
+-   原子性Atomicity,即不可分割,发生错误会回滚
+-   一致性Consistency,即所有读写的数据能够保持一致
+-   隔离性Isolation,即事务之间隔离不互相依赖
+-   持久性Durability,顾名思义一次性变化序列化到磁盘上
+
+使用事务系统,就有可能会遇到三种现象
 
 -   脏读 select到其他程序update的数据但未commit的数据
 
@@ -365,6 +748,15 @@ public static void main(String[] args) throws Expection{
     幻读就是读到原本不存在
 
 -   不可重复读 两次select到其他程序commit前后的数据
+
+四种事务隔离级别
+
+-   READ_UNCOMMIT 读不提交,即不做任何操作,可能会
+-   READ_COMMIT 读操作要在提交了之后才能执行,避免脏读
+-   REPETABLE_READ 可重复读,可以避免脏读,幻读
+-   SERIALIZABLE 序列化,可以避免脏读幻读不可重复读
+
+
 
 ### 事务隔离机制
 
@@ -387,6 +779,8 @@ read-uncommited 最低的级别 等于不做任何操作
 repeatable_read 其可以解决脏读和不可重复度问题 利用快照实现 就读快照的内容不读原数据库 显而易见只读自己内存副本里面的东西就绝对不会脏读和重复读 但有**幻读**问题
 
 serializable 把所有操作序列化 所有事物按顺序执行 开销最大
+
+
 
 ---
 
@@ -411,13 +805,15 @@ public void methodC(){
 }
 ```
 
-methodA调用了调用了methodB,但是在methodA中并没有开启事务(由AOP的机制就可以知道).我们一般在springboot中的service层使用@Transaction.且在一原子性Service中描述集体调用的方法
+methodA调用了调用了methodB,但是在methodA中并没有开启事务(由AOP的机制就可以知道).我们一般在springboot中的service层使用@Transaction.且在一原子性Service中描述集体调用的方法.
+
+从上面的写法我们也能猜出其实现原理,是完全通过AOP来实现的,所以关于各种事务,需要有spring管理的bean来进行调用.如果想要在一个事务中调用另一个事务,那么该方法要标注事务,且需要被spring管理(进行AOP增强).
 
 ```java
 @Service
 class TransactionService{
   @Autowired
-  XXXService s;
+  XXXService s; // AOP代理了,具有事务特性
   
   public void invoke(){
   	s.methodB(); // 在自己的事务中独立运行
