@@ -275,6 +275,44 @@ System.out.println(s3 == s4);
 
 
 
+#### Integer对象
+
+```java
+Integer i01 = 59;
+int i02 = 59;
+Integer i03 = Integer.valueOf(59);
+Integer i04 = new Integer(59);
+```
+
+首先我们先要理解装箱和拆箱,上面的代码等价于
+
+```java
+Integer i01 = new Integer(59);
+int i02 = 59;
+Integer i03 = Integer.valueOf(59);
+Integer i04 = new Integer(59);
+```
+
+##### 数值比较
+
+如果`i02`和其他对象发生比较的话返回的一定是true,因为在和数值类型比较的过程中,先进行拆箱返回数值,然后利用数值进行比较.
+
+##### 对象比较
+
+其他的所有比较都是对象之间的比较,关于Integer对象的比较比较的是地址,`new Integer()`使用的是内部数据结构引用采用常量池引用而对象引用在堆内存.所以`new Integer()==new Integer()`返回类型一定是false
+
+##### Integer.valueOf
+
+```java
+public static Integer valueOf(int i) {
+  if (i >= IntegerCache.low && i <= IntegerCache.high)
+    return IntegerCache.cache[i + (-IntegerCache.low)];
+  return new Integer(i);
+}
+```
+
+`-128~127`的从缓存中取,也就是说调用该函数的所有合适的值都会被缓存.
+
 ### 类加载与初始化过程
 
 ---
@@ -509,9 +547,101 @@ clinit方法和init方法 是指类的初始化和对象的初始化
 
 
 
+#### 复杂初始化
+
+上面我们知道了父子类之间的初始化关系,那么我们看如下代码
+
+```java
+public class Test {
+    public static void main(String[] args) {
+        System.out.print(B.c);
+    }
+}
+class A {
+    static {
+        System.out.print("A");
+    }
+}
+class B extends A{
+    static {
+        System.out.print("B");
+    }
+    public final static String c = "C"; // 不会初始化类,因为可以从常量池取
+  	public static String c = "C"; // 如果上面的语句换成了下面,就会初始化AB
+  	public final static String c = new String("C"); // 常量阶段获取不到这,所以还是会发生类的初始化
+}
+```
+
+上面的输出只有C,因为访问常量池是不需要初始化的,而常量池的常量都是从解析阶段就确定了,所以不需要`<clinit>`方法.
+
+```java
+public class Test {
+    public static void main(String[] args) {
+        System.out.print(B.c);
+    }
+}
+class A {
+    static {
+        System.out.print("A");
+    }
+}
+class B extends A{
+    static {
+        System.out.print("B");
+    }
+}
+```
+
+
+
 ---
 
 ### **学会了?来试试下面习题吧**
+
+#### 虚拟机加载过程理解应用
+
+```java
+public class Test {
+    public static void main(String[] args) throws Exception{
+      ClassLoader classLoader=ClassLoader.getSystemClassLoader();
+      Class clazz=classLoader.loadClass("A");
+      System.out.print("Test");
+      clazz.forName("A");
+    }
+}
+class A{
+    static {
+        System.out.print("A");
+    }
+}
+```
+
+会输出`TestA`,因为loadClass只是类加载阶段,没有触发`<clinit>`方法
+
+#### 访问域问题
+
+```java
+public static void main(String[] args) {
+	   System.out.println(A.c);
+}
+class B {
+    static {
+        System.out.print("B");
+    }
+    public final static String c = new String("C");
+}
+class A extends B {
+    static {
+        System.out.print("A");
+    }
+}
+```
+
+这个输出是`BC`因为不需要初始化A类.
+
+
+
+#### 单一类加载的线程安全问题
 
 ```java
 public class StaticTest{
@@ -544,6 +674,8 @@ public class StaticTest{
 ```
 
 这题十分考验对clinit和init的理解,我们这里讲述idea的debugger用于说明情况
+
+
 
 ### 使用idea的debugger
 

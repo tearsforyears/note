@@ -111,6 +111,33 @@ tcp建立连接之后就可以稳定传输数据了,而建立连接之后就要�
 
 
 
+#### TCP拥塞控制
+
+一共有4种算法
+
+-   慢开始(指数增长)
+-   拥塞避免(线性增长)
+-   快重传(不必等待计时器过期,直接重传)
+-   快恢复
+
+![](https://img-blog.csdnimg.cn/20190731155254165.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQxNDMxNDA2,size_16,color_FFFFFF,t_70)
+
+![](https://img-blog.csdnimg.cn/20190731165743903.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQxNDMxNDA2,size_16,color_FFFFFF,t_70)
+
+
+
+快重传和快恢复
+
+![](https://img-blog.csdnimg.cn/20190731165605396.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQxNDMxNDA2,size_16,color_FFFFFF,t_70)
+
+![](https://img-blog.csdnimg.cn/20190731184314574.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQxNDMxNDA2,size_16,color_FFFFFF,t_70)
+
+![](https://img-blog.csdnimg.cn/20190731184640178.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQxNDMxNDA2,size_16,color_FFFFFF,t_70)
+
+
+
+
+
 ### HTTP
 
 HTTP相对不在多赘述,其本质上是建立了tcp连接之后,以tcp传输数据的形式把报文字段传送过去,拥有不同的报文头,有几类特殊的报文,例如上传报文等.相应的报文格式也在相应的网络或是资料上可以找到
