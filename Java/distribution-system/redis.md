@@ -10,6 +10,8 @@ nosql满足下列分布式定理 并基于此定理构建系统
 
 默认端口6379
 
+
+
 ## CAP定理
 
 ---
@@ -238,11 +240,83 @@ AOF重写
 
 2.对新的AOF文件进行改名，原子性操作地覆盖现有的AOF文件，完成新旧AOF文件的替换。
 
+
+
 ## redis的线程模型
 
-redis是队列循环加单线程模型,其利主要利用了IO复用(请求注册,注册操作),所以我们
+redis是队列循环加单线程模型,其利主要利用了IO复用(请求注册,注册操作).
 
-### 有待补充
+
+
+## Redis的过期策略
+
+redis里面如果有大量的key,我们看下其过期策略.其实际上使用了下面两种方式结合的删除策略.
+
+### lazy删除
+
+在访问某一key的时候才对其过期时间进行检查,如果过期了就删除.这种策略的弊病就是如果不进行检查的话,该key会一直留在内存中十分占有内存空间.
+
+### 定期删除
+
+redis会把所有设置了过期时间的key放到一个字典中,每隔10秒进行定期扫描.并且删除过期的key.其具体策略如下
+
+1.  从过期字典中随机20个key
+2.  删除这20个key中已过期的
+3.  如果超过25%的key过期，则重复第一步
+
+为了保证循环不会持续太长时间,循环的默认上限是25ms.
+
+### 过期与命令
+
+查看过期时间TTL
+
+```shell
+ttl key
+```
+
+设置过期时间(更新过期时间)
+
+```java
+expire key time
+```
+
+例如删除一个key,可以把其过期时间设置为-1
+
+```shell
+expire key -1
+```
+
+```java
+redisTemplate.opsForValue().getOperations().getExpire(key);
+```
+
+-   清除过期时间 DEL/SET/GET/SET
+-   不会清除过期时间 INCR/LPUSH/HSET
+
+
+
+## redis内存淘汰策略
+
+当key超过了使用最大的内存时就会触发内存淘汰机制,首先可以如下设置,对于32位系统来说只能使用3GB内存
+
+```conf
+maxmemory 100mb
+```
+
+redis淘汰策略大致如下
+
+-   noeviction: 不删除策略, 达到最大内存限制时, 如果需要更多内存, 直接返回错误信息.大多数写命令都会导致占用更多的内存(有极少数会例外,如 DEL).
+-   allkeys-lru: 所有key通用; 优先删除最近最少使用(less recently used ,LRU) 的 key。
+-   volatile-lru: 只限于设置了expire 的部分; 优先删除最近最少使用(less recently used,LRU) 的 key.
+-   allkeys-random: 所有key通用;随机删除一部分 key。
+-   volatile-random: 只限于设置了expire的部分; 随机删除一部分 key。
+-   volatile-ttl: 只限于设置了expire 的部分;优先删除剩余时间(time to live,TTL)短的key。
+
+可以看到**volatile**针对于大部分设置了expire的key.如果没有设置expire那么这几这行为一致.
+
+
+
+
 
 ## redis缓存击穿和缓存雪崩
 
@@ -254,8 +328,6 @@ redis是队列循环加单线程模型,其利主要利用了IO复用(请求注�
 缓存击穿,缓存中没有但数据库中有的数据(缓存时间到期),同一时间并发数太高就会直接落到数据库,导致数据库崩溃,如下设计.即每隔一段时间刷新数据或设置数据永不过期.(访问存在的缓存失效了就直接访问数据)
 
 ![](https://img-blog.csdn.net/20180919143214879?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmd0aWFvNQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
 
 缓存雪崩,即缓存在同一时间大范围失效,通常是缓存时间一致导致的,解决方案就是设置不同的缓存时间.和限流熔断机制.
 
@@ -366,6 +438,8 @@ ValueOperations<String, User> operations = redisTemplate.opsForValue();
 operations.set("user", user);
 System.out.println(operations.get("user"));
 ```
+
+
 
 ## redis集群
 
@@ -565,7 +639,7 @@ redis不采用上面的数据分配模型而是采用的虚拟曹分配(slot)
 
 ### 分布式选举
 
-分布式选举是分布式系统里面的分布式协议(例如Paxos) 也是Sentinel和zookeeper在主要节点挂了之后的协调策略(重新选出master节点) 也就是因为此机制所以至少要有3个节点才能保证选举的成功或者失败
+分布式选举是分布式系统里面的分布式协议(例如Paxos)也是Sentinel和zookeeper在主要节点挂了之后的协调策略(重新选出master节点) 也就是因为此机制所以至少要有3个节点才能保证选举的成功或者失败
 
 redis-slave的选举算法:
 

@@ -313,6 +313,8 @@ public static Integer valueOf(int i) {
 
 `-128~127`的从缓存中取,也就是说调用该函数的所有合适的值都会被缓存.
 
+
+
 ### 类加载与初始化过程
 
 ---
@@ -346,31 +348,49 @@ public static Integer valueOf(int i) {
 
 #### 加载过程 java
 
+加载过程如下,我们主要研究的就是Loading,Linking,Initalization.
+
+![](https://img-blog.csdnimg.cn/20200524221637660.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_0,text_aHR0cDovL3d3dy5mbHlkZWFuLmNvbQ==,size_35,color_8F8F8F,t_70)
+
 和下文的`<clinit>`方法不同,该过程在`<clinit>`之前执行,总的来说加载过程就是把类的字节码加载到JVM生成常量池引用和在方法区堆内存分配相应的数据结构的过程,并不包括初始化
 
--   加载 Loading (此过程由ClassLoader完成)
 
-    从class中加载字节流 在方法区生成入口type=Class的对象
 
-    把字节码解析成方法区中的klass数据结构(元信息)
+##### 加载 Loading (此过程由ClassLoader完成)
 
--   连接 Linking
+从class中加载字节流 在方法区生成入口type=Class的对象
 
-    验证 准备 解析
+把字节码解析成方法区中的klass数据结构(元信息)
 
-    这个过程主要加载类的static变量完成默认值注入(只针对变量) 生成引用 
+另外值得一提的是,此过程的所有符号引用都来自**常量池**
 
-    ***对final static变量直接注入值***
+ClassLoader有用java实现的,也有用c++(jvm)实现的
 
-    -   验证 Verification 验证字节码的准确性,final是否被覆盖,函数签名
-    -   准备 Preparing 在**方法区**为static变量分配内存(注入默认值)
-    -   解析 Resolution 确定运行时**常量池**的引用
 
--   装载 Initialization
 
-    这个阶段会去真正的执行代码,依据代码的不同进行不同的执行,这个时候static成员变量的值才会被去注入,这个阶段执行的代码在下面也称为`<clinit>`和`<init>`表示类的初始化和对象的初始化
+##### 链接 Linking
 
-    
+链接是为了让类或者接口可以被java虚拟机执行，而将类或者接口并入虚拟机运行时状态的过程。
+
+这个阶段分为三个小阶段 验证 准备 解析
+
+-   验证 Verification 验证字节码的准确性,final是否被覆盖,函数签名
+-   准备 Preparing 在**方法区**为**static变量**注入默认值,***对final static变量直接注入值***
+-   解析 Resolution 确定运行时**常量池**的引用
+
+##### 装载 Initialization
+
+这个阶段会去真正的执行代码,依据代码的不同进行不同的执行,这个时候static成员变量的值才会被去注入,这个阶段执行的代码在下面也称为`<clinit>`和`<init>`表示类的初始化和对象的初始化,执行初始化的时机有以下几种
+
+-   执行需要引用类或者接口的java虚拟机指令(new,getstatic,putstatic,invokestatic)的时候
+-   初次调用java.lang.invoke.Methodhandle实例的时候
+-   调用类库中的某些反射方法的时候
+-   对类的某个子类进行初始化的时候
+-   被选定为java虚拟机启动时候的初始类的时候
+
+所以我们看到基本去访问static域的成员变量或者代码的时候都会触发装载.
+
+
 
 
 #### 双亲委派模型
@@ -1568,6 +1588,22 @@ public class JvmInfo {
 
 
 
+### 定位Full GC(JVM调优)
+
+定位Full GC问题要利用到jvm的控制指令以及了解JVM的知识.所有调优的基础都日志信息,没有相应的日志就无法确定故障点.
+
+-   登录到出问题的机器
+-   **jps -l** 查看进程
+-   **jstat -gcutil -h 20 pid 1000 20000** 查看GC统计信息 [jstat使用方法](https://blog.csdn.net/zhaozheng7758/article/details/8623549)
+-   **jmap -histo:live pid | head -10** 统计存活对象
+-   根据情况分析代码
+
+可以看到核心的命令就是jstat,jmap两个.
+
+
+
+
+
 ### JIT与其他优化
 
 java的编译在早期的时候是由`javac`完成的,内存分配的工作也基本上由传统的JVM完成.
@@ -1620,3 +1656,4 @@ TLAB(Thread Local Allocation Buffer)即栈上分配内存,默认是开启状态,
 ### 字节码
 
 -   未完待续
+

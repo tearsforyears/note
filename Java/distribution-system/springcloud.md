@@ -116,7 +116,7 @@ springboot+mongodb集群曾是微服务架构下最好的数据治理方案
 
 ## RPC
 
-RPC:**Remote Procedure Call** 远程调用框架 SpringCloud中的组件使用Restful通信充当SOA中RPC的职责
+RPC:**Remote Procedure Call**远程调用框架 SpringCloud中的组件使用Restful通信充当SOA中RPC的职责
 
 ![RPC](https://upload-images.jianshu.io/upload_images/6943526-1ce8749921dc6280)
 

@@ -417,6 +417,25 @@ public void test() throws InterruptedException {
 
 建立索引意味着可以通过数据结构去找到相应的节点
 
+### 索引和存储引擎
+
+存储引擎及代表索引
+
+-   聚簇索引InnoDB
+-   二级索引MyISAM
+-   Hash索引Memory (只有Memory存储引擎支持hash索引,hash用于精确索引)
+
+![](https://images2015.cnblogs.com/blog/851461/201703/851461-20170306202857781-1607368004.png)
+
+其中MyISAM和InnoDB用的多是B+树,是为磁盘上文件系统设计的索引结构,而Memory是内存型的数据库Hash索引则是用的hash方法查找具体的数据,由于是非线性结构所以不支持排序等.
+
+一些不常见的索引
+
+-   R-Tree空间索引 MyISAM对一些地理数据进行索引支持
+-   Full-Text全文索引 MyISAM支持的另一个索引,顾名思义是进行全文索引用的,即查询文本中的关键词
+
+
+
 
 
 ## 索引覆盖(Using index)
@@ -435,11 +454,9 @@ public void test() throws InterruptedException {
 
 
 
-## InnoDB MyISAM B+树
+## 数据库索引原理
 
 ---
-
-B+树数据结构特点:高度低 索引次数小 相比于B树其节点数据全在叶子节点上 使得中间索引能够放得下更多 mysql默认是分配16k 树的高度在不超过3的前提下 就能轻松索引千万级数据了
 
 InnoDB: 其文件为聚集索引,及叶子节点的索引存储的是数据本身而非数据的地址
 
@@ -447,13 +464,291 @@ MyISAM: 其文件为非聚集索引,叶子节点存储的是数据的地址
 
 B+树支持叶子节点的前驱后继指针非常良好的支持范围查找(where id>20) 减少磁盘I/O 
 
+
+
+下面要考虑的问题主要分为两个层次
+
+-   多个索引条件的查询索引
+-   Mysql的实际存储逻辑
+
+
+
+### 详解B+树
+
+B+树是由BST,AVLTree和B树演化而来的,BST和AVL是内存中基本的索引树,这里就不在赘述了.我们介绍B树,其是一种专门为磁盘I/O设计的树结构,其有一非常优秀的特点就是,树的高度不高,也就是说其在索引磁盘I/O的次数会远比AVL小,且保持了BST的向下索引特性.
+
+#### B树(Balance Tree)
+
+![](http://www.liuzk.com/wp-content/uploads/2019/11/5.jpg)
+
+可以看到B树只是多路的AVL,其在mysql中对应的是准确索引.其中的增加删除节点结构我们不作深究.我们作为研究B+树的一个前置知识.
+
+#### B+树
+
+B+树是对B树的一种改进
+
+![](http://www.liuzk.com/wp-content/uploads/2019/11/6.jpg)
+
+-   B+树的非叶子节点是不存储数据的 (InnoDB默认是16k) 
+    -   这么做的好处是,页的大小固定键值数就增加了
+-   B+数的叶子节点按照顺序存储数据
+    -   使得范围查询,排序查找,分组查询,以及去重变得简单
+    -   叶子节点通过单向链表连接,页通过双向列表连接
+
+### 聚簇索引和非聚簇索引
+
+从上面B树,B+树我们基本知道了索引的实现方式,而B+树主要实现的就是聚簇索引和非聚簇索引(辅助索引/二级索引),其是一种**数据存储的方式**,而非某一种具体的索引.
+
+-   Innodb中的主键索引是一种聚簇索引,非聚簇索引都是辅助索引,像复合索引,前缀索引,唯一索引.
+-   Innodb使用的是聚簇索引,MyISam使用的是非聚簇索引
+-   Innodb通过主键聚集数据,如果没有定义主键,innodb会选择非空的唯一索引代替.如果没有这样的索引,innodb会隐式的定义一个主键(6个字节,长整形)来作为聚簇索引.
+
+InnoDB的非聚簇索引在聚簇索引的前提下创建
+
+![](https://img2018.cnblogs.com/i-beta/1464190/201911/1464190-20191106145143172-1760681728.png)
+
+![](https://img2018.cnblogs.com/i-beta/1464190/201911/1464190-20191106151527647-152458631.png)
+
+
+
+其数据不在如同主键索引那般保存整个行的值,而是索引的key值和相应行数据的聚簇索引键.由上图的辅助索引知,其是单独建立的,和主键索引基本是独立的,所以一张表中可能有多个辅助索引.基于以上的索引实现我们来谈下优化问题
+
+-   不宜选用过长字段作为主索引
+-   使用单调递增的字段
+
+我们来描述两种概念
+
+-   覆盖索引(Cover Index/Using Index)
+-   回表查询
+
+回表查询指的是从上面索引中找到了相应的字段(key值和表中row的id)如果只是为了查询key值就没必要按照主索引在找一遍,如上红线的过程,这个过程就叫**回表**,是属于辅助索引特有的状态
+
+所谓的覆盖索引,即是只利用了辅助索引没有出现回表查询的即是少了一轮I/O操作,这个称之为索引覆盖.
+
+那其中一个优化点已经可以出来了,就是**防止回表查询**,即所谓的**建立联合索引**.
+
+### 索引过程
+
+#### 聚集索引索引过程
+
+![](http://www.liuzk.com/wp-content/uploads/2019/11/7.jpg)
+
+```sql
+select * from user where id>=18 and id <40
+```
+
+-   跟节点一般是常驻内存的,所以首先读取内存
+-   然后找到`id>=18 and id<40`的首范围18,即p2指针,以及p1指针定位到页8
+-   然后这里是个顺序存储的链表,按照二分法去找到18,因为各个节点是顺序连接的,那么就按照顺序查找到下一页,加入内存在找,知道找到id<40
+
+#### 非聚集索引索引过程
+
+![](http://www.liuzk.com/wp-content/uploads/2019/11/9-1024x626.jpg)
+
+`x-y x表示非聚簇的key,y表示主键的key`
+
+![](http://www.liuzk.com/wp-content/uploads/2019/11/921.jpg)
+
+那我们就看到了这个回表查询的过程
+
+
+
+### 联合索引的最左匹配原则
+
+最左匹配原则就是指在**联合索引**中,如果你的SQL语句中用到了联合索引中的最左边的索引,那么这条SQL语句就可以利用这个联合索引去进行匹配.
+
+```sql
+select * from t where a=1 and b=1 and c =1;     
+# 这样可以利用到定义的索引（a,b,c）,用上a,b,c
+select * from t where a=1 and b=1;     
+# 这样可以利用到定义的索引（a,b,c）,用上a,b
+select * from t where b=1 and a=1;     
+# 这样可以利用到定义的索引（a,b,c）,用上a,c（mysql有查询优化器）
+select * from t where a=1;     
+# 这样也可以利用到定义的索引（a,b,c）,用上a
+
+select * from t where b=1 and c=1; # 因为没用(a,b,c)中的a所以匹配不上不走索引     
+# 这样不可以利用到定义的索引（a,b,c）
+
+select * from t where a=1 and c=1;     
+# 这样可以利用到定义的索引（a,b,c），但只用上a索引，b,c索引用不到
+```
+
+通过上面的sql,我们看到了所谓的最左匹配是指联合索引中最左侧的key需要匹配上
+
+**值得注意的是，当遇到范围查询(>、<、between、like)就会停止匹配**
+
+```sql
+select * from t where a=1 and b>1 and c =1; 
+# 这样a,b可以用到（a,b,c），c索引用不到
+select * from t where a=1 and b >1 and c=1;  
+# 如果是建立(a,c,b)联合索引，则a,b,c都可以使用索引
+```
+
+-   以index （a,b,c）为例建立这样的索引相当于建立了索引a、ab、abc三个索引。(因为查询时候只有左侧是a,ab或者abc三个条件的时候才会去走上面的联合索引)一个索引顶三个索引当然是好事，毕竟每多一个索引，都会增加写操作的开销和磁盘空间的开销。
+
+### 最左匹配原理
+
+首先我们要知道联合索引是怎么构建B+树的,构建B+树只能通过一个键来进行构建,所以数据库会按照联合索引的最左key来进行B+树的构建.
+
+![](https://img2020.cnblogs.com/blog/867078/202007/867078-20200703134853993-1354025866.png)
+
+最后一部分表代表(a,b,c)三个索引的位置信息.可以看到的是,当a相同的时候,b是有序的,但c是无序的,当a和b都相同的时候c是有序的,这就是之前说的原理,
+
+即以index （a,b,c）为例建立这样的索引相当于建立了索引a、ab、abc三个索引。
+
+
+
 ---
 
-## 优化实践(建立索引)
+## 优化
 
 多个单列索引:多个单列字段加上索引 mysql在分析的时候只取最有用的一个 而这种时候 根据where字句的情况完全可以用来判别 是应该采用联合索引还是单个索引
 
 联合索引:多个字段有先后顺序的索引 但本质相当于一个索引 其本质内容就是 按照key1排序然后在按照key2排序然后在按照key3以此类推
+
+一般而言优化主要
+
+分为几个方面
+
+-   建立索引
+-   建立联合索引
+
+关于上面的建立优化我们通过索引查询原理基本已经得知,下面介绍一些选择的问题
+
+-   创建单列索引还是多列索引
+    -   如果查询语句中的where、order by、group 涉及多个字段，一般需要创建多列索引
+-   多列索引的顺序如何选择
+    -   一般情况下，把选择性高的字段放在前面
+-   尽量避免使用范围查询
+-   尽量避免查询不需要的数据
+-   查询的数据类型要正确
+
+
+
+### 回表优化
+
+考虑如下sql,其中tid是主索引(主键字段)
+
+```sql
+select tid,return_date from t1 order by inventory_id limit 50000,10;
+```
+
+```shell
+explain select tid,return_date from t1 order by inventory_id limit 50000,10*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: t1
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 1023675
+        
+1 row in set (0.00 sec)
+```
+
+全表扫描加上order by性能损耗严重.且没有任何索引,如果我们尝试给inventory_id加上索引为了查找return_date就要进行回表操作,会非常的慢.因此我们考虑不用回表操作的联合索引
+
+```sql
+alter table t1 add index liu(inventory_id,return_date);
+```
+
+```shell
+explain select tid,return_date from t1 order by inventory_id limit 50000,10\G
+*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: t1
+         type: index
+possible_keys: NULL
+          key: liu
+      key_len: 9
+          ref: NULL
+         rows: 50010
+　　　　Extra: Using index
+1 row in set (0.00 sec)
+```
+
+### 排序Order by优化
+
+通过EXPLAIN我们可以看到Order by的字句有两种排序
+
+-   Using Index
+-   Using filesort
+
+Using index不必多说,Using filesort是指利用额外的空间(磁盘I/O)进行,我们要做的就是按照聚合索引的最左匹配原则进行,另外在后续的版本中优化了`order by ... limit n,m`使用的本质是堆排序.
+
+
+
+### Like优化
+
+`like %a%`这样形式的字句是不走索引以及产生大量性能消耗,而对于`like %a`或者`like a%`这两种形式的字句explain发现其是使用索引的.
+
+对`table.field like '%AAA%' `我们可以用locate函数改写成`locate ('AAA' , table.field) > 0`的形式,locate函数相当于返回`'AAA'`在`table.field`中出现的第一个位置,如果未出现则返回0.
+
+
+
+### 子查询和IN优化
+
+从前面我们知道IN是用不到索引的,子查询的时候又大量使用到IN
+
+```mysql
+create table test_table2
+(
+    id int auto_increment primary key,
+    pay_id int, # 有索引
+    pay_time datetime,
+    other_col varchar(100)
+)
+```
+
+当有如下sql查询,查询时间段在之间支付记录大于一条的信息
+
+```sql
+select * from test_table2 force index(idx_pay_id) 
+# 如果mysql没使用索引的话force index强制使用索引
+where pay_id in (
+　　select pay_id from test_table2 
+　　where pay_time>="2016-06-01 00:00:00" 
+　　　　AND pay_time<="2017-07-03 12:59:59" 
+　　group by pay_id 
+　　having count(pay_id) > 1
+);
+```
+
+可以改成如下写法,利用join对同张表进行连接,其效率比上面要快
+
+```sql
+select t1.* from test_table2 t1, 
+(
+     select pay_id 
+     from test_table2 
+      WHERE pay_time>="2016-07-01 00:00:00" 
+     AND pay_time<="2017-07-03 12:59:59" 
+     group by pay_id 
+     having count(pay_id) > 1
+) t2 
+where t1.pay_id=t2.pay_id
+```
+
+我们可以看到,哪怕是join只要使用上了索引,其连接速度就会加快.可以得到以下优化的推论
+
+```note
+在范围判断时，尽量不要使用not in和not exists，使用 left join on xxx is null代替。
+```
+
+所以对于mysql的in索引我们要谨慎使用
+
+
+
+
+
+
+
+
+
 
 ## 索引类型
 

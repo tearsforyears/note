@@ -299,6 +299,22 @@ master的处理过程如下
 -   Leader收到写操作时,生成zxid然后发给所有follower节点.
 -   follower会把提议的事务写到本地磁盘,成功后返回Leader,Leader收到半数以上反馈在对所有Follower确认,让所有的Follower进行提交,Follower收到事务后进行提交,整个过程就就完成了.
 
+### 选主过程
+
+![](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL21tYml6X3BuZy85VFBuNjZIVDkzMm9pY0tSNGdzaWNrcEZwMEN6dHpFVEtVZUlCWVpyaWFlM3hkZmQydEg3M1VoN0tSZXVNcVRIc3dGakxsNlR5QmZnZTZROURTRGhheExvZy82NDA?x-oss-process=image/format,png)
+
+三台zookeeper节点如上.
+
+2台ZooKeeper进行投票选举的时候，第一次都是推荐自己为Leader，投票包含的信息是：服务器本身的myid和ZXID。比如第一台投自己的话，它会发送给第二台机器的投票是(0,0)，第一个0代表的是机器的myid，第二个0代表是的ZXID.故两台机器收到的投票情况如下
+
+-   第一台(1,0)
+-   第二台(0,0)
+
+两台服务器在接收到投票后，将别人的票和自己的投票进行PK。PK的是规则是：
+
+-   优先对比ZXID,ZXID大的优先作为Leader(ZXID大的表示数据多)
+-   如果ZXID一样的话,那么就比较myid,让myid大的作为Leader服务器。
+
 
 
 ### 实例
