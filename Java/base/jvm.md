@@ -739,7 +739,11 @@ gc指的是garage collection,即垃圾回收.
 
 ![](https://img-blog.csdnimg.cn/20190305150132242.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM3NTk4MDEx,size_16,color_FFFFFF,t_70)
 
+#### 垃圾分类和垃圾处理示意
 
+![](https://img2018.cnblogs.com/blog/926003/201909/926003-20190902230035745-1201448392.png)
+
+![](https://img2018.cnblogs.com/blog/926003/201909/926003-20190902230111437-1106854979.png)
 
 #### 内存结构基于GC的理解
 
@@ -772,6 +776,8 @@ gc指的是garage collection,即垃圾回收.
 ##### 软引用:obj=null;
 
 拥有弱引用的对象都活不过下一次GC之前,也就是说**无论内存溢出与否下一次都会被回收**.
+
+除了上面这种常规的使用方式之外,还可以用SoftReference,WeakReference,PhantomReference三种方式去获取本身的引用.
 
 一般我们会配合ReferenceQueue去使用,其作用就是回收的时候这个对象加入软引用的队列,如果还没发生GC可以重新获得,如果发生了GC获得null
 
@@ -874,6 +880,17 @@ JDK1.7到1.8发生的改变主要是涉及到**方法区(永久代)**的改变,�
 
 下面的所有回收算法都要依赖根搜索算法,顺带一提GC Root指的是从栈上引用的变量开始往下递归找
 
+##### GC ROOT
+
+可作为GC Root的对象包括4种
+
+- 虚拟机栈(本地变量表)中被引用的对象
+- 方法区中静态属性的对象
+- 方法区中常量引用的对象
+- 本地方法栈中JNI引用的对象
+
+
+
 ##### 回收算法
 
 -   Copying算法 需要额外空间,高效 **新生代eden**
@@ -940,13 +957,13 @@ Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对
 
 -   统计得到的Minor GC晋升到老年代的平均大小大于老年代的剩余空间(JVM觉得老年代空间要不够用了)
 
-    
+![](https://img2018.cnblogs.com/blog/926003/201909/926003-20190902230125562-2085470088.png)  
 
 #### 空间分配担保
 
 在进行`Minor GC`时jvm会检查老年代的可用空间是否大于新生代的所有空间,如果是的话可以保证`Minor GC`是安全的,如果不安全的话参照`HandlePromotionFailire`进行进一步处理,
 
-如果允许继续检查老年代最大可用可用的连续空间是否大于之前晋升的平均大小,如果是就尝试进行一次`Minor GC`(如果新生代出现了大对象可能会失败,失败就触发`Full GC`)否则就进行`Full GC`
+如果允许继续检查老年代最大可用可用的连续空间是否大于之前晋升的平均大小,如果是就尝试进行一次`Minor GC`(如果新生代出现了大对象可能会失败,失败就触发`Full GC`)否则就进行`Full GC`,这个所谓的大对象在虚拟机中的参数可以调
 
 这是一种动态的概率保护手段
 
@@ -1643,13 +1660,15 @@ public static StringBuffer craeteStringBuffer(String s1, String s2) {
 
 
 
-#### TLAB
+#### TLAB栈上内存分配
 
 TLAB(Thread Local Allocation Buffer)即栈上分配内存,默认是开启状态,可以用`-XX:+UseTLAB`即每个线程都向堆请求内存的话就需要大量的调度开销,所以就向JVM申请一段连续的内存(在堆空间上)称为TLAB去给这些对象分配内存.
 
 同时TLAB还解决了指针碰撞问题,即两个线程并发new的时候指针的修改顺序的安全性.所以虚拟机在线程栈初始化的时候会分配一块内存(这块内存位于Eden区),这块内存的大小很小仅有Eden区的1%,专门用于分配局部变量的内存.
 
 ![](https://img-blog.csdnimg.cn/20190809191201695.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2p1XzM2MjIwNDgwMQ==,size_16,color_FFFFFF,t_70)
+
+
 
 
 

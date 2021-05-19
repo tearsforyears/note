@@ -827,6 +827,86 @@ class RefSortingSink<T> extends AbstractRefSortingSink<T> {
 
 
 
+## springweb的体系
+
+在实现自己的web体系之前我们不妨看看springweb是怎么实现的,其中有一些比较小的技术点,这里主要说明的是springweb,servlet,传统通信之间的区别
+
+### cookie和session
+
+什么是cookie和session在此不必赘述,可你真的了解这两种技术的本质吗?(阿里巴巴lazada曾经在这个问题上深入到实现,这里我们说明下其技术原理)
+
+#### cookie存储的数据结构
+
+- cookie本质上是浏览器维护的一个sqllite的**嵌入式数据库**(Chrome,Firefox)
+- 在如今复杂的网络环境下通常要我们自己实现cookie机制
+
+所以我们为什么会说是cookie一般以磁盘I/O的文件形式存在浏览器端,以set-cookie字段(response报文)和cookie(request报文)的形式进行通信传递,往高处看其本质上是一种单次无连接的服务形式.
+
+```sql
+CREATE TABLE cookies (
+	creation_utc INTEGER NOT NULL,
+	host_key TEXT NOT NULL,
+	name TEXT NOT NULL,
+	value TEXT NOT NULL,
+	path TEXT NOT NULL,
+	expires_utc INTEGER NOT NULL,
+	is_secure INTEGER NOT NULL,
+	is_httponly INTEGER NOT NULL,
+	last_access_utc INTEGER NOT NULL,
+	has_expires INTEGER NOT NULL DEFAULT 1,
+	is_persistent INTEGER NOT NULL DEFAULT 1,
+	priority INTEGER NOT NULL DEFAULT 1,
+	encrypted_value BLOB DEFAULT '',
+	samesite INTEGER NOT NULL DEFAULT - 1,
+	source_scheme INTEGER NOT NULL DEFAULT 0,
+	source_port INTEGER NOT NULL DEFAULT - 1,
+	is_same_party INTEGER NOT NULL DEFAULT 0,
+UNIQUE ( host_key, name, path ) 
+);
+```
+
+我们对一chrome的数据库文件进行读取,看到其建表语句
+
+我们重点注意下host_key字段,以及source_port,这两个字段可以帮我们区分不同的cookie,对host_key字段进行,其内部并无主键,即可以重复.我们从下面可以看到domain标识了哪些域名可以接受cookie(进行了部分保留)
+
+```note
+.blog.51cto.com
+.blog.itblood.com
+.wenku.baidu.com
+.wiki.mbalib.com
+.worldfirst.com.cn
+.woshipm.com
+.www.baidu.com
+.zhidao.baidu.com
+47.103.216.138
+blog.51cto.com
+blog.bccn.net
+blog.itblood.com
+gitee.com
+github.com
+jingyan.baidu.com
+nacos.io
+passport.baidu.com
+passport.csdn.net
+seata.io
+www.baidu.com
+```
+
+从上面我们可以看出来,其至少是要通过二级域名的形式来保存上面的host_key
+
+#### 阿里如何实现天猫和淘宝页面跳转只需要登录一次的?
+
+这个问题的答案就是利用了cookie技术在本地数据库存储的host_key
+
+-   当发起ajax请求的时候,cookie的domain指向`.tanx.com`和`.taobao.com`通过这两个就可以访问不同的域
+
+由于cookie的这些特性,现在我们使用的是localStorage和sessionStorage
+
+- localStorage保存数据会一直保存没有过期时间，不会随浏览器发送给服务器。大小5M或更大
+- sessionStorage仅当前页面有效一旦关闭就会被释放。也不会随浏览器发送给服务器。大小5M或更大
+
+
+
 ## socket
 
 ---
