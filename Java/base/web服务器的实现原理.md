@@ -109,6 +109,8 @@ tcp建立连接之后就可以稳定传输数据了,而建立连接之后就要�
 
 ![](https://img2018.cnblogs.com/blog/1615025/201905/1615025-20190518144523766-28426128.png)
 
+我们这里聊一下为什么要等2MSL
+
 
 
 #### TCP拥塞控制
@@ -833,7 +835,12 @@ socket是java和其他线程等,网络通信的基础,从TCP的传输层出发,�
 
 ![](https://img-blog.csdnimg.cn/20190718154556909.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3Bhc2hhbmh1NjQwMg==,size_16,color_FFFFFF,t_70)
 
-如上为socket客户端和服务端的构建
+如上为socket客户端和服务端的构建,其中我们需要注意的是accept函数的语义,是阻塞到三次握手完成后.accept的本质是从内核中取出完成三次握手socket队列中的一个.
+
+`accept只是把内核中的“已完成连接队列（FIFO with established state)”取出， 
+另一个队列是“未完成连接队列( FIFO with syn_rcvd state)”，并且这两个队列总和的最大值是backlog.`
+
+
 
 ### socket
 

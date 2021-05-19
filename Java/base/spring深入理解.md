@@ -947,3 +947,23 @@ public class TransactionConfig implements TransactionManagementConfigurer{
 
 
 
+## 源码
+
+### 三级缓存问题
+
+-   singletonObjects	一级缓存，存放完整的 单例Bean实例。
+
+-   earlySingletonObjects	二级缓存，存放提前暴露的Bean，Bean 是不完整的，可能未完成populateBean属性注入和执行 initializeBean初始化方法。
+
+-   singletonFactories	三级缓存，存放的是 Bean的ObjectFactory，主要是生产 Bean实例并且进行代理，随后将结果存放到二级缓存中。
+
+    ---
+
+-   首先尝试从singletonObjects单例bean实例的缓存中获取给定beanName的实例singletonObject；
+-   如果singletonObject为null，并且正在创建该beanName对应的单例bean，即singletonsCurrentlyInCreation缓存中包含该beanName，我们知道，在调用createBean方法前后，就会将beanName加入、移除该缓存：
+    -   从早期的单例对象缓存earlySingletonObjects中获取单例对象赋值给singletonObject，这里的对象可能仅仅是被初始化了，还未进行属性填充，即早期实例，也可能是一个代理对象。
+    -   如果singletonObject还是为null，并且允许创建早期引用，即第二个参数allowEarlyReference是true：
+        -   从单例工厂缓存singletonFactories中尝试指定获取beanName的单例工厂singletonFactory，通过单例工厂创建一个单例对象。
+        -   将该对象存入早期单例对象缓存earlySingletonObjects中，并将该beanName对应的单例工厂从earlySingletonObjects中移除，这个单例工厂已经没用了。
+-   最后返回singletonObject。
+
