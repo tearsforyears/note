@@ -92,9 +92,9 @@ heap是对象的存放区域也是管理最麻烦的一个区域,具体内容会
 
 关于C++和java多态实现方法
 
->   在C++中通过虚函数表的方式实现多态，每个包含虚函数的类都具有一个**虚函数表（virtual table）**，在这个类对象的地址空间的最靠前的位置存有指向虚函数表的指针。在虚函数表中，按照声明顺序依次排列所有的虚函数。由于C++在运行时并不维护类型信息，所以在**编译时直接在子类的虚函数表中将被子类重写的方法替换掉**。
+>   在C++中通过虚函数表的方式实现多态,每个包含虚函数的类都具有一个**虚函数表（virtual table）**,在这个类对象的地址空间的最靠前的位置存有指向虚函数表的指针.在虚函数表中,按照声明顺序依次排列所有的虚函数.由于C++在运行时并不维护类型信息,所以在**编译时直接在子类的虚函数表中将被子类重写的方法替换掉**.
 >
->   在Java中，在运行时会维持类型信息以及类的继承体系。每一个类会在**方法区中对应一个数据结构用于存放类的信息**，可以通过Class对象访问这个数据结构。其中，类型信息具有superclass属性指示了其超类，以及这个类对应的方法表（其中只包含这个类定义的方法，不包括从超类继承来的）。而每一个在堆上创建的对象，都具有一个指向方法区类型信息数据结构的指针，通过这个指针可以确定对象的类型。
+>   在Java中,在运行时会维持类型信息以及类的继承体系.每一个类会在**方法区中对应一个数据结构用于存放类的信息**,可以通过Class对象访问这个数据结构.其中,类型信息具有superclass属性指示了其超类,以及这个类对应的方法表（其中只包含这个类定义的方法,不包括从超类继承来的）.而每一个在堆上创建的对象,都具有一个指向方法区类型信息数据结构的指针,通过这个指针可以确定对象的类型.
 
 c++的类在java中的职责如下
 
@@ -344,7 +344,7 @@ public static Integer valueOf(int i) {
 
     常量池有字面量 符号引用和 运行时常量池
 
-    通过javah命令编译之后，用javap -v 命令查看编译后的文件
+    通过javah命令编译之后,用javap -v 命令查看编译后的文件
 
 #### 加载过程 java
 
@@ -370,7 +370,7 @@ ClassLoader有用java实现的,也有用c++(jvm)实现的
 
 ##### 链接 Linking
 
-链接是为了让类或者接口可以被java虚拟机执行，而将类或者接口并入虚拟机运行时状态的过程。
+链接是为了让类或者接口可以被java虚拟机执行,而将类或者接口并入虚拟机运行时状态的过程.
 
 这个阶段分为三个小阶段 验证 准备 解析
 
@@ -939,11 +939,10 @@ JDK1.7到1.8发生的改变主要是涉及到**方法区(永久代)**的改变,�
 
 Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对年轻代也是针对老年代的,所以我们可以知道Major GC和Full GC实际上是两个完全不同的东西
 
+-   Major GC: 清理老年代
+-   Full GC: 清理整个堆内存，包括年轻代和老年代
 
-
-#### 触发Full gc的情况
-
--   Minor GC 年轻代满的时候
+但是更多情况下,许多**Minor GC会触发Major GC**,所以实际情况两者分离是不可能的.这就使得我们关注重点变成,GC是否能并发处理这些GC.
 
 **Full GC**的触发条件比较多
 
@@ -985,6 +984,18 @@ Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对
 
 #### 垃圾回收器
 
+垃圾回收器可以看做是上面一些GC的具体实现,根据对不同的区域,GC回收器一般可以用下图表示
+
+![](https://img2018.cnblogs.com/blog/1326194/201810/1326194-20181017145352803-1499680295.png)
+
+如果垃圾回收器存在连线,说明其可以搭配使用.我们这里说一些主要的应用场景
+
+-   ParNew是被用于运行在Server环境下首选的新生代GC,其可以配合CMS一起工作
+-   CMS因为是并行进行回收,不会暂停,所以经常被用在服务端用于提供服务
+-   G1完全并行,专门面向服务端应用
+
+
+
 ##### 一些只需要了解的垃圾回收器
 
 -   Serial 串行垃圾回收,年代久远
@@ -995,13 +1006,21 @@ Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对
 
 
 
-##### ParallelGC
+##### ParallelGC(Server默认回收器)
 
 ```shell
 -XX:+UseParallelGC # jdk的默认参数
 ```
 
 这个其实是上面垃圾回收的组合,新生代使用`Parallel Scaveng`老年代使用`Parallel Old(mark-sweep)`进行垃圾回收,另需说明此处的`Parallel Old`是采用了`Serial Old`去进行设计的所以在很多资料中也能看到`Serial Old`的说法.**回收所有区域的垃圾**
+
+一般来讲配合CMS使用
+
+```shell
+-XX:+UseConcMarkSweepGC -XX:+UseParNewGC
+```
+
+
 
 
 
@@ -1016,6 +1035,35 @@ Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对
 
 其特别吃cpu的核心数,且会极大的影响系统性能,其无法处理浮动垃圾(因为要和用户线程一起并发,所以临时产生的垃圾就无法去清楚了),可能会触发Full GC,且其会产生大量的内存碎片
 
+我们来详细说明其过程,CMS是为了解决Stop-the-world停顿时间过长而设计的一款垃圾回收器.其工作过程如图
+
+![](https://img2018.cnblogs.com/blog/1326194/201810/1326194-20181017221500926-2071899824.png)
+
+-   初始标记阶段,标记GC ROOT会存在stop-the-world现象
+-   并发标记阶段,对GC ROOT进行跟踪,标记所有可达对象,此过程中就是CMS主要的思想体现了,没有stop-the-world,但因为并发执行的其他线程可能对GC ROOT产生一些影响.这些需要在后面的阶段进行处理.
+-   并发预清理阶段,重新标记修正被线程修改的部分对象的可达性,这个时候也是会发生stop-the-world,我们主要看老年代是如何处理的,这里老年代使用了一个`CARD_TABLE`,其把老年代划分成512byte的块,如果发生了改变就变成了`dirty_card`,这个阶段CMS就会重新扫描这些块把其中某些对象标记为可达.
+-   重新标记阶段,重新扫描,扫描目标的新生代对象+GC ROOT+dirty_card,这里会存在stop-the-world阶段
+-   并发清除,对标记的对象进行垃圾回收
+
+上面我们看到标记阶段的stop-the-world会存在`初始标记,并发清理,重新标记`而
+
+-   并发标记
+-   并发清除
+
+这两个阶段是会并发执行的,可以看到在这两个阶段都会产生一些问题都需要解决,并发清除中产生的一些新垃圾无法清除(称为浮动垃圾)
+
+CMS的一些缺点
+
+-   无法百分百清除所有垃圾
+-   对于CPU资源比较敏感
+-   无法处理浮动垃圾,可能出现Concurrent Model Failure失败而导致另一次Full GC的产生
+-   CMS不对永久代进行垃圾回收
+
+CMS的两个触发条件
+
+-   阈值检查机制:由于并发清除过程会产生浮动垃圾.所以老年代的使用率没有办法达到100%.只能到达某一个阈值以后（jdk1.8默认值92%,1.6之后是92%,1.5默认是68%）,或者通过CMSInitiatingOccupancyFraction和UseCMSInitiatingOccupancyOnly 两个参数来调节;过小会造成GC频繁；过大,导致并发模式失败.
+-   动态检查机制:JVM会根据最近的回收历史,估算下一次老年代被耗尽的时间,快到这个时间了就启动一个并发周期. 可以用UseCMSInitiatingOccupancyOnly来将这个特性关闭.
+
 
 
 ##### G1(garbage first)
@@ -1024,13 +1072,60 @@ Minor GC是回收年轻代的,Major GC是回收老年代的,**Full GC**是针对
 -XX:+UseG1GC # 启用该垃圾回收器
 ```
 
-JDK1.7以后前沿的垃圾回收器,服务器上常使用此垃圾回收器,其弱化了**分代**的概念,强化了**分区**的概念,且优先考虑从垃圾多的区域(存活数量少)开始回收,其用到的算法为`mark-sweep`和`copying`的算法,**回收所有区域的垃圾**
-
-g1会给内存分出大小相同的区域(region)
+JDK1.7以后前沿的垃圾回收器,服务器上常使用此垃圾回收器,其弱化了**分代**的概念,强化了**分区**的概念,且优先考虑从垃圾多的区域(存活数量少)开始回收,其用到的算法为`mark-sweep`和`copying`的算法,**回收所有区域的垃圾**,g1会给内存分出大小相同的区域(region),这些区域可能是新生代可能是老年代,也可能是他们联系在一起的区域.称新生代为Y,老年代为O.G1会第一时间处理垃圾最多的块,且g1是可以预测停顿的.
 
 g1通过并发(并行)标记阶段查找老年代存活对象,通过并行`copying`存活对象
 
 g1将一组或多组区域中存活对象以增量并行的方式复制到不同区域进行压缩,从而减少堆碎片,目标是尽可能多回收堆空间 **垃圾优先**,且尽可能不超出暂停目标以达到低延迟的目的.
+
+和CMS相比,G1的优势
+
+-   空间压缩更好
+-   避免内碎片
+-   因为把所有区域都是用了,内存使用更灵活,CMS是根据垃圾分代来的
+-   G1可以设置预期stop-world的时间(Pause Time),控制垃圾回收时间
+-   回收同时内存合并,CMS会在标记之后整理内存
+
+我们来看其具体做法
+
+![](https://awps-assets.meituan.net/mit-x/blog-images-bundle-2016/8ca16868.png)
+
+G1默认把堆内存分为1024个区域,每个regin大小都是固定的,可以通过`-XX:G1HeapRegionSize`调整大小,上图的H表示的是一些大对象.大对象再分配内存前,检查是否超过initiating heap occupancy percent(启动堆占用比例)和the marking threshold(标记阈值),如果超,会启动global concurrent marking,为的是提早回收,防止evacuation failures 和full GC
+
+如果一个系统中存在大量的大对象,建议增大regin的值来减少垃圾回收的影响.因为其是并发标记的所以对于一个对象其有三种状态(三色标记算法)
+
+-   白色,对象没有标记到,标记阶段结束后,会当做垃圾回收.
+-   灰色,对象被标记了,但是它的field还没有标记或还没有标记完.
+-   黑色,对象被标记了,且它的所有field也被标记完了.
+
+在并发标记的情况下,有两个线程来进行垃圾回收Mutator(变换器/增变因子)和Garbage Collector.两个线程的职责也相对明确,Mutator是用来对并发中增加对象进行处理,而Garbage Collector则是进行垃圾回收
+
+-   在并发标记阶段,如果该白对象是new出来的,并没有灰对象持有.Region中有两个top-at-mark-start(TAMS)指针,分别是prevTAMS和nextTAMS.在TAMS以上的对象是新分配的,这是一种隐式标记,通过这种的方式找到了再GC过程中新分配的对象,并认为是活对象
+-   Mutator删除了所有从灰对象到该白对象的直接或者间接引用
+    如果灰对象到白对象的直接引用或间接引用被替换或者删除了,那白对象就会被**漏标**.G1给出了利用write barrier将就引用记录下来,以防止被清除)对象引用被替换是就会发生write barrier).
+-   因为上面的算法,白对象有可能是要被回收的,那就会产生浮动垃圾(Float Garbage)
+
+停顿预测模型(Pause Prediction Model)
+
+G1使用暂停预测模型来满足用户定义的暂停时间目标,并根据指定的暂停时间目标选择要收集的区域数量.
+G1 是一个相应时间优先的GC算法,它与CMS最大的不同是:用户可以设定整个GC过程的期望停顿时间.参数`-XX:XX:MaxGCPauseMillis`指定一个G1收集过程目标期望停顿时间,默认值200ms.G1根据整个模型统计计算出的历史数据来预测本次收集需要Region数量,从而满足用户设定 的目标停顿时间.停顿预测模型是以衰减标准偏差为理论基础实现的.
+
+**工作流程**
+
+![](https://img2018.cnblogs.com/blog/1326194/201810/1326194-20181017225802481-709835773.png)
+
+-   初始标记:标记GC ROOT,然后修改TAMS,这个阶段需要线程停顿,消耗时间很短.
+-   并发标记:从GC ROOT中找存活对象(与用户线程并发执行)
+-   重新标记:修正部分标记,其记录用的数据结构叫RSet
+-   筛选回收:根据Region的回收成本进行排序,根据用户期望的GC时间来进行回收
+-   Evacuation对象拷贝:该阶段全暂停,用来根据上面的筛选结果进行回收,把Region中存活的对象拷贝到另外的Region上
+
+对于G1的调优
+
+-   `-XX:MaxGCPauseMillis`设置GC时间,默认是200ms,如果设置太短,垃圾消费速度跟不上生产速度就会退成Full GC.
+-   `Evacuation Failure`和CMS中的晋升失败类似,如果垃圾太多就有可能发生一个,会触发Full GC.
+
+
 
 
 
@@ -1114,23 +1209,23 @@ jstat -gc 各个字段的意思
 
 ![](https://img2018.cnblogs.com/blog/978388/201906/978388-20190626150321415-587548863.png)
 
-- S0C：第一个幸存区的大小
-- S1C：第二个幸存区的大小
-- S0U：第一个幸存区的使用大小
-- S1U：第二个幸存区的使用大小
-- EC：伊甸园区的大小
-- EU：伊甸园区的使用大小
-- OC：老年代大小
-- OU：老年代使用大小
-- MC：方法区大小
-- MU：方法区使用大小
+- S0C:第一个幸存区的大小
+- S1C:第二个幸存区的大小
+- S0U:第一个幸存区的使用大小
+- S1U:第二个幸存区的使用大小
+- EC:伊甸园区的大小
+- EU:伊甸园区的使用大小
+- OC:老年代大小
+- OU:老年代使用大小
+- MC:方法区大小
+- MU:方法区使用大小
 - CCSC:压缩类空间大小
 - CCSU:压缩类空间使用大小
-- YGC：年轻代垃圾回收次数
-- YGCT：年轻代垃圾回收消耗时间
-- FGC：Full GC垃圾回收次数
-- FGCT：Full GC垃圾回收消耗时间
-- GCT：垃圾回收消耗总时间
+- YGC:年轻代垃圾回收次数
+- YGCT:年轻代垃圾回收消耗时间
+- FGC:Full GC垃圾回收次数
+- FGCT:Full GC垃圾回收消耗时间
+- GCT:垃圾回收消耗总时间
 
 ##### jmap
 
@@ -1464,18 +1559,18 @@ public class JvmInfo {
  
 	private static void printCompilationInfo(){
 		CompilationMXBean compilation = ManagementFactory.getCompilationMXBean();
-		System.out.println("JIT编译器名称："+compilation.getName());
+		System.out.println("JIT编译器名称:"+compilation.getName());
 		//判断jvm是否支持编译时间的监控
 		if(compilation.isCompilationTimeMonitoringSupported()){
-			System.out.println("总编译时间："+compilation.getTotalCompilationTime()+"秒");
+			System.out.println("总编译时间:"+compilation.getTotalCompilationTime()+"秒");
 		}
 	}
 	
 	private static void printClassLoadingInfo(){
 		ClassLoadingMXBean classLoad= ManagementFactory.getClassLoadingMXBean();
-		System.out.println("已加载类总数："+classLoad.getTotalLoadedClassCount());
-		System.out.println("已加载当前类："+classLoad.getLoadedClassCount());
-		System.out.println("已卸载类总数："+classLoad.getUnloadedClassCount());
+		System.out.println("已加载类总数:"+classLoad.getTotalLoadedClassCount());
+		System.out.println("已加载当前类:"+classLoad.getLoadedClassCount());
+		System.out.println("已卸载类总数:"+classLoad.getUnloadedClassCount());
 		
 	}
 	
@@ -1485,7 +1580,7 @@ public class JvmInfo {
 		System.out.println("jvm规范名称:"+runtime.getSpecName());
 		System.out.println("jvm规范运营商:"+runtime.getSpecVendor());
 		System.out.println("jvm规范版本:"+runtime.getSpecVersion());
-		//返回虚拟机在毫秒内的开始时间。该方法返回了虚拟机启动时的近似时间
+		//返回虚拟机在毫秒内的开始时间.该方法返回了虚拟机启动时的近似时间
 		System.out.println("jvm启动时间（毫秒）:"+runtime.getStartTime());
 		//相当于System.getProperties
 		System.out.println("获取System.properties:"+runtime.getSystemProperties());
@@ -1512,7 +1607,7 @@ public class JvmInfo {
 		List<MemoryManagerMXBean> managers = ManagementFactory.getMemoryManagerMXBeans();
 		if(managers != null && !managers.isEmpty()){
 			for(MemoryManagerMXBean manager : managers){
-				System.out.println("vm内存管理器：名称="+manager.getName()+",管理的内存区="
+				System.out.println("vm内存管理器:名称="+manager.getName()+",管理的内存区="
 			+Arrays.deepToString(manager.getMemoryPoolNames())+",ObjectName="+manager.getObjectName());
 			}
 		}
@@ -1521,7 +1616,7 @@ public class JvmInfo {
 	private static void printGarbageCollectorInfo(){
 		List<GarbageCollectorMXBean> garbages = ManagementFactory.getGarbageCollectorMXBeans();
 		for(GarbageCollectorMXBean garbage : garbages){
-			System.out.println("垃圾收集器：名称="+garbage.getName()+",收集="+garbage.getCollectionCount()+",总花费时间="
+			System.out.println("垃圾收集器:名称="+garbage.getName()+",收集="+garbage.getCollectionCount()+",总花费时间="
 		+garbage.getCollectionTime()+",内存区名称="+Arrays.deepToString(garbage.getMemoryPoolNames()));
 		}
 	}
@@ -1549,8 +1644,8 @@ public class JvmInfo {
 		List<MemoryPoolMXBean> pools = ManagementFactory.getMemoryPoolMXBeans();
 		if(pools != null && !pools.isEmpty()){
 			for(MemoryPoolMXBean pool : pools){
-				//只打印一些各个内存区都有的属性，一些区的特殊属性，可看文档或百度
-				//最大值，初始值，如果没有定义的话，返回-1，所以真正使用时，要注意
+				//只打印一些各个内存区都有的属性,一些区的特殊属性,可看文档或百度
+				//最大值,初始值,如果没有定义的话,返回-1,所以真正使用时,要注意
 				System.out.println("vm内存区:\n\t名称="+pool.getName()+"\n\t所属内存管理者="+Arrays.deepToString(pool.getMemoryManagerNames())
 						+"\n\t ObjectName="+pool.getObjectName()+"\n\t初始大小(M)="+pool.getUsage().getInit()/MB
 						+"\n\t最大(上限)(M)="+pool.getUsage().getMax()/MB
@@ -1623,9 +1718,37 @@ public class JvmInfo {
 
 ### JIT与其他优化
 
-java的编译在早期的时候是由`javac`完成的,内存分配的工作也基本上由传统的JVM完成.
+我们看到Java虚拟机执行的原理如下
 
-JIT指的是java即是编译技术,对传统的技术做了分析和改进.下文主要是对JIT相关技术的分析,JIT的目的是为了降低内存负载,减少堆内存的分配压力,JIT的技术主要由逃逸分析,锁消除,锁膨胀,方法内联,空值检查消除,类型检测消除,公共子表达式消除
+![](https://img-blog.csdn.net/20160812104144969?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center)
+
+我们看到字节码有两种执行方式,解释器和JIT在由这些生成器或者解释器直接给硬件发出指令.
+
+java的编译在早期的时候是由`javac`完成的,内存分配的工作也基本上由传统的JVM完成.JIT指的是java即是编译技术,对传统的技术做了分析和改进.下文主要是对JIT相关技术的分析,JIT的目的是为了降低内存负载,减少堆内存的分配压力,JIT的技术主要由逃逸分析,锁消除,锁膨胀,方法内联,空值检查消除,类型检测消除,公共子表达式消除.所以实际上JIT的技术就是**C++**的技术.
+
+![](https://images2018.cnblogs.com/blog/1165868/201808/1165868-20180828180924226-980200012.png)
+
+由上面我们可以看出编译器和解释器影响语言的动态静态和强弱,热点代码通过JIT等编译器由解释变为编译,Java使用的是热点技术的方法
+
+-   为什么HotSpot虚拟机要使用解释器与编译器并存的架构？
+
+尽管并不是所有的Java虚拟机都采用解释器与编译器并存的架构,但许多主流的商用虚拟机（如HotSpot）,都同时包含解释器和编译器.解释器与编译器两者各有优势:当程序需要*迅速启动和执行*的时候,解释器可以首先发挥作用,省去编译的时间,立即执行.在程序运行后,随着时间的推移,编译器逐渐发挥作用,把越来越多的代码编译成本地代码之后,可以获取*更高的执行效率*.当程序运行环境中*内存资源限制较大*（如部分嵌入式系统中）,可以使用*解释器执行节约内存*,反之可以使用*编译执行来提升效率*.此外,如果编译后出现“罕见陷阱”,可以通过逆优化退回到解释执行.
+
+![](https://img-blog.csdn.net/20160812102841736?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center)
+
+从上面我们也注意到了编译器由两种客户端和服务器的,客户端注重编译速度,服务端注重编译质量根据不同的使用场景而有不同.对于编译和解释其实也是有不同使用场景的
+
+-   解释适合只执行一次的代码(类的初始化,无循环代码)
+-   编译后的代码也是需要存储空间,且编译大多代码后会导致代码膨胀
+
+```note
+对一般的Java方法而言,编译后代码的大小相对于字节码的大小,膨胀比达到10x是很正常的.同上面说的时间开销一样,这里的空间开销也是,只有对执行频繁的代码才值得编译,如果把所有代码都编译则会显著增加代码所占空间,导致“代码爆炸”
+```
+
+JVM判断热点代码的方式目前来说分为两种
+
+-   基于采样的热点探测(周期性检查栈顶方法统计)
+-   基于计数器的热点探测(代码块建立计数器统计) (Hotspot采用这种)
 
 
 
@@ -1664,11 +1787,20 @@ public static StringBuffer craeteStringBuffer(String s1, String s2) {
 
 TLAB(Thread Local Allocation Buffer)即栈上分配内存,默认是开启状态,可以用`-XX:+UseTLAB`即每个线程都向堆请求内存的话就需要大量的调度开销,所以就向JVM申请一段连续的内存(在堆空间上)称为TLAB去给这些对象分配内存.
 
-同时TLAB还解决了指针碰撞问题,即两个线程并发new的时候指针的修改顺序的安全性.所以虚拟机在线程栈初始化的时候会分配一块内存(这块内存位于Eden区),这块内存的大小很小仅有Eden区的1%,专门用于分配局部变量的内存.
+同时TLAB还解决了指针碰撞问题,即两个线程并发new的时候指针的修改顺序的安全性.这里简单说下指针分配的问题
+
+![](https://upload-images.jianshu.io/upload_images/14131260-4f531fdccb83fa85.png)
+
+堆内存的对象是连续分配的,也就是对象多大,指针就要移动到哪个位置,有点像段式分配.而new对象的时候,就可能指针发生了两次移动,如果不加并发控制就会出现线程安全问题,这就是指针碰撞.解决这种指针碰撞的方法不止一个,而TLAB就是解决的方案之一.
+
+所以虚拟机在线程栈初始化的时候会分配一块内存(这块内存位于**Eden区**),这块内存的大小很小仅有Eden区的1%,专门用于分配局部变量的内存.
 
 ![](https://img-blog.csdnimg.cn/20190809191201695.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2p1XzM2MjIwNDgwMQ==,size_16,color_FFFFFF,t_70)
 
+TLAB的缺点
 
+-   TLAB也在堆内存中申请空间,大小固定,大对象容纳不下TLAB失效,内碎片
+-   TLAB申请的内存区域也是需要GC的,如果线程特别多就会频繁GC
 
 
 
