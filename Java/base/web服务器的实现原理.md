@@ -19,6 +19,35 @@
 
 ## 网络协议及底层模型
 
+### TCP/IP协议族
+
+TCP/IP是一组协议,其中最具有代表性的是TCP/IP,理解完整的TCP传输过程需要理解linux内核,这里只是简单说明其主要功能.后续在了解linux内核后会对此进行补充,其包含了以下的协议.我们主要关注传输层极其以下的协议
+
+应用层
+
+-   FTP (TCP) 文件传输
+-   telnet (TCP) 提供远程登录
+-   SMTP (FTP) 电子邮件协议
+-   Http/Https
+
+传输层
+
+-   TCP
+-   UDP
+
+网络层
+
+-   IP
+-   ICMP
+-   IGMP
+
+数据链路层
+
+-   ARP
+-   RARP
+
+
+
 ### 物理层和链路层协议
 
 #### 物理层协议
@@ -109,7 +138,11 @@ tcp建立连接之后就可以稳定传输数据了,而建立连接之后就要�
 
 ![](https://img2018.cnblogs.com/blog/1615025/201905/1615025-20190518144523766-28426128.png)
 
-我们这里聊一下为什么要等2MSL
+我们这里聊一下为什么要等2MSL.
+
+这个时间是两次报文的时间就是发送**ACK = 1 **的报文所需要的时间加上**ICMP出错回传**的时间,即其实从这里看出每次请求都是携带ICMP错误探测数据包的,所以实际上2MSL即是每个FIN请求响应的超时时间,我们可以看到一个来回才能够得知消息是否被正确传到了服务器端,即服务器是否正常关闭,如果服务器未正常关闭需要进行重传ACK.
+
+如果没有这个等待的话,服务器可能一直保持着TCP连接一直不关闭,导致服务器资源无法释放造成资源浪费.
 
 
 
@@ -178,6 +211,70 @@ nc -nvz [地址] [端口号] // n 不使用dns v列出执行过程 z不发生io�
 nc -nv [地址] [端口号] // 和telnet一样可以发生交互
 nc -l -p // 启用监听模式,相当于小型tcp服务器
 ```
+
+
+
+#### http/1.1
+
+-   未完待续
+
+
+
+### HTTPS
+
+S代表着safe,即利用了密码学的知识对http的整个过程进行了加密.我们在介绍之前先介绍三种加密
+
+-   对称加密,只有一把秘钥,用该秘钥对密文进行加密和解密
+-   数据摘要,类似单方面hash
+-   非对称加密,有公钥和私钥,两个要是都可以解开密文,但一般公钥是公开的,只能完成解密,但无法篡改加密的内容(因为要用私钥对篡改的数据进行二次加密,可是不知道加密私钥)
+
+#### 数字签名
+
+这是非对称加密的一个很简单的特性,即非对称加密可以截获信息,但基本不可能进行篡改的特性,我们可以对某一份文件进行数字签名,即该数据文件大概率不会发生篡改问题.但密文可能会被破译,因为看到传输中其实是利用了公钥的.
+
+![](https://gitee.com/ahuntsun/BlogImgs/raw/master/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/7.3.%E6%95%B0%E5%AD%97%E7%AD%BE%E5%90%8D/1.png)
+
+其中上面被加密的摘要称为**数字签名**加密的过程被称为**数字签名的过程**,即唯一标识.
+
+#### 证书颁发
+
+CA 证书颁发机构,工作流程如图
+
+![](https://gitee.com/ahuntsun/BlogImgs/raw/master/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/7.3.%E6%95%B0%E5%AD%97%E7%AD%BE%E5%90%8D/3.png)
+
+既然公钥还是有不可靠的概率的,我们选择用CA去代替公钥的过程,我们先假设这个CA是可以被完全信任的,实际上,这个CA是写死在操作系统里面的,其本质也是一个公钥私钥对.那我们就从证书的角度上得到了这么一个完全加密的签名过程.我们看下https的实现.
+
+![](https://img2018.cnblogs.com/blog/163758/201912/163758-20191216154454989-789161896.png)
+
+我们看到这个过程运用了两个东西
+
+-   证书的非对称加密加密
+-   对称加密
+
+非对称加密主要用来传输对称加密的秘钥,也就是上面生成的随机数,对称加密是通信加密的主要内容,由于非对称加密使用CA进行实现即写死在操作系统上,那么不会存在公钥私钥泄漏的问题.也正是通过如此可以顺利传输对称加密的秘钥
+
+
+
+### SSL
+
+ssl是http连接建立过程的基础,Secure Sockets Layer.又称TLS,Transport Layer Security.简单点理解就是在传统TCP的连接上加了一层安全验证的,一般Http用到的是80端口,SSL用到的是443端口.其过程如下
+
+-   client向server的443端口发送信息,发送的内容是支持的加密算法
+-   server对client进行ACK,发送的内容是匹配的加密算法
+-   server对client发送第二个响应是CA证书
+-   client解析证书,验证证书是否有效(此部分功能由TLS完成)
+-   client生成一个随机值(可以是两次通信的随机值组合),用CA证书秘钥加密直接发送给server
+-   server得到这个随机值,然后利用加密算法进行对称加密
+
+---
+
+-   client和server之间用这个随机值作为对称加密的秘钥进行通信
+
+所以本质上和Https的通信内容基本一致.
+
+
+
+
 
 
 
@@ -915,7 +1012,7 @@ socket是java和其他线程等,网络通信的基础,从TCP的传输层出发,�
 
 ![](https://img-blog.csdnimg.cn/20190718154556909.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3Bhc2hhbmh1NjQwMg==,size_16,color_FFFFFF,t_70)
 
-如上为socket客户端和服务端的构建,其中我们需要注意的是accept函数的语义,是阻塞到三次握手完成后.accept的本质是从内核中取出完成三次握手socket队列中的一个.
+如上为socket客户端和服务端的构建,其中我们需要注意的是accept函数的语义,**是阻塞到三次握手完成后**.accept的本质是从内核中取出完成三次握手socket队列中的一个.
 
 `accept只是把内核中的“已完成连接队列（FIFO with established state)”取出， 
 另一个队列是“未完成连接队列( FIFO with syn_rcvd state)”，并且这两个队列总和的最大值是backlog.`
@@ -1060,3 +1157,277 @@ HttpURLConnection和HttpClient是两个Http请求库,前者为原生jdk,后者�
 ## netty
 
 -   未完待续
+
+
+
+## 其他技术
+
+### web安全
+
+#### CORS跨域资源共享
+
+Cross-origin resource sharing.跨域资源共享.在了解此问题之前,我们要先了解同源(origin)策略,虽然CORS翻译成跨域资源共享,但其实应该理解成跨源资源共享.
+
+所谓的域指的是hostname/domain,即不同域名/服务下的资源.
+
+而同源(origin)的策略会更为复杂.其最初的含义是A网站设置的Cookie不能由B网站打开.除非两个网站`同源`,这里指的同源是
+
+-   协议相同
+-   域名相同
+-   端口相同
+
+举个例子
+
+`http://www.example.com/dir/page.html`
+
+-   `http://www.example.com/dir2/other.html`：同源
+-   `http://example.com/dir/other.html`：不同源（域名不同）
+-   `http://v2.www.example.com/dir/other.html`：不同源（域名不同）
+-   `http://www.example.com:81/dir/other.html`：不同源（端口不同）
+
+随着后续技术发展同源策略制约的有以下几项
+
+-   Cookie、LocalStorage 和 IndexDB
+-   DOM 无法取得
+-   AJAX 不能发送
+
+而我们有时候必须从不同的服务路由拉取服务信息,就不得不破坏上面的同源政策,我们看如何解决,对于cookie形式,我们可以设置domain来共享cookie
+
+```js
+document.domain = 'example.com';
+```
+
+在服务端可用Http报文中Set-Cookie指令来设置domain
+
+```http
+Set-Cookie: key=value; domain=.example.com; path=/
+```
+
+就可以让有相同一级域名的站点共享资源.这个时候他们的cookie共享,而LocalStorage和IndexDB不共享,该方法主要解决的是不同iframe共享资源的问题,上面这两种方法即是一种安全性攻击的手段.HTML5中利用了跨文档通信 API（Cross-document messaging）解决问题.
+
+对于AJAX的解决,这才是现代web急需解决的问题.有三种方式解决
+
+-   JSONP
+-   WebSocket
+-   **CORS**
+
+JSONP,利用js本身`<script>`标签来设置发信回调foo.
+
+```js
+function addScriptTag(src) {
+  var script = document.createElement('script');
+  script.setAttribute("type","text/javascript");
+  script.src = src;
+  document.body.appendChild(script);
+}
+
+window.onload = function () {
+  addScriptTag('http://example.com/ip?callback=foo');
+}
+
+function foo(data) {
+  console.log('Your public IP address is: ' + data.ip);
+};
+```
+
+除了上面这种方式之外我们可以利用WebSocket协议,其是一种基于http的简单通讯协议.
+
+`ws://`或者`wss://`其报文如下
+
+```http
+GET /chat HTTP/1.1
+Host: server.example.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==
+Sec-WebSocket-Protocol: chat, superchat
+Sec-WebSocket-Version: 13
+Origin: http://example.com
+```
+
+origin就是websocket没有实行同源政策的字段,服务器会根据origin字段应答websocket请求.应答报文如下
+
+```http
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: HSmrc0sMlYUkAGmm5OPpG2HaGWk=
+Sec-WebSocket-Protocol: chat
+```
+
+铺垫了这么多,我们来看下CORS(跨域资源共享),这是解决跨(源)资源共享最好的办法.
+
+---
+
+>   CORS需要浏览器和服务器同时支持。目前，所有浏览器都支持该功能，IE浏览器不能低于IE10。整个CORS通信过程，都是浏览器自动完成，不需要用户参与。对于开发者来说，CORS通信与同源的AJAX通信没有差别，代码完全一样。浏览器一旦发现AJAX请求跨源，就会自动添加一些附加的头信息，有时还会多出一次附加的请求，但用户不会有感觉。因此，实现CORS通信的关键是服务器。只要服务器实现了CORS接口，就可以跨源通信。
+
+CORS请求分为两种
+
+-   简单请求(simple request)
+-   非简单请求(not-so-simple request)
+
+简单请求满足下面两个条件
+
+>   **请求方法是以下三种方法之一**
+>
+>   -   HEAD
+>   -   GET
+>   -   POST
+>
+>   **HTTP的头信息不超出以下几种字段**
+>
+>   -   Accept
+>   -   Accept-Language
+>   -   Content-Language
+>   -   Last-Event-ID
+>   -   Content-Type：只限于三个值`application/x-www-form-urlencoded`、`multipart/form-data`、`text/plain`
+
+简单请求
+
+如果浏览器发现ajax请求,就自动加上origin字段,服务器根据origin判断是否同源发出响应报文,含有`Access-Control-Allow-Origin`字段表示允许访问,若不包含该字段字说明请求失败,浏览器做出错误处理.
+
+```http
+GET /cors HTTP/1.1
+Origin: http://api.bob.com
+Host: api.alice.com
+Accept-Language: en-US
+Connection: keep-alive
+User-Agent: Mozilla/5.0...
+```
+
+如果请求成功了,会发出如下响应报文.
+
+```http
+HTTP/1.1 200
+Access-Control-Allow-Origin: http://api.bob.com
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: FooBar
+Content-Type: text/html; charset=utf-8
+```
+
+-   `Access-Control-Allow-Origin`字段是请求时origin字段的值,或者是个`*`
+-   `Access-Control-Allow-Credentials`该字段表明是否需要cookie,如果是true会连着cookie一起发送,false或者不写该字段表示不允许发送cookie
+-   `Access-Control-Expose-Headers`在`XMLHttpRequest`中只能拿到6个基本字段,如果想要拿到其他字段,就需要在`Access-Control-Expose-Headers`里面指定暴露的字段名
+
+非简单请求得需要在服务器上设计响应的可以服务器可以使用的动词,浏览器会在CROS请求之前发送一个请求给服务器预检(preflight),得到了答复之后,浏览器才会发送`XMLHttpRequest`
+
+
+
+
+
+#### SQL注入
+
+通过参数构造来更改SQL语句.用来访问不该访问的数据
+
+解决方案是参数化查询,校验参数.
+
+
+
+#### XSS跨站点脚本
+
+Cross Site Scripting,往web里面注入脚本,一种常用的攻击手段.如果有网页代码是改变增加div里面的内容.我们往输入框输入代码就被注入到web页面中,供给所有访问该留言板.那么就会执行如下的script代码,如果是其他一些隐藏性质的代码,就可以盗取用户的信息了
+
+```html
+<html>
+    <head>
+       <title>留言板</title>
+    </head>
+<body>
+<div id=”board”>
+        <script>
+  				alert(“hey!you are attacked”)
+  			</script>
+</div>     
+    </body>
+</html>
+```
+
+此供给手段被用在两个方面
+
+-   流浪劫持,恶意跳转
+-   cookie信息破解
+
+我们先讲下攻击手段,对于构造报文,后端的校验可能会被大小写绕过例如如下报文
+
+```url
+http://192.168.1.102/xss/example2.php?name=<sCript>alert("hey!")</scRipt>
+```
+
+后端如果只过滤了`<script>`标签,像这样的内容还是会被写进response报文里.过滤绕过
+
+```url
+http://192.168.1.102/xss/example3.php?name=<sCri<script>pt>alert("hey!")</scRi</script>pt>
+```
+
+其他也可以利用错误事件进行注入代码
+
+```url
+http://192.168.1.102/xss/example4.php?name=<img
+src='w.123' onerror='alert("hey!")'>
+```
+
+XSS攻击手段分为两种
+
+-   非持久性XSS(反射型XSS)
+-   持久性XSS(储存型XSS)
+
+反射型XSS就是一次性请求返回页面的,而存储型XSS则是要把脚本等记录到数据库上,以供访问这个数据库的所有页面进行反射,比如一开始的留言板.
+
+防止手段
+
+-   首先是过滤。对诸如`<script> <img> <a>`等标签进行过滤。
+-   其次是编码(html转义 `&nbsp;`等会直接被解释成字符而不是代码)。
+-   对于href,location.href等连接要禁止javascript:开头
+-   最后是限制。通过以上的案例我们不难发现xss攻击要能达成往往需要较长的字符串，因此对于一些可以预期的输入可以通过限制长度强制截断来进行防御。
+
+对于cookie信息的防御,我们可以在服务端做好客户端hash唯一性校验.
+
+XSS对于以下内容能够进行注入,所以在做安全防护的时候认为以下信息不可信
+
+```note
+来自用户的 UGC 信息
+来自第三方的链接
+URL 参数
+POST 参数
+Referer （可能来自不可信的来源）
+Cookie （可能来自其他子域注入）
+```
+
+
+
+
+
+#### CSRF跨站点请求伪造
+
+Cross—Site Request Forgery,跨站点请求伪造.即伪造其他网站的请求,如下
+
+```html
+<body>
+哈哈，给你开了个玩笑，莫生气~
+<iframe name="hiddenIframe"  style="display:none"></iframe>
+<form action="https://www.request.com/api/action" id="form" method="post" style="visibility:hidden" target="hiddenIframe">
+	<input type="text" name="giftId" value="ab231">
+</form>
+<script>
+	document.getElementById('form').submit();
+	location.href = "http://www.csrf.com";
+</script>
+</body>
+```
+
+如果用户访问了第三方网站`csrf.com`,第三方伪造了请求通过自动提交的方法发送给了`request.com`,其中`request.com`是被恶意攻击的网站.那用户就会在不知情的情况下,访问`request.com`.
+
+而作为被攻击的网站基本只能通过后端防御,跨过前端进行攻击,解决思路如下.前端和后端保存相同的交付钥匙.利用钥匙进行信息校验,**保证所有请求都是在本站点的前端发出来的**,防止跨站点攻击.具体做法如下
+
+-   服务端在收到路由请求时，生成一个随机数，在渲染请求页面时把随机数埋入页面（一般埋入 form 表单内，`<input type="hidden" name="_csrf_token" value="xxxx">`）
+-   服务端设置setCookie，把该随机数作为cookie或者session种入用户浏览器
+-   当用户发送 GET 或者 POST 请求时带上`_csrf_token`参数（对于 Form 表单直接提交即可，因为会自动把当前表单内所有的 input 提交给后台，包括_csrf_token）
+-   后台在接受到请求后解析请求的cookie获取`_csrf_token`的值，然后和用户请求提交的`_csrf_token`做个比较，如果相等表示请求是合法的。
+-   如果是异步ajax请求需要注意到的还有CROS
+
+除此之外,我们还有用到同源请求验证的手段
+
+-   Origin Header
+-   Referer Header
+
+这两为http报文请求字段,可以在报文头部设置,其他更详细可[参考](https://zhuanlan.zhihu.com/p/46592479)
