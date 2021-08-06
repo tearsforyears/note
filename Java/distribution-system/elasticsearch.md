@@ -920,6 +920,10 @@ shard = hash(routing) % number_of_primary_shards
 
 
 
+
+
+
+
 ### 优化
 
 #### ES 使用到的资源
