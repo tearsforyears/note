@@ -69,7 +69,7 @@ curl 'localhost:9200/{index}/{type}/_search?pretty&q={content}' # 收缩index下
 # &sort=created_on:asc &sort=created_on:desc sort=_score 排序
 # _source=organizer,description 指定哪些属性返回
 screen -S mfmc mfmc -w 9090
-curl --socks5 127.0.0.1:9090 '..../video/_search?pretty&q=mcpoze&from=0&size=1'
+curl --socks5 127.0.0.1:9090 '..../video/_search?pretty&q=T&from=0&size=1'
 curl --socks5 127.0.0.1:9090 '..../video/UNBdGWIBI2NcsxokJ0lQ' # 根据id查询video
 ```
 

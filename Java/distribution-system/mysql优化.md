@@ -817,6 +817,31 @@ EXPLAIN select * from users
 
 
 
+### 索引下推
+
+索引下推是5.6版本的优化,称为ICP(index condtion pushdown),在原来的时候我们一般是从存储引擎拉取所有日志在服务器做判断数据数据是否复合条件.
+
+ICP解决的问题,服务器把这部分条件判断下推到存储引擎,由存储引擎来做这部分条件的判断,索引下推减少存储引擎查询基础表的次数.减少存储引擎的数据量.
+
+![](https://pic3.zhimg.com/80/v2-04b4a496ab53eccc5feba150bf9fb7ea_720w.jpg)
+
+这是原来的数据查询,利用某个索引查到id进行回表查询.不使用ipc的情况下,第一次搜到name就查询到了对应的id然后返回服务器,服务器在查询到对应的id然后根据id去继续查找索引.所以其本身使用的索引有效字段是1个.
+
+![](https://pic1.zhimg.com/80/v2-211aaba883221c81d5d7578783a80764_720w.jpg)
+
+使用了 IPC 之后就用到了2个,此过程由存储引擎完成,返回的数据只有一个
+
+explain  可以通过 `Using index condition` 来确定是否使用索引下推
+
+>```sql
+>SELECT * from user where  name like '陈%' and age=20
+>```
+>
+>组合索引满足最左匹配，但是遇到非等值判断时匹配停止。
+>name like '陈%' 不是等值匹配，所以 age = 20 这里就用不上 (name,age) 组合索引了。如果没有索引下推，组合索引只能用到 name，age 的判定就需要回表才能做了。5.6之后有了索引下推，age = 20 可以直接在组合索引里判定。
+
+
+
 ## mysql日志系统
 
 主要分为以下几个日志
@@ -829,30 +854,59 @@ EXPLAIN select * from users
 
 我们看到server层面的东西都是mysql的sql实现
 
-### redo-log(内存/磁盘上)
+### innodb存储日志
 
-redo-log是存储引引擎层的日志,用于记录**事务操作**的变化,记录的是**数据修改后的值**,无论事务是否提交都会被记录下来.如果数据库宕机,redo-log就可以恢复.
+#### redo-log(内存/磁盘上)
 
-每条insert语句都会被记录下来,然后更新内存,这是条完整的语句执行.redo-log实在空闲时或者是按照设定的更新策略把redo-log的内容更新到磁盘
+- 内存中 redo-log-buffer 缓冲区
+- 磁盘上 redo log file 持久化在磁盘
 
-redo-log的缓冲区大小是固定的写完了就得从头写.从头写的时候数据库就会把日志持久化到磁盘上.
+redo-log是存储引引擎层的日志,用于记录**事务**操作的变化,记录的是数据修改后的值,无论事务是否提交都会被记录下来.如果数据库宕机,redo-log就可以恢复.每条insert语句都会**被记录下来,然后更新内存**,这是条完整的语句执行.redo-log实在空闲时或者是按照设定的更新策略把redo-log的内容更新到磁盘,redo-log的缓冲区大小是固定的写完了就得从头写.从头写的时候数据库就会把日志持久化到磁盘上.一般触发持久化的条件为 512MB 即块的大小,由 `innodb_log_file_size` 控制
 
-### binlog日志
+#### undo-log回滚日志
 
-其本身是以二进制形式记录这个语句的原始逻辑.binlog可以用作为数据恢复使用,主从复制搭建.即类比redis的rdb和aof,rdb对应redo-log,aof对应binlog.
-
-### undo-log
-
-undo-log和redo-log是innodb事务的重要的实现基础.又叫回滚日志.提供向前滚的操作.
+undo-log和redo-log是innodb事务的重要的实现基础.又叫回滚日志.提供向前滚的操作.同时其提供MVCC版本的读.
 
 - redo-log通常是物理操作,记录的是数据页的物理修改.用它来恢复到提交后的物理数据页
 - undo用来回滚杭机路到某个版本,且undo-log是逻辑日志.
 
-redo-log用来保证实物的持久性,防止有些脏页未写入磁盘,再重启mysql的时候,根据redo-log进行重做,从而达到实物持久性.
+redo-log用来保证实物的持久性,防止有些脏页未写入磁盘,再重启mysql的时候,根据redo-log进行重做,从而达到实物持久性.undo-log保存了事务发生之前的版本用于回滚,同时提供MVCC,undo-log对于每一个insert存一个delete,update执行相反的update
 
-undo-log保存了事务发生之前的版本用于回滚,同时提供MVCC
+当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log，如隔离级别为 repeatable read 时，事务读取的都是开启事务时的最新提交行版本，只要该事务不结束，该行版本就不能删除，即 undo log 不能删除。
 
-undo-log对于每一个insert存一个delete,update执行相反的update
+当事务提交之后，undo log 并不能立马被删除，而是放入待清理的链表，由 purge 线程判断是否有其他事务在使用 undo 段中表的上一个事务之前的版本信息，决定是否可以清理 undo log 的日志空间。
+
+#### 一般一个事务的执行过程是
+
+1. 开启事务
+2. 查询待更新的记录到内存，并加 X 锁
+3. 记录 undo log 到内存 buffer
+4. 记录 redo log 到内存 buffer
+5. 更改内存中的数据记录
+6. 提交事务，触发 redo log 刷盘**真正写入表中**
+7. 记录 bin log
+8. 事务结束
+
+所以观看其存储设计,我们会发现内存文件和磁盘文件的结构和ES很类似.所有文件都以内存和磁盘两种形式去存储
+
+
+
+### binlog日志 记录所有更新语句 用于复制
+
+其本身是以二进制形式记录这个语句的原始逻辑.binlog可以用作为数据恢复使用,主从复制搭建.即类比redis的rdb和aof,rdb对应redo-log,aof对应binlog.
+
+binlog 有三种格式
+
+- Row 记录下每行的修改细节,不记录上下文信息,alter table的时候每行数据都会发生改变就会产生大量数据
+- Statement 每一条修改的语句会记录下,减少日志的记录,缺点就是需要执行所有的语句需要上下问信息
+- Mixed 上面两种的混合,例如在alter语句使用 Statement
+
+### Others
+
+- 慢查询日志
+- 错误日志
+- 中继日志(slave 配合 master 进行 binlog 复制)
+- 一般查询日志(general log)
 
 
 
@@ -1235,4 +1289,26 @@ update Items set quantity=quantity-2 where id=100;
 这个锁的是扫描过的所有字段 如果不加索引 相当于全表锁,
 
 
+
+
+
+## sql 优化器
+
+### 谓词下推
+
+```sql
+select *
+from sbtest t1 join snapshot t2 on t1.id=t2.id
+where t2.snap_id=1420637262
+```
+
+```sql
+select *
+from sbtest t1 join (select * from snapshot where snap_id=1420637262) t2
+on t1.id=t2.id
+```
+
+看两个查询,如果按照顺序执行sql,那么下面的要比上面的快,因为其子查询决定了其链接时候数据小,但实际执行的时候两者的效率相差不大
+
+这是因为我们写的sql被进行了优化,选择相关的条件尽可能的早做,这个优化在Spark Sql中有大量的应用.优化器自动帮我们实现了这种优化.
 
