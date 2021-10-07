@@ -889,14 +889,16 @@ public Boolean tryAcquire(String usertoken) {
 
 所以说hash实际的底层类型包括如下几种
 
--   raw
+-   raw (simple dynamic string) 小字符串,需要分配两个对象sds,redisobj
 -   int 
--   embstr
--   hashtable
--   ziplist
--   linkedlist
--   inset
--   skiplist
+-   embstr 只需要分配一个对象,区别于raw,只需要分配sds
+-   
+-   ziplist 可压缩的ArrayList
+-   linkedlist 链表
+-   quicklist 结合了linkedlist和ziplist外层linkedlist,里层ziplist
+-   hashtable 即java中的hashmap
+-   inset 用hash进行去重保存在同一contents里面,按hash进行二分搜索
+-   skiplist zset特有,更好实现的红黑树
 
 我们都知道redis是用C实现的,这里会设计部分C的源码,一个redisObject用下面的方式表示
 
