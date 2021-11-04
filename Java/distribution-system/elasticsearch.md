@@ -257,6 +257,26 @@ curl -X GET "host/{index}/_search?pretty" -H 'Content-Type: application/json' -d
 }
 ```
 
+**这里需要注意**,如果精确查找是诸如 ugc-st 这样的词,则在分词器的指引下会分割成 ugc,st 两个词无法被精确查找,有两种解决方案,利用短语匹配或者增加索引
+
+```json
+PUT /my_store 
+{
+    "mappings" : {
+        "products" : {
+            "properties" : {
+                "productID" : {
+                    "type" : "string",
+                    "index" : "not_analyzed" 
+                }
+            }
+        }
+    }
+}
+```
+
+
+
 ##### 模糊查询
 
 ```json
@@ -859,7 +879,7 @@ score(q,d)  =
 
 
 
-## 细节和原理
+## Advance
 
 ### 集群模式
 
@@ -899,6 +919,11 @@ shard = hash(routing) % number_of_primary_shards
 
 ![](https://img2018.cnblogs.com/blog/1070942/201906/1070942-20190628214213519-987528358.png)
 
+注意这里两个操作 fsync 和 flush
+
+- fsync 5分钟内不使用的内存页(不活跃)就会被刷新到磁盘
+- flush 是同步刷新磁盘
+
 #### 读取
 
 和写入一样,读取也是分协调节点的.协调节点会算出在哪个primary shard上.
@@ -920,11 +945,9 @@ shard = hash(routing) % number_of_primary_shards
 
 
 
-
-
-
-
 ### 优化
+
+[参考](https://blog.csdn.net/q364367207/category_8677712.html)
 
 #### ES 使用到的资源
 
@@ -942,9 +965,13 @@ ES 主要使用heap和file system cache.堆中存储的东西是FST(Finite State
 }
 ```
 
-- 存储索引倒排文件 .tim .tip .doc
-- 用于聚合排序 .dvd .dvm
-- 全文检索 .pos .pay .nvd .nvm
+- 存储索引倒排文件 .tim .tip .doc （tim 存储索引元数据,tip 存储倒排索引 doc存储doc的词频）
+- 用于聚合排序 .dvd .dvm (按列存储的格式,用于聚合和排序)
+- 全文检索 .pos .pay .nvd .nvm (pos是主要全文索引,保存term在doc中的位置,pay是应用payload查询的一些数据,后面两者字段加权文件)
+
+[参考](https://elasticsearch.cn/article/6178)
+
+**从这里也能看出全文索引是通过文件的形式去进行存储索引的**
 
 force-merge 一部分不会更新的索引,等待ES自动merge是一个非常消耗内存的操作.
 
@@ -1002,6 +1029,194 @@ force-merge 一部分不会更新的索引,等待ES自动merge是一个非常消
 
 然后就是搜索字段才存入ES,这样就可以尽量节省数据,意思是ES只用来存储索引.所以其他字段一般存入Hbase或者是mysql里面.一般使用hbase+elasticsearch架构.用ES单纯用作索引就好.
 
+
+
+#### mappings 和 templates
+
+mappings 和 templates 即上面工具的使用,mappings 可以理解为索引定义和schema定义meta定义等,比如可以通过 mappings 定义是否使用分词器等,而template则是映射模板
+
+```http
+GET /mapping_test/_mapping
+```
+
+```json
+{
+  "mapping_test" : {
+    "mappings" : {
+      "properties" : {
+        "info" : {
+          "properties" : {
+            "address" : { // 字段属性
+              "type" : "text", // 字段类型
+              "fields" : {
+                "keyword" : {
+                  "type" : "keyword",
+                  "ignore_above" : 256
+                }
+              }
+            },
+            "card" : {
+              "type" : "text",
+              "fields" : {
+                "keyword" : {
+                  "type" : "keyword",
+                  "ignore_above" : 256
+                }
+              }
+            }
+          }
+        },
+        "is_vip" : {
+          "type" : "boolean"
+        },
+        "uid" : {
+          "type" : "long"
+        },
+        "user_name" : {
+          "type" : "text",
+          "fields" : {
+            "keyword" : {
+              "type" : "keyword",
+              "ignore_above" : 256
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+我们可以修改其中的信息
+
+```http
+PUT mapping_test3
+{
+  "mappings": {
+    "properties": {
+      "user_name":{
+        "index": false, // 取消 index
+        "type": "text"
+      },
+      "info":{
+        "index_options": "positions",
+        "type": "text"
+      }
+    }
+  }
+}
+```
+
+```json
+{
+  "mappings": {
+      "_doc": {
+          "dynamic": "strict",			
+        	// schema 策略严格控制策略，遇到陌生字段当错误处理
+        	// 可选值 true 遇到陌生字段开启动态映射
+        	// 可选值 false 忽略遇到陌生字段
+          "properties": {
+              "name": { "type": "text" },
+              "address": {
+                  "type": "object",
+                  "dynamic": "true"		// 开启动态映射策略
+              }
+          }
+      }
+  }
+}
+```
+
+```http
+PUT .../_mapping/_doc # 路由请求可以按路由或者json
+{
+"date_detection": false
+} // 开启关闭日期检测
+```
+
+```json
+"mapping": {
+  "type": "text",        // 把所有的string类型, 映射成text类型
+  "analyzer": "english", // 使用english分词器
+  "fields": {
+    "raw": {
+      "type": "keyword",
+      "ignore_above": 256
+    }
+  }
+}
+```
+
+不使用分词器的字段
+
+```shell
+curl -XPUT '..../index/_mapping/type' -d '                                                            
+{
+    "type" : {
+        "properties" : {
+					"message" : {
+            "type":"string",
+            "index":"not_analyzed" # 同样可以在 mapping 中指定
+            # "analyzer": "english" 或者是指定存在的分词器
+					}
+				}
+		}
+}'
+```
+
+而[模板](https://www.cnblogs.com/shoufeng/p/10641560.html)则是把创建好的settings和mapping保存下来,在搜索时刻重用,可以把模板理解为一组索引的使用
+
+- Settings 指定 index 的配置信息,分片数,副本数,translog同步,refresh策略等,类似于环境变量
+- mappings 用于指定 index 的内部构建信息
+
+mapping 中的重要字段
+
+- `_all` 6.0之后被替换成 copy_to 字段实现相同的功能了
+- `_source` 如果不开启 `"_source": {"enabled": false}`则会只返回文档的id需要再次索引才能获取
+- `properties` 最终要的配置也是我们上面研究的配置
+
+创建模板
+
+```json
+PUT _template/shop_template
+{
+    "index_patterns": ["shop*", "bar*"],       // 可以通过"shop*"和"bar*"来适配索引,所有这个开头的索引都会走这个模板
+    "order": 0,                // 模板的权重, 多个模板的时候优先匹配用, 值越大, 权重越高
+    "settings": {
+        "number_of_shards": 1  // 分片数量, 可以定义其他配置项
+    },
+    "aliases": {
+        "alias_1": {}          // 索引对应的别名
+    },
+    "mappings": {
+        // ES 6.0开始只支持一种type, 名称为“_doc”
+        "_doc": {
+            "_source": {            // 是否保存字段的原始值
+                "enabled": false
+            },
+            "properties": {        // 字段的映射
+                "@timestamp": {    // 具体的字段映射
+                    "type": "date",           
+                    "format": "yyyy-MM-dd HH:mm:ss"
+                },
+                "@version": {
+                    "doc_values": true,
+                    "index": "false",   // 设置为false, 不索引
+                    "type": "text"      // text类型
+                },
+                "logLevel": {
+                    "type": "long"
+                }
+            }
+        }
+    }
+}
+```
+
+
+
+
+
 ##### 数据预热
 
 这个不难理解,把可能会被索引到的数据提前用ES搜索一次,建立好索引,刷新在filesystem cache里面即可提高整体效率.对于常年热门的数据,做一个专门的子系统用来进行数据预热.
@@ -1012,11 +1227,118 @@ force-merge 一部分不会更新的索引,等待ES自动merge是一个非常消
 
 ![](https://img2018.cnblogs.com/blog/1070942/201906/1070942-20190628214248335-1581895054.png)
 
-然后尽量避免复杂查询.
+然后尽量避免复杂查询.比如禁止查询过长字符,禁止深度分页
+
+ES的冷热分离主要依赖分片规则
+
+```properties
+#设置节点属性rack_id及属性值rack_one
+node.rack_id: rack_one  
+#设置rack_id属性作为分片分布规则
+cluster.routing.allocation.awareness.attributes: rack_id 
+# 可以设置多个属性
+cluster.routing.allocation.awareness.attributes: rack_id,zone
+```
+
+分片可以设置多个分片属性,当设置了分片属性时,如果节点没有设置其中任何一个属性,分片就不会出现在节点中
+
+##### 分片规则
+
+###### 强制分片规则
+
+```properties
+cluster.routing.allocation.awareness.force.zone.values: zone1,zone2  
+# zone 为不同节点的规则分配
+cluster.routing.allocation.awareness.attributes: zone
+```
+
+1个节点`node.zone`属性被设置为zone1,shard=5,replica=1.索引建立完成之后没有分片,只有当`node.zone`设置为zone2的时候,副本才会被分配到这个节点上
+
+>  上面配置的意思就是设置属性zone作为分布规则，并且属性zone的值为zone1/zone2,由于副本与主分片不分配在一类节点中，则副本分片到zone2节点中。
+
+###### 分片过滤规则
+
+即是打上tag,使用 include 和 exclude 来控制分片分布
+
+```properties
+node.tag: hot
+node.tag: cold
+node.tag: value3
+```
+
+```shell
+curl -XPUT localhost:9200/test/_settings -d '{ 
+  "index.routing.allocation.include.tag": "hot"
+  "index.routing.allocation.exclude.tag" : "value3"
+}'
+```
+
+实现冷热分离
+
+```properties
+node.tag: hot
+node.tag: cold
+node.max_local_storage_nodes: 2   
+#允许每个机器启动两个es进程(可选)
+```
+
+按照时间规律建立索引,比如
+
+/index_2021-11-03,/index_2021-11-04,/index_2021-11-05
+
+注意下 这样建立的索引就需要通过
+
+- `/_search`
+- `/index1,index2/_search`
+- `/_all/_search` 
+
+三种方式去完成
+
+```http
+PUT /_template/logstash
+{
+        "order": 0,
+        "template": "logstash*", // 6.0 之后用 index pattern
+        "settings": {
+            "index.routing.allocation.include.tag": "hot", // 这行规则是主要的,新建的索引会分配到 node.tag = hot 下
+            "index.refresh_interval": "30s",
+            "index.number_of_replicas": "1",
+            "index.number_of_shards": "1",
+            "index.translog.flush_threshold_ops": "30000"
+        }
+}
+```
+
+或者是使用上面方式定义模板,会以 logstash 开头的所有模板进行匹配,然后使用定时任务吧历史索引保存到 cold 节点
+
+这里有两种操作方式
+
+1.手动标记,等 es 自动迁移数据到新节点下
+
+```http
+PUT /index_2021-11-03/_settings
+{
+   "index.routing.allocation.include.tag" : "cold"
+}
+```
+
+2. 利用 [elasticsearch的命令行管理工具curator](https://github.com/elastic/curator) 编写定时脚本实现
 
 
 
 ### 日志与内存
+
+首先我们要区分一下几个东西
+
+- [磁盘]同步回复日志 translog
+- [内存] 缓冲区 buffer
+- [堆内存] FST 相当于前缀索引
+- [操作系统内存 os cache] segment file 倒排索引 `.sl`文件存储元数据
+- [磁盘] 大量数据,会活化到到内存
+
+双写 translog 的原因是,translog 专门用于记录 checkpoint 的增量日志,比较简单不用建立数据结构(倒排索引和FST),所以直接落地磁盘
+
+![img](https://lh6.googleusercontent.com/qgy55oYDCTjcrjO8_xBbXjGOVk9TN5tTTAuff-3vLEAEFK_doQvE2nPI9X5vyVkXRbXs_Kjr-P8Cqap3wjEVne_yD8HiWLaWwEQhehdilpw2L_BR-obzfv3se-os1hCeVrE6D_OS)
 
 ![](https://img-blog.csdnimg.cn/20190604221441892.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTIxMzMwNDg=,size_16,color_FFFFFF,t_70)
 
