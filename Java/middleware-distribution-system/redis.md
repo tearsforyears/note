@@ -212,6 +212,34 @@ rdb-save-incremental-fsync yes
 
 
 
+## 缓存更新
+
+缓存更新策略.一般会有如下几种
+
+- Cache aside
+- Read/write Through
+- Write behind
+
+Cache Aside 
+
+- 这种模式是我们平时使用的模式,如果缓存中没有数据则从缓存中加载数据,没命中则从数据库读数据
+- 更新数据时先去更新数据库的数据,更新完成后通过指令让缓存Cache中数据失效,这是一种简单的模式
+
+Read/Write Through
+
+- 这种模式把缓存当成主要用途,数据库的服务只是供给同步,基本所有的请求都到缓存中去访问,数据库只充当持久化工具
+- 新增缓存节点的时候会有问题,强依赖缓存的一种模式
+
+Write Behind
+
+- 和上面的区别仅在于同步导数据库的时候使用异步去更新数据到数据库,但数据库会导致一致性比较差
+
+版本号控制
+
+- todo
+
+
+
 ## redis持久化方式
 
 redis有两种持久化的方式 rdb和aof (redis database和append only file)
@@ -850,6 +878,41 @@ public Boolean tryAcquire(String usertoken) {
 }
 ```
 
+### 高级数据结构
+
+- bitmap 特殊结构,可以用来实现布隆过滤器
+- hyperLogLog 统计方法
+- Geo Hash 地理信息的Hash
+- Stream 即 pub/sub 其中大部分东西用消息队列代替
+
+bitmap可以直接用RedisTemplate去操控
+
+```java
+redisTemplate.opsForValue().setBit(key, offset, bool);
+redisTemplate.opsForValue().getBit(key, offset);
+```
+
+其主要使用场景有如下几种
+
+- 实现布隆过滤器判断某一个id重复
+- 日活统计,因为活跃之后也是不需要计数的只需要区分是不是
+- 点赞服务,点赞只能有一个,某一个bit去实现点赞,因为只能有一次点赞
+- 签到服务,同上可以归咎于需要大量key,但只需要boolean的状态
+
+
+
+hyperLogLog是一重要的统计功能,其主要实现的事基数(去重)统计,其用极少的内存处理巨量的数据.统计存在误差(和布隆过滤器一样).
+
+```java
+redisTemplate.opsForHyperLogLog().add(key,val);
+redisTemplate.opsForHyperLogLog().size(key); // 统计功能 注入灵魂
+redisTemplate.opsForHyperLogLog().delete(key);
+```
+
+我们可以把其当成一个集合,其可以知道在集合内有什么元素,但不能取出集合的元素(满满的hash思想),我们看下其实现思路.
+
+我们看下之前使用的bitmap,set同样可以去使用基数统计,不过两者都有问题,先说set,如果数据量很大,那么set的速度会很慢,bitmap则是另一种方法,如果我们使用bitmap就可以节省下非常多的内存,不过其有一些问题,例如要先进行编码,如果要进行合并的话需要进行或操作.但问题在于,如果bitmap存储的是对象,可能要经过非常复杂的编码,且不易于压缩.这个情况下我们应该使用HyperLogLog.
+
 
 
 ### 一些重要的应用功能的实现
@@ -868,6 +931,87 @@ public Boolean tryAcquire(String usertoken) {
 
 
 ## redis实现
+
+### 服务器线程结构
+
+Reactor 连接处理的线程模型是 redis 使用的线程模型
+
+> The reactor design_pattern is an **event_handling** pattern for handling service requests delivered concurrently to a service handler by **one or more inputs**. The service handler then **demultiplexes** the incoming requests and **dispatches** them synchronously to the associated request handlers.
+
+可以看到 reactor 模型是一种事件驱动的模型,其专门针对服务器的I/O场景设计,可以处理多个输出,利用I/O多路复用,处理异步请求等.Java中的NIO(Non-Blocking-i/o)便是采用了这种模型,Netty和tomcat8.0以上也是采用了这样的模型,在说这个模型之前,我们来聊下I/O多路复用
+
+I/O 多路复用
+
+![](https://pic3.zhimg.com/80/5d8e39d83e931da6ba3b6bc496302e5c_720w.jpg?source=1940ef5c)
+
+I/O 多路复用有几种经典的实现
+
+- select 单线程,远古时期算法,只支持1024个handler
+- poll 单线程,改进了select,使用了轮询算法去检查 select 有没有被select
+- epoll 多线程,2002年实现,只存在于linux平台,基于poll改进,不再使用轮询去访问 Selector,其采用的是通知的机制(回调函数)来进行实现,其可以很好的实现多线程的模式
+
+[tomcat 服务器线程模型文档参考](https://github.com/tearsforyears/note/blob/master/Java/base/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E4%B8%8E%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86.md)
+
+
+
+思考
+
+- 为什么 poll 不能实现多线程
+- 一个服务器使用 I/O 多路复用的请求解耦方式,BIO服务器 tomcat 7.0 真的是单线程服务器吗?
+- 为什么 epoll 比 poll 效率快很多倍
+
+Reactor 模型分为几种
+
+- 单 Reactor 单线程 select,poll Java的NIO采用的就是类似poll模型来实现的(不支持多线程)
+- 单 Reactor 多线程 epoll
+- 多 Recator 多线程 epoll
+
+每个 Reactor 模型中有如下组件
+
+- **Reactor**：把IO事件分配给对应的handler处理
+- **Acceptor**：处理客户端连接事件
+- **Handler**：处理非阻塞的任务
+
+![](https://pic3.zhimg.com/80/v2-a3a7f2b064f424fbb11e77f019123e62_720w.jpg)
+
+如上图,acceptor用来处理连接事件,读写等交给后续线程去处理(实际上也只有一个线程),一个线程去处理自然引起性能问题.当事件队列过多的时候就会出问题.那我们可以对无状态的几个操作进行线程池的优化
+
+- reactor 所有请求打过来这,没有前方路由不能多线程,有前方路由多实例,这里只是作为一个中转的功能去设计
+- accepor accept请求,这个会产生一个socket,本身不是阻塞的
+
+
+
+![](https://pic1.zhimg.com/80/v2-d60a5c2c930e3ec611855d387d2429ec_720w.jpg)
+
+单reactor多线程模型改进是把处理请求的部分利用线程池进行了多线程的处理.Reactor承担所有线程的监听和相应.这也体现了对于无关乎调度状态的操作可以交给后续的并发的线程池去处理.
+
+![](https://pic2.zhimg.com/80/v2-ca0ee6f64ec8654ba143c30548874095_720w.jpg)
+
+上面其实还可以拆分,注意到只有连接是需要等待三次握手完成才能accept出socket,所以单线程去处理连接请求,多线程去处理其他请求,可以尽可能的减少阻塞的部分.
+
+#### redis 的线程模型
+
+![](https://img-blog.csdnimg.cn/20190918215924363.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3hwX3hweHA=,size_16,color_FFFFFF,t_70)
+
+![](https://img-blog.csdnimg.cn/20190615185708852.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM4NjAxNzc3,size_16,color_FFFFFF,t_70)
+
+![](https://segmentfault.com/img/remote/1460000040376115)
+
+显而易见的,redis6.0的多线程操作和redis6.0以下的单线程操作其实是一样的,其核心都使用了主线程进行执行,不过网络的读写交给了多线程组去执行,即并发度更高了
+
+
+
+redis提供了原子性的保证,即执行的指令可以被合称为一个**[ae事件](http://www.web-lovers.com/redis-source-ae.html)**,可以由lua脚本保证
+
+> ## Redis is single threaded. How can I exploit multiple CPU / cores?
+>
+> **It's not very frequent that CPU becomes your bottleneck with Redis, as usually Redis is either memory or network bound.** For instance, using pipelining Redis running on an average Linux system can deliver even 1 million requests per second, so if your application mainly uses O(N) or O(log(N)) commands, it is hardly going to use too much CPU.
+>
+> However, to maximize CPU usage you can start multiple instances of Redis in the same box and treat them as different servers. At some point a single box may not be enough anyway, so if you want to use multiple CPUs you can start thinking of some way to shard earlier.
+>
+> However with Redis 4.0 we started to make Redis more threaded. For now this is limited to deleting objects in the background, and to blocking commands implemented via Redis modules. For future releases, the plan is to make Redis more and more threaded.
+
+6.0的性能比之前提高了一倍,使用多线程相当于把原来单线程的写回socket这部分操作从单线程变成了多线程
 
 ### redis数据结构
 

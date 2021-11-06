@@ -351,6 +351,109 @@ System.out.println(l1.getClass() == l2.getClass()); // true
 
 **泛型信息只存在于代码编译阶段，在进入 JVM 之前，与泛型相关的信息会被擦除掉，专业术语叫做类型擦除**
 
+#### 可变长度参数的语法糖
+
+```java
+void func(String...a); func("hello", "world");
+// 实际上编译器会把它变成
+void func(String...a); func(new String[]{"hello", "world"});
+// 所以只要在可变参数的地方传入对应的Array类型即可使用可变长度参数
+```
+
+
+
+### Date和LocalDate
+
+---
+
+Date的使用方式大致如下
+
+```java
+Date date = new Date(); // 得到现在时间,也可以自行设计
+SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+sdf.format(date);
+```
+
+Date本质上保存了一个时间戳,在不同的时区会解析出不同的时间,比如代码运行在北京和东京服务器中打印的东西就不一致.
+
+JDK1.8之后就使用了新的API,利用LocalDate,LocalTime,LocalDateTime来获取时间.主要解决了虾米你的问题
+
+- Date在打印日期的时候可读性比较差
+- SimpleDateFormat不是线程安全的(底层使用calendar来作为共享变量),多线程环境得用ThreadLocal去设计
+
+LocalDate获取年月日,LocalTime获取当地时间,LocalDateTime相当于获取时分秒
+
+```java
+LocalDate localDate = LocalDate.now();
+int y = localDate.getYear();
+LocalTime localTime = LocalTime.now();
+int h = localTime.getHour();
+LocalDateTime localDateTime = LocalDateTime.now();
+```
+
+创建自己的日期可以使用下面的方法
+
+```java
+LocalDate.of(2020,6,18);
+```
+
+格式化时间
+
+```java
+DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+String time = localDate.format(dateTimeFormatter);
+```
+
+创建带有时区信息的时间
+
+```java
+LocalDateTime.now(ZoneOffset.UTC);
+```
+
+### Date和LocalDateTime
+
+---
+
+JDK1.8里使用LocalDateTime.Date的使用有两个问题
+
+- date保存时间戳信息,不同的时区读出来的时间不相同.
+- date用于转换时间格式的SimpleDateFormat是线程不安全的,得使用ThreadLocal保证线程安全
+
+以时间转换为例子
+
+Data的时间转换如下
+
+```java
+public static String getFormatTimeNow(String format) {
+  SimpleDateFormat sdf = new SimpleDateFormat();
+  return sdf.format(new Date());
+}
+public static String getMinTimeStampNow() {
+  Date date = new Date();
+  return String.valueOf(date.getHours() * 60 + date.getMinutes());
+}
+```
+
+LocalDateTime的时间转换如下
+
+```java
+public static String getFormatTimeNow(String format) {
+  LocalDateTime dt = LocalDateTime.now();
+  DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(format);
+  return dt.format(dateTimeFormatter);
+}
+public static String getMinTimeStampNow() {
+  LocalDateTime ldt = LocalDateTime.now(ZoneOffset.UTC);
+  return String.valueOf(ldt.getHour() * 60 + ldt.getMinute());
+}
+```
+
+
+
+
+
+
+
 ### 排序与稳定性
 
 堆排序、快速排序、希尔排序、直接选择排序是不稳定的排序算法,基数排序、冒泡排序、直接插入排序、折半插入排序、归并排序是稳定的排序算法.

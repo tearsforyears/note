@@ -151,7 +151,31 @@ c++的类在java中的职责如下
 
 所以从这里我们可以看到**java的对象其实例数据保存在堆上,其本质是oop对象,其引用保存在栈上,其元信息保存在方法区,本质上是klassOop对象.**
 
+#### Klass 数据结构
 
+oop(Object-Oriented Programming)和oop(ordinary object pointer)普通对象指针不是同一个东西,klass-oop体系中的oop指的是后者.oop作为普通对象的指针,直接受到GC管辖.除了markOopDesc外,所有的实例都有GC管理.markOopDesc是直接对象(例如int直接存储在指针里,不再去堆中进行查找)
+
+- oop用于表示对象的实例信息,其指向堆内存中的首地址
+- klass则是包含元数据和方法信息
+
+![](https://img-blog.csdnimg.cn/20190630101729566.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3Npbm9sb3Zlcg==,size_16,color_FFFFFF,t_70)
+
+上面的图描述了两模型三维度的映射.两模型指的是oop和klass,而klass从元数据和函数分发表(虚函数表/分发规则)两个维度去描述一个Java类.元信息是实现反射的关键数据结构,能在运行时动态的反射出类的信息.
+
+oop的模型描述中,不同的结构(类,方法,成员变量,常量,数组)用不同的oop去描述,oop的顶层类是oopDesc其包含了两个成员变量`_mark`用来保存markword的地址,`_metadata`用于保存元数据的指针.元数据用于描述一个类的TYPE(比如class,enum,interface,@interface),修饰符,类名,字节码,成员变量,静态区域等.
+
+从这个角度我们介绍下Hotspot的加载顺序`ClassA a = new ClassA()`
+
+- 把ClassA加载到perm区（方法区），创建instanceKlass用于描述这个类,和instanceOop用于指向instanceKlass
+- 在堆中给实例对象开辟内存空间,存放实例数据
+
+![](https://img-blog.csdnimg.cn/20190630101040739.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3Npbm9sb3Zlcg==,size_16,color_FFFFFF,t_70)
+
+除此之外,JVM内部还有一种类叫handle
+
+![](https://img-blog.csdnimg.cn/20190630101849710.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3Npbm9sb3Zlcg==,size_16,color_FFFFFF,t_70)
+
+handle主要是用于作为oop和klass的一个封装,其最终就能操纵二者的行为.如果在其内部调用C++对应的oop函数可以不需要handle来中转,直接通过拿到oop拿到指定的klass.这个handle模型其实是Java类行为的表达.
 
 ---
 

@@ -13,9 +13,158 @@
 -   日志系统(内存管理)
 -   并发控制与实现MVCC,事务
 
+## 高级语法及命令
+
+一些语句
+
+- `alter table Video add columzhege1n videoLevel int(11)`
+- `mysql -h {host/Ip} -P 3306 -u username -p password`链接远程数据库
+
+varchar和char的区别
+
+- char是长度固定的,varchar的长度是不固定的
+- char(10) 表示存储的字符占10个字节
+- varchar(10) 表示只占3个字节,最大值是10
+- char的效率要更高点,varchar比char更节省空间
+
+datetime和varchar查询效率在2倍左右[全表扫描]
+
+数据注入思路:如果要注入数据,大型的可以考虑python脚本,小型的考虑生成insert语句而不直接通过java去操作数据库.
 
 
-## JDBC的读取细节
+
+### in 的用法
+
+```sql
+select * from plugin where (pluginId,versionCode) in
+(select * from (select pluginId,max(versionCode) from plugin
+where (minFrameworkVersion <= ?1 and frameworkVersion >= ?2)
+group by pluginId limit ?3 offset ?4) as t)
+```
+
+
+
+### JDBCTemplate
+
+正如 Dao 一样,Springboot 对 JDBC 的操作也进行了封装,让我们可以使用 JDBCTemplate 去操作数据库.同理可以使用 hibernate 的 entityManager 去完成类似的操作.
+
+```java
+@Autowired
+@PersistenceContext
+private EntityManager entityManager;
+
+private List<BanWord> searchByCondition(String condition, String blackword, String whiteword,
+                                        int limit, int offset) {
+  String sql = "select * from ban_word where morphemeId in (select * from "
+    + "(select t.morphemeId from "
+    + "(select morphemeId from ban_word where type=1 and word like '%" + blackword + "%' "
+    + condition + " ) as t "
+    + "INNER JOIN "
+    + "(select morphemeId from ban_word where type=0 and word like '%" + whiteword + "%' "
+    + condition + " ) as b "
+    + "on t.morphemeId = b.morphemeId group by morphemeId limit " + limit + " offset " + offset
+    + ") as v)";
+  System.out.println(sql);
+  Query q = entityManager.createNativeQuery(sql, BanWord.class);
+  List<BanWord> results = q.getResultList();
+  System.out.println(results);
+  return results;
+}
+```
+
+### 调试命令
+
+- explain
+- show processlist
+
+#### explain
+
+explain 命令有一点 个 extra 属性
+
+- using index 指完全覆盖索引
+- using index condition 查询的列不全在索引中,是一个前导列的范围
+- using where;using index; 覆盖索引,但并不是前导列
+- using where 可能需要全表扫描 或者扫描索引
+
+前导列及using where和 using index 的区别
+
+```sql
+create index idx(a,b,c) on table
+```
+
+那么前导列就是 a,ab.abc,而单独的b是不会使用索引的
+
+#### show processlist
+
+表示用来查看正在进行的线程,但一般只能用来查看自己执行的线程,所以需要通过同一身份登录或者赋予权限.如下数据结构
+
+![](https://pic3.zhimg.com/80/v2-eb4254945a43d5fdc0e8718da8183aa6_1440w.jpg)
+
+这个信息其实是来自于 information_schema 这张表,其中 time 表示线程处于当前状态的时间.info 会用于记录当前执行的语句,可以用来排查慢查询,其中time的时间单位是s
+
+Command 的值：
+
+- Binlog Dump: 主节点正在将二进制日志 ，同步到从节点
+- Change User: 正在执行一个 change-user 的操作
+- Close Stmt: 正在关闭一个Prepared Statement 对象
+- Connect: 一个从节点连上了主节点
+- Connect Out: 一个从节点正在连主节点
+- Create DB: 正在执行一个create-database 的操作
+- Daemon: 服务器内部线程，而不是来自客户端的链接
+- Debug: 线程正在生成调试信息
+- Delayed Insert: 该线程是一个延迟插入的处理程序
+- Drop DB: 正在执行一个 drop-database 的操作
+- Execute: 正在执行一个 Prepared Statement
+- Fetch: 正在从Prepared Statement 中获取执行结果
+- Field List: 正在获取表的列信息
+- Init DB: 该线程正在选取一个默认的数据库
+- Kill : 正在执行 kill 语句，杀死指定线程
+- Long Data: 正在从Prepared Statement 中检索 long data
+- Ping: 正在处理 server-ping 的请求
+- Prepare: 该线程正在准备一个 Prepared Statement
+- ProcessList: 该线程正在生成服务器线程相关信息
+- Query: 该线程正在执行一个语句
+- Quit: 该线程正在退出
+- Refresh：该线程正在刷表，日志或缓存；或者在重置状态变量，或者在复制服务器信息
+- Register Slave： 正在注册从节点
+- Reset Stmt: 正在重置 prepared statement
+- Set Option: 正在设置或重置客户端的 statement-execution 选项
+- Shutdown: 正在关闭服务器
+- Sleep: 正在等待客户端向它发送执行语句
+- Statistics: 该线程正在生成 server-status 信息
+- Table Dump: 正在发送表的内容到从服务器
+- Time: Unused
+
+查看执行时间特别长的线程
+
+```sql
+select * from information_schema.processlist where Command != 'Sleep' order by Time desc;
+```
+
+分组查看客户端的连接数
+
+```sql
+select client_ip,count(client_ip) as client_num from (select substring_index(host,':' ,1) as client_ip from processlist ) as connect_info group by client_ip order by client_num desc;
+```
+
+生成 kill 语句用于消灭5分钟以上的线程
+
+```sql
+select concat('kill ', id, ';') from information_schema.processlist where Command != 'Sleep' and Time > 300 order by Time desc;
+```
+
+#### 慢查询相关
+
+```sql
+SHOW VARIABLES LIKE '%query%' # 查询慢查询日志
+SHOW STATUS LIKE '%slow_queries%' # 查看慢查询状态
+```
+
+需要开启慢查询日志 `slow_query_log = on`,然后通过慢查询日志 tail -f 就可以分析相应的状态,慢查询的时间可以自己定义,默认是10秒,但可以进行设置 `long_query_time`
+
+
+
+## JDBC
 
 ---
 
@@ -840,11 +989,82 @@ explain  可以通过 `Using index condition` 来确定是否使用索引下推
 >组合索引满足最左匹配，但是遇到非等值判断时匹配停止。
 >name like '陈%' 不是等值匹配，所以 age = 20 这里就用不上 (name,age) 组合索引了。如果没有索引下推，组合索引只能用到 name，age 的判定就需要回表才能做了。5.6之后有了索引下推，age = 20 可以直接在组合索引里判定。
 
+### 在线DDL
+
+[参考](https://www.cnblogs.com/xinysu/p/6732646.html)
+
+5.6.7 以前 InnoDB支持两种表的DDL方式
+
+- copy table
+- inplace
+
+#### copy table
+
+- 创建临时表,在临时表上执行DDL
+- 锁表,不允许DML,允许查询
+- 数据逐行写入临时表中
+- 写入后原表停止读取
+- rename 重命名表完成DDL
+
+#### inplace
+
+仅针对索引的创建和删除,不支持其他表结构的修改
+
+- 新建frm临时文件
+- 锁原表,不允许DML,允许查询
+- 按照聚集索引的顺序,查询数据,找到需要的索引列数据,排序后插入到新的**索引页**中
+- 禁止原表读写
+- 进行 rename 操作替换 frm 文件
+
+inplace 在 copy table 的基础上进行了一个改进就是不需要取所有的数据,但是其相当于重构索引,这个时候数据是变少了但是也只能够去修改索引而不能修改表的结构,因为修改表的结构需要额外的操作支持不像索引比较简单
+
+对于线上而言无论是上面那种都只是支持查找,在DDL期间写将会失效.在5.6.7以后 mysql 支持动态 DDL
+
+5.6.7以后其会按照下面的形式支持,如果是不支持 online ddl 的 sql 会走 copy table的路径 
+
+![](https://images2015.cnblogs.com/blog/608061/201704/608061-20170419114223009-2125010920.png)
+
+ddl 以类似事务的方式执行,但不需要记录 redo-log 和 undo-log
+
+- 需要rebuild: 利用 row_log 对象记录增量, **row_log** 记录的增量最后会放到一个 block 中
+- 不需要rebuild: 生成临时的 idb 文件,重建索引块
+- 提交
+
+在 ddl 期间如果数据发生修改数据本身是会直接刷到 idb 文件中, row_log 应该是记录了主键,然后通过主键来确定新增的数据
+
+## 分库分表
+
+常用的数据库中间件有 mycat 和 shardingsphere,两者之间的对比[参考](https://blog.csdn.net/yiyihuazi/article/details/107836304),从性能的角度看 Sharding-JDBC的侵入式稍微强点,性能也稍微高点.
+
+### mycat
+
+mycat是基于Cobar演变而来,其是实现了MySQL协议的一个Server.如下我们可以看到其主要功能
+
+![](https://img-blog.csdnimg.cn/20200514152508518.png?#pic_center)
+
+其主要作为一个代理访问数据库的中间件使用
 
 
 
 
-## mysql日志系统
+
+
+
+---
+
+> 上文所述基本是实现业务相关内容,下文主要探讨 mysql 服务器实现相关内容
+>
+> 此处特别鸣谢 @wudayuan 分享,整理的下面一部分知识点,参考自 mysql 的官网和 innodb
+
+---
+
+## mysql 服务器结构
+
+
+
+
+
+## 日志系统
 
 主要分为以下几个日志
 
@@ -909,14 +1129,6 @@ binlog 有三种格式
 - 错误日志
 - 中继日志(slave 配合 master 进行 binlog 复制)
 - 一般查询日志(general log)
-
-
-
-## 事务
-
----
-
-// TO-DO
 
 
 
@@ -1358,11 +1570,23 @@ update Items set quantity=quantity-2 where id=100;
 
 
 
+## innodb 的存储结构
+
+- frm 文件是表的结构描述文件
+- idb 文件,innodb 特有的文件存储数据和索引
+- par 文件是分区之后的信息存储文件
+
+如果是 myisam 的结构,其数据和索引是分开存放的分别存放于 `MYD` 和 `MYI`文件中
 
 
-## sql 优化器
 
-### 谓词下推
+
+
+
+
+## 存储引擎和 sql 优化
+
+### 谓词下推 ICP
 
 ```sql
 select *

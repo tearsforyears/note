@@ -877,13 +877,84 @@ System.out.println(operations.get("user"));
 
 ## **springboot-jpa(hibernate)**
 
-jpa是Java Persistence API 指的是一套持久化的规范,springboot-jpa是基于jpa在spring上的一套实现,我们可以不再编写传统的CRUD操作
+jpa是Java Persistence API 指的是一套持久化的规范,springboot-jpa是基于jpa在spring上的一套实现,我们可以不再编写传统的CRUD操作,**JPA 适用于开发后台程序**,对sql不需要特别多的精准控制,**其核心特点就是开发速度极快,但tkmybatis等框架也让Jpa优势没有那么大**
 
-普通Pojo类得标注@Entity 被JPA 引用 可以添加@Column
+关键注解
 
-标注@Repositroy被spring引用
+- @Entity @Table 两者都是用于关联表和pojo,前者标准,后者自定义映射规则
+- @EnableJpaAuditing @EntityListeners 在持久化时进行监听
+- @Enumerated 用于表示枚举类型在数据库中的存储形式,一般是在数据库中存的数字,这里可以转化成存String类型
+- @Temporal(TemporalType.TIME) 用于指定时间格式
+- @LastModifiedDate , @CreatedDate 对应数据库两个字段
+- @DynamicUpdate @DynamicInsert 自动生成更新和插入语句
+- @Convert
 
-DAO等接口标注 @Component 用以被 @Autowried注入
+```java
+@Data
+@Entity
+@Table(name = "PushQueue",
+    indexes = {@Index(name = "uniq_region_name", columnList = "region,name")})
+@EntityListeners(AuditingEntityListener.class) // 指定监听类回调监控持久化
+public class PushQueue {
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private long id;
+
+  @Convert(converter = LongListToStringConverter.class)
+  private List<Long> relatedUserGroup;
+
+  private String timezone;
+
+  @Convert(converter = StringListToStringConverter.class)
+  private List<String> scheduleTime;
+
+  @Convert(converter = StringListToStringConverter.class)
+  private List<String> subRegions;
+
+  @Temporal(TemporalType.TIMESTAMP)
+  @CreatedDate
+  private Date createTime;
+}
+```
+
+
+
+添加自定义方法与高级条件查询
+
+原生查询,一般不会多使用,因为其涉及到表明等问题
+
+```java
+@Query(value = "select * from book b where b.name=?1", nativeQuery = true) // ?1 表示一个参数
+List<Book> findByName(String name); // List<Book> findByName(@Param("name") String name);
+
+@Query(value = "select name,author,price from Book b where b.name like %:name%") // 注入属性
+List<Book> findByNameMatch(@Param("name") String name);
+```
+
+specification提供了更加复杂的条件查询,其整体可以理解为一个条件
+
+```java
+public interface PushVideoRepository extends JpaRepository<PushVideo, Long>,
+JpaSpecificationExecutor<PushVideo> {
+
+}
+
+static Specification<PushVideo> sourceKey(String sourceKey) {
+  return (root, query, cb) -> cb.equal(root.get("sourceKey"), sourceKey);
+  // 这三个参数形式固定
+  // Root<T> root, CriteriaQuery<?> query, CriteriaBuilder cb
+  // 其实就是生成查询条件,上面的形式比较固定,用于生产Specification
+  // 上述代码的作用就是生成 sourceKey == sourceKey的条件
+  // 这三个处理如下
+}
+```
+
+- root
+  Root接口，主要用于处理实体和字段、实体与实体之间的关系。除了上述例子中的取字段的操作以外，还可以做join操作。
+- query
+  CriteriaQuery接口，主要用于对查询结果的处理，包括groupBy、orderBy、having、distinct等操作。
+- criteriaBuilder
+  CriteriaBuilder接口，主要用于各种条件查询、模拟sql函数等。
 
 ### 基本查询
 
@@ -1128,8 +1199,6 @@ spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 orm框架发展到现在就剩以mybatis/mybatis-plus的灵活sql和不用写一句sql,jpa-hibernate为顶层的两大框架,hibernate经过jpa优化已经开发难度已经很低了,而mybatis经过注解等优化之后基本也是非常完善的技术体系了 按照经验而言mybatis给了DBA存在的理由 优化可以做的特别好
 
-按照经验而言 互联网公司一般用mybaits 非互联网公司用hibernate
-
 -   @Mapper 标注在Mapper上 
 -   @MapperScan("com.example.mapper") 标注在启动类上
 
@@ -1267,6 +1336,608 @@ public interface UserMapper extends BaseMapper<User> {
   // 如果需要类jpa的查询方式可以使用 不过用mybatis原生查询会比较好
 }
 ```
+
+mybatis 少了 jpa 的部分创建语句多了部分 sql,除了 原生的 mybatis,mybatis 之外,还可以使用 tkmybatis 进行更加优化查询的方式
+
+
+
+```xml
+ <dependency>
+   <groupId>tk.mybatis</groupId>
+   <artifactId>mapper-spring-boot-starter</artifactId>
+   <version>2.1.5</version>
+</dependency>
+```
+
+```java
+public interface HouseMapper extends Mapper<House>,MySqlMapper<House> {
+}
+```
+
+除此之外可以使用 Example 动态拼接 sql 进行查询和删除等
+
+```java
+@Override
+  public DataPage<Experiment> search(Integer limit, Integer offset, Long id, Long parentId,
+      String name, Integer status) {
+    Example example = new Example(Experiment.class);
+    example.and()
+        .andEqualTo("id", id)
+        .andEqualTo("parentId", parentId)
+        .andEqualTo("status", status)
+        .andLike("name", StringUtil.isEmpty(name) ? null : "%" + name + "%")
+    ;
+    int total = experimentMapper.selectCountByExample(example);
+    List<Experiment> data = experimentMapper.selectByExample(example);
+    return DataPage.<Experiment>builder()
+        .data(data)
+        .total(total)
+        .nextOffset(Math.min(offset + limit, total))
+        .build();
+  }
+```
+
+自动建表可以使用下面的方法
+
+```xml
+<dependency>
+    <groupId>com.gitee.sunchenbin.mybatis.actable</groupId>
+    <artifactId>mybatis-enhance-actable</artifactId>
+    <version>1.0.3</version>
+</dependency>
+```
+
+```properties
+mybatis.table.auto=update
+mybatis.model.pack=com.example.entity
+mybatis.database.type=mysql
+```
+
+
+
+## spring缓存
+
+- 在介绍SpringCache之前.我们先来说说缓存的作用,一般对于后端程序而言,耗时操作有两个地方
+
+  - 查询数据库
+  - 调用其他服务的API(其他的服务也会最终去调用数据库的查询).
+
+  重复查询的如果每次都使用数据库那么其就有非常大的流量进入.缓存的框架大概分为以下的几类
+
+  - redis
+  - memcached
+  - guava
+  - caffeine
+
+  spring就提供了一种缓存技术用于缓存本地的key-value对,其有如下特性
+
+  - 支持SpEL
+  - 支持注解
+  - 支持自己定义key和定义缓存池
+
+  我们来介绍其使用,配置好一缓存池,比如spring自带的缓存池,可以用
+
+  ```xml
+  <bean id="cacheManager" class="org.springframework.cache.support.SimpleCacheManager">
+    <property name="caches">
+      <set>
+        <bean class="org.springframework.cache.concurrent.ConcurrentMapCacheFactoryBean">
+          <property name="name" value="default"/>
+        </bean>
+        <bean class="org.springframework.cache.concurrent.ConcurrentMapCacheFactoryBean">
+          <property name="name" value="accountCache"/>
+        </bean>
+      </set>
+    </property>
+  </bean>
+  ```
+
+  ```java
+  @Cacheable(value="accountCache") // 使用了accountCache这个缓存池.
+  public Account getAccountByName(String accountName) {
+    // 方法内部实现不考虑缓存逻辑，直接实现业务
+    logger.info("real querying account... {}", accountName);
+    Optional<Account> accountOptional = getFromDB(accountName);
+    if (!accountOptional.isPresent()) {
+      throw new IllegalStateException(String.format("can not find account by account name : [%s]", accountName));
+    }
+    return accountOptional.get();
+  }
+  ```
+
+  这个注解的意思没有的话使用下面的代码段获取数据,否则就把数据加载到缓存.顶层还是用到了一个cacheManager.除此之外我们还需要清空缓存的逻辑.
+
+  ```java
+  // 使用了一个缓存名叫 accountCache
+  @Cacheable(value="accountCache")
+  public Account getAccountByName(String accountName) {
+    // 方法内部实现不考虑缓存逻辑，直接实现业务
+    logger.info("real querying account... {}", accountName);
+    Optional<Account> accountOptional = getFromDB(accountName);
+    if (!accountOptional.isPresent()) {
+      throw new IllegalStateException(String.format("can not find account by account name : [%s]", accountName));
+    }
+    return accountOptional.get();
+  }
+  
+  @CacheEvict(value="accountCache",key="#account.getName()") // 清空缓存,以Account的name作为key去标识缓存的不同
+  public void updateAccount(Account account) {
+    updateDB(account);
+  }
+  
+  @CacheEvict(value="accountCache",allEntries=true) //
+  public void reload() {
+    
+  }
+  ```
+
+  可以做条件缓存,如下.给`accountName.length() < 4`,这condition指定一个boolean值返回就可以.指定可以是SpEL.
+
+  ```java
+  @Cacheable(value="accountCache",condition="#accountName.length() <= 4") // 缓存名叫 accountCache 
+  public Account getAccountByName(String accountName) {
+      // 方法内部实现不考虑缓存逻辑，直接实现业务
+      return getFromDB(accountName);
+  }
+  ```
+
+  强制更新缓存
+
+  ```java
+   // 更新 accountCache 缓存
+   @CachePut(value="accountCache",key="#account.getName()")
+   public Account updateAccount(Account account) { 
+     return updateDB(account); 
+   }
+  
+   private Account updateDB(Account account) { 
+     logger.info("real updating db..."+account.getName()); 
+     return account; 
+   }
+  ```
+
+  一般使用的就是以下三个注解
+
+  - @Cacheable 设置缓存,**一般用在查询方法上**
+  - @CachePut 没次都会触发方法调用,**一般用在新增方法上**
+  - @CacheEvict 根据一定条件对缓存进行清空,**一般用在修改或是删除方法上**
+
+  因为查询用的比较多我们通过一些SpEL来看看@Cacheable的其他用法
+
+  ```java
+  @Cacheable(value = "user-group", cacheManager = "redisCacheManager", // value是用来指定组件的名字
+        key = "#groupId + ':amount'", // #groupId代表了参数,SpEL这句话的含义即是字符串拼接,key代表了含义是缓存里的key
+             unless = "#result < 0") // #result代表了方法执行后的返回值,这句话的含义是一个条件表达式
+  public long getGroupUserAmount(String queryId, String groupId) {}
+  ```
+
+  注意到上面注解还有unless属性
+
+  - unless属性是这个条件为true的时候,方法的返回值就不会被缓存
+  - 同理还有condition属性,即只有condition为true的时候该方法才会被缓存
+
+  
+
+  spring的缓存有一些缺点,我们可以通过第三方缓存来解决这个问题
+
+  - 不支持高可用
+  - 不支持分布式
+
+  spring给我们提供了一个cache接口
+
+  ```java
+  import org.springframework.cache.support.AbstractCacheManager;
+  ```
+
+  我们可以实现其中一些方法让他拥有使用,我们实现其管理器和自己的缓存
+
+  ```java
+   public class MyCacheManager extends AbstractCacheManager { 
+     private Collection<? extends MyCache> caches;
+     /** 
+     * Specify the collection of Cache instances to use for this CacheManager. 
+     */ 
+     public void setCaches(Collection<? extends MyCache> caches) { 
+       this.caches = caches; 
+     } 
+     @Override 
+     protected Collection<? extends MyCache> loadCaches() { 
+       return this.caches; 
+     } 
+   }
+  
+   public class MyCache implements Cache { 
+     private String name; 
+     private Map<String,Account> store = new HashMap<String,Account>();; 
+  
+     public MyCache() { 
+     } 
+  
+     public MyCache(String name) { 
+       this.name = name; 
+     } 
+  
+     @Override 
+     public String getName() { 
+       return name; 
+     } 
+  
+     public void setName(String name) { 
+       this.name = name; 
+     } 
+  
+     @Override 
+     public Object getNativeCache() { 
+       return store; 
+     } 
+  
+     @Override 
+     public ValueWrapper get(Object key) { 
+       ValueWrapper result = null; 
+       Account thevalue = store.get(key); 
+       if(thevalue!=null) { 
+         thevalue.setPassword("from mycache:"+name); 
+         result = new SimpleValueWrapper(thevalue); 
+       } 
+       return result; 
+     } 
+  
+     @Override 
+     public void put(Object key, Object value) { 
+       Account thevalue = (Account)value; 
+       store.put((String)key, thevalue); 
+     } 
+  
+     @Override 
+     public void evict(Object key) { 
+     } 
+  
+     @Override 
+     public void clear() { 
+     } 
+   }
+   
+  ```
+
+  我们可以用以下两种高性能缓存库
+
+  - guava
+  - caffeine
+
+  ```xml
+  <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-cache</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>com.github.ben-manes.caffeine</groupId>
+    <artifactId>caffeine</artifactId>
+    <version>2.7.0</version>
+  </dependency>
+  ```
+
+  ```java
+  @Configuration
+  public class CacheManagerConfig {
+    @Bean
+    public CacheManager localCacheManager() {
+      CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+      cacheManager.setCaffeine(Caffeine.newBuilder().expireAfterWrite(2, TimeUnit.HOURS));
+      return cacheManager;
+    }
+  }
+  ```
+
+  然后我们在springboot上标注相应的注解,就可以使用了
+
+  ```java
+  @EnableCaching
+  ```
+
+  
+
+## AOP
+
+使用强制代理方法,我们知道在初始化类的过程时才会完成代理,但有些时候我们需要在本类调用其内部方法,又要其发生代理,我们可以直接这么写其方法,可以强制其代理invokeMethod
+
+```java
+public void method(){
+	((ThisServiceImpl) AopContext.currentProxy()).invokeMethod(url);
+}
+```
+
+我们对注解进行拦截就可以使其实现一定的功能如下
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TimerLog {
+  String name() default "";
+}
+
+@Component
+@Aspect
+@Slf4j
+public class TimeLogAspect {
+
+  @PostConstruct
+  public void init() {
+    log.info("[TimerLogAspect] init in spring context");
+  }
+
+  @Pointcut("@annotation(com.dayuwuxian.plugin.annotation.TimerLog)")
+  public void TimerLog() {
+  }
+
+  @Around("TimerLog()")
+  public Object toTimerLog(ProceedingJoinPoint pjp) throws Throwable {
+    MethodSignature signature = (MethodSignature) pjp.getSignature();
+    TimerLog annotation = signature.getMethod().getAnnotation(TimerLog.class);
+    long start = System.currentTimeMillis();
+    Object o = pjp.proceed();
+    log.info("{} cost {} ms ", annotation.name(), System.currentTimeMillis() - start);
+    return o;
+  }
+}
+
+```
+
+
+
+## Bean生命周期的控制方法
+
+- @PostConstruct
+- @PreDestory
+- @Autowired
+- InitializingBean接口
+- DisposableBean接口
+
+```java
+@Component
+public class InitSequenceBean implements InitializingBean,DisposableBean {
+    public InitSequenceBean() {
+       System.out.println("constructor");
+    }
+  	
+  	@Autowired
+  	public static InitClass initClass; 
+  	// class InitClass{ static{ System.out.println("invoke");} }  
+      
+    @PostConstruct
+    public void postConstruct() {
+       System.out.println("postConstruct");
+    }
+  
+  	@PreDestroy
+  	public void preDestory(){
+      System.out.println("preDestory");
+    }
+  
+  	@Override
+  	public void destory(){
+      System.out.println("destory");
+    }
+    @Override
+    public void afterPropertiesSet() throws Exception {
+       System.out.println("afterPropertiesSet");
+    }
+}
+```
+
+代理之后的输出结果
+
+```shell
+constructor
+postConstruct
+invoke
+afterPropertiesSet
+# init method
+preDestory
+destory
+```
+
+
+
+
+
+## RestTemplate
+
+一个请求的通用接口,可以通过 setClientHttpRequestFactory 指定底层的请求库,默认使用了 java.net.HttpUrlConnection 包实现了Http请求,就和 python 的 requests 库一样,我们可以用来实现爬虫等,其在项目中的整体作用就是用于实现远程调用
+
+- RestTemplate用于发送Http请求时,如果是Get请求参数直接拼接到url上,如果是Post请求的话要用`postForObject`要拼接map用于注入.
+- 经过测试其发送的报文可能会和想象中的不一样,熟悉报文的请研究好报文体在发送请求
+
+关键方法
+
+```java
+```
+
+
+
+
+
+## 定时调度
+
+- @Scheduler
+
+我们这里讨论定时任务的一些细节,假设一个定时任务每5s执行一次,但任务本身耗时6s.
+
+- Cron默认处理是等待上一个任务执行完成之后再去执行下一个任务,**且在执行任务时间过长的时候会进行判断跳到下一个时间段**,即**默认单线程**
+- 指定fixedDelay,即上一任务执行完成之后多久才执行下一任务
+- 指定fixedRate,上一任务和下一任务开始时间的间隔,**当上一次任务没有执行完执行上次完成后再去执行下一个**
+
+使用场景
+
+- fixedDelay用于两个任务之间延迟时间的指定
+- fixedRate是两次任务开始之间的间隔,不会跳过,顺序执行
+- cron配置了哪一刻执行任务,如果不能执行则会跳过
+
+强调任务间隔的定时任务,使用fixedRate和fixedDelay,强调某时某刻某分执行的任务使用cron表达式
+
+### 定时调度的多线程配置
+
+因为@Scheduler的默认配置是单线程实现的,某些场景会造成堵塞,对于每个任务都新起一个线程去执行的情况,可以使用`@Async`注解.
+
+```java
+@Scheduled(cron = "0/2 * * * * ?")
+@Async("threadPoolBean")
+public void doTask() throws InterruptedException {
+  logger.info(Thread.currentThread().getName()+"===task run");
+  Thread.sleep(6*1_000);
+  logger.info(Thread.currentThread().getName()+"===task end");
+}
+```
+
+这样就完成了我们的需求.@Async的默认线程池数量是100,我们可以把线程池的一些核心参数自己配置.
+
+
+
+## 其他语法相关
+
+@Autowired
+
+```java
+@Autowired
+List<Job> ls; // spring语法,可以把所有的实现了Job接口的Bean都导入进来
+
+BeanUtils.copyProperties(source,target); // 浅拷贝复制相同的属性
+
+@Value("${val:default_val}") // spel表达式的默认值
+String value;
+
+/**利用构造方法一并 autowired **/
+private final TopicRepository topicRepository;
+private final TopicVideoRelRepository tvRepository;
+
+@Autowired
+public TopicServiceImpl(TopicRepository topicRepository,
+                        RedisTopicCache redisTopicCache) {
+  this.topicRepository = topicRepository;
+  this.redisTopicCache = redisTopicCache;
+}
+
+```
+
+实现ApplicationContextAware接口获取上下文
+
+```java
+private static ApplicationContext context;
+private transient AutowireCapableBeanFactory beanFactory;
+@Override
+public void setApplicationContext(ApplicationContext ctx) throws BeansException {
+  beanFactory = ctx.getAutowireCapableBeanFactory();
+  context = ctx;
+}
+```
+
+### enum类
+
+所有的枚举类都继承于`java.lang.Enum`,枚举是一种常见形式的常量定义,避免我们书写过多的final static的一种特殊类型
+
+简单使用,其实就相当于一个常量的存储库
+
+```java
+public enum TestEnum{
+  VAL1,VAL2
+}
+
+@Test
+public void test(){
+  TestEnum val = TestEnum.VAL1;
+  System.out.println(val);
+  System.out.println(val instanceof java.lang.Enum);
+}
+```
+
+枚举类的基本实现原理
+
+编译器会生成一个相关的类,这个类继承抽象类`java.lang.Enum`,除此之外还有两个static方法,`valuesOf`和`values`方法.我们可以通过该方法遍历到其所有属性,其内部还有一方法叫`ordinal`用于标注其顺序,如下所以本质上其内部使用的是int作为顺序去进行传递,同时其实现了compareable接口,也是根据此来进行比较的
+
+```java
+public final int ordinal() {
+  return ordinal;
+}
+```
+
+我们观察期代码还会发现一个全量构造器
+
+```java
+protected Enum(String name, int ordinal) {
+  this.name = name;
+  this.ordinal = ordinal;
+}
+```
+
+然后我们可以利用如下进行定义和声明
+
+```java
+public enum Day{
+  MONDAY("周一",1),
+  TUESDAY("周二",2),
+  WEDNESDAY("周三",3); // 这里要用分号结束
+  
+  // 成员变量和方法定义
+  private String desc;
+  public String getDesc(){
+    return desc;
+  }
+  public String setDesc(String desc){
+    this.desc = desc;
+  }
+}
+```
+
+扩展枚举类不能使用继承,因为其继承自`java.lang.Enum`,但可以实现其他接口,我们可以用接口组织枚举
+
+```java
+public interface Food {  
+    enum Coffee implements Food{  
+        BLACK_COFFEE,DECAF_COFFEE,LATTE,CAPPUCCINO  
+    }  
+    enum Dessert implements Food{  
+        FRUIT, CAKE, GELATO  
+    }  
+}
+
+System.out.println(Food.Coffee.BLACK_COFFEE); // 如此形式调用
+```
+
+然后再调用的时候我们就可以把接口当做类去调用其内部属性了,另外要注意的是,枚举类型本身不是int类型,所以无法直接比较
+
+```java
+System.out.println(Food.Coffee.BLACK_COFFEE == Food.Dessert.FRUIT); // 如下代码会出错
+```
+
+另外其有一多态的功能（面向接口编程牛逼）
+
+```java
+Food food = Food.Coffee.BLACK_COFFEE;
+food = Food.Dessert.CAKE; // also ok
+```
+
+可以扩充的enum写法,如果是上面的类型就直接自己new一种然后指定.
+
+```java
+public enum VideoSource {
+  OPS_VIDEO("OPS_Video"),
+  RANK_TOP_DOWNLOAD("Rank_Top_Download"),
+  RANK_TOP_5S_PLAY("Rank_Top_5s_Play"),
+  RANK_TOP_5S_PLAY_RATE("Rank_Top_5s_Play_Rate"),
+  YOUTUBE_CHANNEL("Youtube_channel");
+
+  private String value;
+
+  VideoSource(String value) {
+    this.value = value;
+  }
+
+  public String getValue() {
+    return value;
+  }
+}
+```
+
+
 
 ## 集成spring-security
 
@@ -2619,6 +3290,35 @@ public String index(){
   return "hello";
 }
 ```
+
+
+
+### ThreadPoolTaskExecutor与定时调度
+
+ThreadPoolExecutor是原生线程池,继承自Executor接口.其是一个ExecutorService.`ThreadPoolTaskExecutor`是spring的线程池,我们一般先进行配置之后在使用
+
+```java
+@Configuration
+public class ExecutorConfig {
+
+  @Bean(name = "pushExecutor")
+  public TaskExecutor pushExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(10);
+    executor.setMaxPoolSize(200);
+    executor.setQueueCapacity(10);
+    executor.setKeepAliveSeconds(20);
+    executor.setThreadNamePrefix("pushExecutor-");
+    executor.initialize();
+    return executor;
+  }
+}
+```
+
+定时调度,用的是`ThreadPoolTaskScheduler`,我们可以看到其执行的任务框架有两个
+
+- ThreadPoolTaskScheduler
+- ThreadPoolTaskExecutor
 
 
 

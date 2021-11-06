@@ -1,4 +1,4 @@
-## kafka
+# kafka
 
 ---
 
@@ -38,7 +38,7 @@ Kafka使用场景
 3. 持久性高
 4. 多样化的消费处理模型
 
-### 消息队列使用场景
+#### 消息队列使用场景
 
 消息队列的特性是用来沟通不同系统之间的,所以其强调的也是BASE,即核心是最终一致性,而非强一致性,这让消息队列有了很好的分布式系统的特性,而作为分布式系统的kafka可以做到这一步.
 
@@ -74,13 +74,48 @@ Kafka使用场景
 
 
 
-### 维护消息队列可能会遇到的问题
+## 维护消息队列可能会遇到的问题
 
 - 重复消费
 - 消息丢失
 - 顺序消费
 
+我们在后续会去介绍 kafka 是如何解决这种问题的
 
 
-### kafka的使用场景
 
+---
+
+## 基本操作
+
+一些命令,首先kafka有操控远程的命令行需要去官网下载,不然可以通过Java SDK达到同样的效果.
+
+```shell
+sh kafka-topics.sh --list --zookeeper broker.kafka.dev.mobiu.space # 查看所有topic
+sh kafka-topics.sh --create --zookeeper broker.kafka.dev.mobiu.space --replication-factor 1 --partitions 1 --topic test # 指定分区数和副本数创建topic
+sh kafka-topics.sh --delete --zookeeper broker.kafka.dev.mobiu.space --topic test # 阐述topic
+```
+
+模拟测试的生产者
+
+```shell
+sh kafka-console-producer.sh --broker-list broker.kafka.dev.mobiu.space --topic test
+```
+
+测试模拟消费者
+
+```shell
+sh kafka-console-consumer.sh --zookeeper broker.kafka.dev.mobiu.space --topic test --from-beginning
+```
+
+
+
+
+
+
+
+
+
+
+
+## kafka 服务器结构
