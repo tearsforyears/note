@@ -430,17 +430,37 @@ bean的生命周期中涉及到了4类方法
 
 ### BeanPostProcessor
 
+```java
+public interface BeanPostProcessor {
+
+	/**
+	 * 初始化方法调用前要进行的处理逻辑
+	 */
+	@Nullable
+	default Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+		return bean;
+	}
+
+	/**
+	 * 在初始化方法指定后要进行的处理逻辑
+	 */
+	@Nullable
+	default Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+		return bean;
+	}
+
+}
+```
+
 该过程对应spring使用时候的相关注解
 
 -   @PostConstruct 用于指定init-method
 
 -   @PreDestory 用于指定destory-method
 
-这个类围绕在bean的init-method周围,bean post是bean投入使用的意思
+这个类围绕在bean的init-method周围,**注意此处init-method并非构造器 对照上面的图**,可以在bean使用前后添加方法 对bean进行改造代理什么的,如下图则是 BeanPostProcessor 执行的时机
 
-**注意此处init-method并非构造器 对照上面的图**
-
-可以在bean使用前后添加方法 对bean进行改造代理什么的
+![](https://img2020.cnblogs.com/blog/951914/202103/951914-20210326170509077-1475712380.png)
 
 ```java
 public class MyBeanPostProcessor implements BeanPostProcessor {
@@ -515,9 +535,7 @@ public class MyInstantiationAwareBeanPostProcessor extends
 
 #### BeanFactoryPostProcessor
 
-该Processor的切入点只有一个 为bean工厂注入bean的信息 或者前置处理等
-
-这个玩意其实是属于BeanFactory的
+该Processor的切入点只有一个为bean工厂注入bean的信息 或者前置处理等
 
 ```java
 public class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
