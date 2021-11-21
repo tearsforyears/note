@@ -170,6 +170,27 @@ SHOW STATUS LIKE '%slow_queries%' # 查看慢查询状态
 
 我们先从JDBC的优化开始说起,要清楚JDBC的读取细节,先看下面代码
 
+### 加载驱动
+
+```java
+public class Driver extends NonRegisteringDriver implements java.sql.Driver {
+    public Driver() throws SQLException {
+    }
+
+    static {
+        try {
+            DriverManager.registerDriver(new Driver());
+        } catch (SQLException var1) {
+            throw new RuntimeException("Can't register driver!");
+        }
+    }
+}
+```
+
+可以看到我们每次加载驱动只要触发 static 块就行了,驱动本身需要去获取操作系统的信息等相关字段来进行驱动的加载
+
+
+
 ### PrepareStatement和Statement
 
 ```java
@@ -558,6 +579,32 @@ public void test() throws InterruptedException {
   Thread.sleep(1000);
 }
 ```
+
+
+
+### spring-jdbc
+
+spring对jdbc的支持体现在以下几个库
+
+-   springboot-starter
+-   spring-jdbc
+-   JdbcTemplate
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+```
+
+springboot 加载 jdbc 主要是通过上面的 starter 完成的,starter主要加载了两个东西
+
+-   spring-jdbc
+-   hikariCP 一个连接池
+
+我们看下 spring-jdbc 的作用
+
+
 
 
 

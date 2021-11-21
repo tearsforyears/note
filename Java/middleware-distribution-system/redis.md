@@ -728,6 +728,8 @@ quorum和majority:(majority>quorum)
 
 如果有quorunm个哨兵认为主节点挂了,才可以选举出一个哨兵然后majority个哨兵授权才能让这个哨兵称为主节点.
 
+
+
 ## redis 高级特性
 
 ### redis发布订阅模式
@@ -840,10 +842,6 @@ redisson
 ```
 
 其本质是用了Redis执行lua脚本的方式去构建的各种锁.但redis的分布式锁会有各种问题(因为事务的原子性)
-
-```java
-
-```
 
 
 

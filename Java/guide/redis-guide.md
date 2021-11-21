@@ -12,8 +12,37 @@
 
 ---
 
+- 命令缓冲区
 - 持久化
 - 非持久化
+
+### 命令缓冲区
+
+-   输入缓冲区
+-   输出缓冲区
+
+redis 为每个客户端分配了一个输出缓冲区,可以通过`client-output-buffer-limit`来设置.
+
+<img src="https://img-blog.csdnimg.cn/2020051621360616.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM0NTU2NDE0,size_16,color_FFFFFF,t_70" alt="50" style="zoom:50%;" />
+
+看下列数据结构
+
+```c
+typedef struct redisClient {
+// 动态缓冲区列表
+list *reply;
+// 动态缓冲区列表的长度(对象个数)
+unsigned long reply_bytes;
+// 固定缓冲区已经使用的字节数
+int bufpos;
+// 字节数组作为固定缓冲区 默认 16k
+char buf[REDIS_REPLY_CHUNK_BYTES];
+} redisClient;
+```
+
+该缓冲区使用字节数组和动态的列表去存 redis 的返回结果
+
+
 
 ### 持久化
 
@@ -293,8 +322,6 @@ redis提供了原子性的保证,即执行的指令可以被合称为一个**[ae
 
 ### redis数据结构
 
-本章节主要讲redis实现的原理部分,涉及到数据结构,内存管理,线程模型,日志系统等.
-
 [![img](https://camo.githubusercontent.com/cdbc35896f0346ec2c14830aac34bc38f7697e6fd54f9909f2a877d76bce1050/68747470733a2f2f696d67323031382e636e626c6f67732e636f6d2f626c6f672f313238393933342f3230313930362f313238393933342d32303139303632313136333933303831342d313339353031353730302e706e67)](https://camo.githubusercontent.com/cdbc35896f0346ec2c14830aac34bc38f7697e6fd54f9909f2a877d76bce1050/68747470733a2f2f696d67323031382e636e626c6f67732e636f6d2f626c6f672f313238393933342f3230313930362f313238393933342d32303139303632313136333933303831342d313339353031353730302e706e67)
 
 我们看到其无外乎就五中数据结构
@@ -314,7 +341,6 @@ redis提供了原子性的保证,即执行的指令可以被合称为一个**[ae
 - raw (simple dynamic string) 小字符串,需要分配两个对象sds,redisobj
 - int
 - embstr 只需要分配一个对象,区别于raw,只需要分配sds
-- 
 - ziplist 可压缩的ArrayList
 - linkedlist 链表
 - quicklist 结合了linkedlist和ziplist外层linkedlist,里层ziplist
@@ -324,7 +350,7 @@ redis提供了原子性的保证,即执行的指令可以被合称为一个**[ae
 
 我们都知道redis是用C实现的,这里会设计部分C的源码,一个redisObject用下面的方式表示
 
-```
+```c
 typedef struct redisObject {
     unsigned [type] 4; // string hash list set zset之一
     unsigned [encoding] 4; // 对应右边的编码
@@ -334,7 +360,7 @@ typedef struct redisObject {
 } robj;
 ```
 
-[![img](https://camo.githubusercontent.com/1dbe8297561ee45f252799722ba322638d4f42b37a1cea6d1f00d1e7eba5ff4d/68747470733a2f2f696d67323032302e636e626c6f67732e636f6d2f626c6f672f313939333234302f3230323030392f313939333234302d32303230303932323039353535323935352d313736353436373235362e706e67)](https://camo.githubusercontent.com/1dbe8297561ee45f252799722ba322638d4f42b37a1cea6d1f00d1e7eba5ff4d/68747470733a2f2f696d67323032302e636e626c6f67732e636f6d2f626c6f672f313939333234302f3230323030392f313939333234302d32303230303932323039353535323935352d313736353436373235362e706e67)
+![img](https://camo.githubusercontent.com/1dbe8297561ee45f252799722ba322638d4f42b37a1cea6d1f00d1e7eba5ff4d/68747470733a2f2f696d67323032302e636e626c6f67732e636f6d2f626c6f672f313939333234302f3230323030392f313939333234302d32303230303932323039353535323935352d313736353436373235362e706e67)
 
 | 编码常量                  | 编码所对应的底层数据结构    |
 | ------------------------- | --------------------------- |
@@ -357,7 +383,7 @@ string的编码方式可以是,在redis中是没有int类型的,这个int指的�
 
 embstr只需要分配一次内存,raw需要分配两次(一次为[`sds`](https://github.com/antirez/redis/blob/unstable/src/sds.h)分配对象,另一次为objet分配对象),sds对象(simple dynamic string),我们只是看其数据结构的定义
 
-```
+```c
 typedef char *sds;
 
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
@@ -445,7 +471,7 @@ zip的设计思路有点像ArrayList,其存储在连续的空间中,每次插入
 
 hashtable可以由ziplist或者hashtable来实现,当数量少的时候使用ziplist进行一次全表扫描更快获取结果,下面我们讲下hashtable,hashtable主要通过dict来实现
 
-```
+```c
 typedef struct dict {
     dictType *type;
     void *privdata;
@@ -489,7 +515,7 @@ set可以是由两种编码类型构成
 
 我们主要来看inset
 
-```
+```c
 typedef struct intset {
     uint32_t encoding;
     uint32_t length; // 数组长度
@@ -578,6 +604,80 @@ typedef struct zskiplistNode {
 2. 平衡树的插入和删除操作可能引发子树的调整,逻辑复杂,而skiplist的插入和删除只需要修改相邻节点的指针,操作简单又快速.
 3. 从内存占用上来说,skiplist比平衡树更灵活一些,一般来说,平衡树每个节点包含2个指针(分别指向左右子树),而skiplist每个节点包含的指针数目平均为1/(1-p),具体取决于参数p的大小.如果像Redis里的实现一样,取p=1/4,那么平均每个节点包含1.33个指针,比平衡树更有优势.
 
+### bitmap
+
+bitmap可以直接用RedisTemplate去操控
+
+```java
+redisTemplate.opsForValue().setBit(key, offset, bool);
+redisTemplate.opsForValue().getBit(key, offset);
+```
+
+其主要使用场景有如下几种
+
+- 实现布隆过滤器判断某一个id重复
+- 日活统计,因为活跃之后也是不需要计数的只需要区分是不是
+- 点赞服务,点赞只能有一个,某一个bit去实现点赞,因为只能有一次点赞
+- 签到服务,同上可以归咎于需要大量key,但只需要boolean的状态
+
+### 布隆过滤器
+
+用于判定集合中有没有重复元素,是一种概率性算法
+
+一个元素,经过多个hash映射到不同的桶位
+
+![](https://pic4.zhimg.com/80/v2-a0ee721daf43f29dd42b7d441b79d227_720w.jpg)
+
+如果获取到相应桶位都有则是在,这就是会发生碰撞[参考](https://cloud.tencent.com/developer/article/1136056)
+
+### hyperLogLog
+
+[参考](https://www.jianshu.com/p/55defda6dcd2)
+
+hyperLogLog是一重要的统计功能,其主要实现的事基数(去重)统计,其用极少的内存处理巨量的数据.统计存在误差(和布隆过滤器一样).
+
+其核心理念是用**序列出现概率**去反推算实验次数
+
+```java
+redisTemplate.opsForHyperLogLog().add(key,val);
+redisTemplate.opsForHyperLogLog().size(key); // 统计功能 注入灵魂
+redisTemplate.opsForHyperLogLog().delete(key);
+```
+
+我们可以把其当成一个集合,其可以知道在集合内有什么元素,但不能取出集合的元素,我们看下其实现思路.
+
+```note
+输入：一个集合
+输出：集合的基数
+算法：
+     max = 0
+     对于集合中的每个元素：
+               hashCode = hash(元素)
+               num = hashCode二进制表示中最前面连续的0的数量
+               if num > max:
+                   max = num
+     最后的结果是2的(max + 1)次幂
+```
+
+加入我现在看到了3个00即 `0bxxxxx1000`,那 `1000` 出现的概率就是$$2^{max+1}$$即8次实验有概率出现这种情况,我们看到在小概率的时候这种情况可能会出现非常大的偏差,我们需要用桶去修正,一个简单的想法是**获取更多的序列信息**,我们把序列分为m个桶,根据前m位进行路由在哪个桶,然后用来**降低风险**,一种平均思想,然后加权合并
+
+```note
+hash(ele1) = 00110111
+hash(ele2) = 10010001
+```
+
+<img src="https://upload-images.jianshu.io/upload_images/10192684-54f40bfe3918eb69.png?imageMogr2/auto-orient/strip|imageView2/2/w/1200/format/webp" alt="50" style="zoom:50%;" />
+
+如上一来,上面的误差就会趋近于真实的情况,如果用全部的位数去路由,那么就可以估算出准确值,下面公式引入了 constant进行修正,合并结果是使用调和平均数而不是使用平均数,数据波动更小.
+
+![](https://upload-images.jianshu.io/upload_images/10192684-8eac2cc8299e6fae.png?imageMogr2/auto-orient/strip|imageView2/2/w/303/format/webp)
+
+所以分桶版本的调和平均可以写成
+
+![](https://upload-images.jianshu.io/upload_images/10192684-8e5d4240f92a7193.png?imageMogr2/auto-orient/strip|imageView2/2/w/771/format/webp)
+
+
+
 
 
 
@@ -585,4 +685,165 @@ typedef struct zskiplistNode {
 ## 集群
 
 ---
+
+redis 的官方的集群模式有三种模式
+
+-   master-slave
+-   master-slave HA
+-   cluster
+
+### 集群模式
+
+#### 单主节点
+
+主从架构,即读写分离架构是各个分布式系统比较常用的一个架构,由于 redis 的从是被动对主节点的日志去进行同步,所以也可以作为备份节点去使用该同步机制.
+
+单主节点问题很明显,主节点挂了服务不可用
+
+#### 哨兵模式
+
+哨兵模式可以认为主节点进行了高可用的保证,哨兵本身是一个高可用的集群
+
+![](https://img2018.cnblogs.com/blog/1350922/201910/1350922-20191006122611921-809764078.png)
+
+其主节点挂掉之后会使用 **Raft算法** 进行哨兵选主,**主哨兵节点会对本次故障进行处理**
+
+-   哨兵监测到master宕机,会自动把slave选主,并切换成master,通过发布订阅模式通知其他服务器
+-   哨兵监控master和slave的状态,通过发送命令监测各个节点状态(master每隔10s发送一次heartbeat slave每隔1s发送一次heartbeat)
+-   哨兵节点监控其他哨兵节点(每秒一次)
+
+下线过程
+
+-   假设主服务器宕机,哨兵1先检测到这个结果,系统并不会马上进行 failover 过程,仅仅是哨兵1主观的认为主服务器不可用,这个现象成为**主观下线**.
+-   当后面的哨兵也检测到主服务器不可用,并且数量达到一定值时(超过一半),那么哨兵之间就会进行一次投票(选主哨兵节点),投票的结果由一个哨兵发起,进行 failover 操作.切换成功后,就会通过发布订阅模式(修改配置文件),让各个哨兵把自己监控的从服务器实现切换主机,这个过程称为**客观下线**.
+
+切换主节点
+
+-   从所有在线的从数据库中,选择优先级最高的从数据库(同步rdb版本号最大)
+-   如果有多个优先级高的从数据库,那么就会判断其偏移量,选择偏移量最小的从数据库,这里的偏移量就是增量复制的顺序
+-   如果还是有相同条件的从数据库,就会选择运行id较小的从数据库升级为master
+
+>   ### Raft算法
+>
+>   工业界的Paxos在实现上比较闹心,因此更多采用的是Raft协议实现的分布式系统.当然也有基于Paxos改进算法实现的分布式系统(参考微信后台的分布式存储系统),相比较而言Zab协议就会比较难理解,我们这里介绍Raft算法.
+>
+>   Raft有三种角色
+>
+>   -   Leader 处理client的更新请求,本地处理后在分发到各个节点
+>   -   Follower 同slave节点,保存Leader的数据副本,同步Leader的数据
+>   -   Candidate Leader出故障了,slave变成此状态,直至选主结束
+>
+>   Leader向所有Follower发送心跳,如果收不到心跳,就转变为Candidate直至选出Leader,每个副本自己维护一个term,每发生一个动作就会递增,系统默认使用最新的term(在zab里面相当于使用最大的zxid),如果一个Candidate收到低于自己term的提议会直接忽略
+>
+>   -   [raft算法动态演示](http://thesecretlivesofdata.com/raft/)
+>
+>   #### 选举
+>
+>   -   当处于Candidate的节点收到心跳的时候会转变为Follower节点.
+>   -   当处于Candidate的节点收到半数投票时候会变成Leader节点,并定期广播心跳信息维持统治.
+>
+>   election timeout
+>
+>   该数据结构由每个节点自己维护,该数据如果超时,那么就会进入Candidate状态,并执行选举流程.Leader的Heartbeat能够重置该数据结构的定时器.
+>
+>   **处于投票阶段的时候有可能有两个节点到达相同的票数(还未到大多数节点)**,那么节点就会等待未投票的节点的响应,如果没有未投票的节点,在超时后进行下一轮的选举,直至选出主节点.
+>
+>   
+>
+>   #### 分区容错/脑裂
+>
+>   假设原本的 Leader 在双节点的集群里面，那么这个集群会照常运作。而新出现的三个节点的集群，由于没有收到心跳，会开始选举，然后选出新的 Leader。这时候，如果有客户端发起请求，有可能发送到两个不同的 Leader 上面，如果发送到原来的那个 Leader 上，即双节点的集群中，Leader 把操作同步给 Follower，会发现收不到足够多的 Follower 响应（因为这个 Follower 还以为自己的集群是五个节点），然后就没办法同步数据。而三节点的新集群，就可以顺利更新数据。
+>
+>   如果这时候网络恢复了，各个节点又可以正常通信，三节点集群中的 Leader 和 双节点集群中的 Leader 会互相通信，然后会发现三节点的 Leader 由于一直正常运行，term 值会不断增大，所以大家会采信他的数据。于是双节点的两台机器会回滚，然后全部接受新 Leader 的数据同步
+
+#### 主从同步复制
+
+其集群的同步日志是 rdb 文件,其同步顺序如下
+
+![](https://img2018.cnblogs.com/blog/962833/201810/962833-20181031110448020-150004929.png)
+
+-   1,2,3称为全量同步(连接阶段)
+-   4,5称为部分同步(心跳保持阶段)
+
+基本上所有的集群模式都是遵循着上面的模式去进行复制
+
+
+
+#### cluster 模式
+
+这是一个无中心的结构,所有的节点都具有路由的功能.cluster支持动态扩容.cluster 模式可以动态的扩容去承压,相比于主从的读写分离,cluster模式的冗余存储更少且能实现**分流**,但也可能会带来随之的数据倾斜现象.
+
+![](https://upload-images.jianshu.io/upload_images/12185313-0f55e1cc574cae70.png)
+
+##### 一致性hash
+
+一致性 hash 用于分配 key 在哪个节点.其算法要求均衡性,分散负载,以及单调性(已经分配好的内容不在进行数据迁移)
+
+![](https://img2018.cnblogs.com/blog/1133627/201810/1133627-20181027173356124-1016731228.png)
+
+<img src="https://img2018.cnblogs.com/blog/1133627/201810/1133627-20181027173404739-1007977005.png" alt="50" style="zoom:60%;" />
+
+![](https://img2018.cnblogs.com/blog/1133627/201810/1133627-20181027173411531-183289257.png)
+
+hash mod 后在环上的数据按方向找最近的节点
+
+显然一致性 hash 算法对于扩容和缩容都很好用
+
+-   扩容 n5
+    -   把 n2 的节点中的数据进行 hash mod
+    -   原本在 n2-n5 之间的数据不动
+    -   在 n1-n5 之间的数据从 n2 移动到 n5
+-   缩容 n5
+    -   把 n5 的数据迁移到 n2
+
+n5 节点挂掉
+
+-   有 replica 的和对应节点发生切换,有可能会造成部分数据丢失
+-   没有 replica,挂了之后,该节点数据丢失
+
+##### 虚拟槽
+
+redis 借鉴了上面的思想使用了虚拟槽,一共分为16384个槽位进行分配,如下可以看到 key 分配到对应的槽位在到对应的节点
+
+![](https://img2018.cnblogs.com/blog/1133627/201810/1133627-20181027173424090-1936846535.png)
+
+扩容和缩容
+
+扩容和缩容都要重新指定每个节点负责的槽的范围,
+
+>   设原来有三个节点：A（0至5000），B（5001至10000），C（10001到16383）。现在需要增加第四个节点D节点进来，重新分配A（0至5000），B（5001至10000），C（10001到13000），D（13001到16383）
+
+```shell
+redis-cli --cluster reshard 10.0.0.51:6380
+```
+
+重新分配后,数据迁移时还能够访问,使用如下 ask 重定向的方式去访问迁移后的数据节点
+
+![](https://img2018.cnblogs.com/blog/1133627/201810/1133627-20181027173806627-1735185965.png)
+
+节点下线
+
+-   当一个节点向另一个节点发送 PING 命令，但是目标节点未能在给定的时限内返回 PING 命令的回复时，那么发送命令的节点会将目标节点标记为PFAIL （possible failure，可能已失效）。
+-   等待 PING 命令回复的时限称为“节点超时时限（node timeout）”，是一个节点选项（node-wise setting）。
+    每次当节点对其他节点发送 PING 命令的时候，它都会随机地广播三个它所知道的节点的信息，这些信息里面的其中一项就是说明节点是否已经被标记为 PFAIL 或者 FAIL 。
+-   当节点接收到其他节点发来的信息时，它会记下那些被其他节点标记为失效的节点。这称为失效报告（failure report）。
+-   如果节点已经将某个节点标记为 PFAIL ，并且根据节点所收到的失效报告显式，集群中的大部分其他主节点也认为那个节点进入了失效状态，那么节点会将那个失效节点的状态标记为 FAIL 。
+-   一旦某个节点被标记为 FAIL ，关于这个节点已失效的信息就会被广播到整个集群，所有接收到这条信息的节点都会将失效节点标记为 FAIL 。
+
+主从切换(从节点选举)
+
+1.  发送授权请求的是一个从节点，并且它所属的主节点处于 FAIL 状态。
+2.  在已下线主节点的所有从节点中，这个从节点的节点 ID 在排序中是最小的。
+3.  从节点处于正常的运行状态：它没有被标记为 FAIL 状态，也没有被标记为 PFAIL 状态。
+
+超过半数授权开始上线
+
+-   通过 PONG 数据包（packet）告知其他节点，这个节点现在是主节点了。
+-   通过 PONG 数据包告知其他节点，这个节点是一个已升级的从节点（promoted slave）。
+-   接管（claiming）所有由已下线主节点负责处理的哈希槽。
+-   显式地向所有节点广播一个 PONG 数据包，加速其他节点识别这个节点的进度，而不是等待定时的 PING / PONG 数据包。
+-   所有其他节点都会根据新的主节点对配置进行相应的更新，特别地：
+    -   所有被新的主节点接管的槽会被更新。
+    -    已下线主节点的所有从节点会察觉到 PROMOTED 标志，并开始对新的主节点进行复制。
+    -   如果已下线的主节点重新回到上线状态，那么它会察觉到 PROMOTED 标志，并将自身调整为现任主节点的从节点。
 
