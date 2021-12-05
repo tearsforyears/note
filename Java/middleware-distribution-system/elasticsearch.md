@@ -670,7 +670,7 @@ document有如下元数据,分别表示了文档所在的索引,分类以id,分�
 
 #### Type/Mapping
 
-索引Index包含了许多相似的文档,比如商品索引,每个索引下又有多个Type.这个Type可以理解为给不同的文档分组,可以使用下面的命令查看index下的Type. ES6.0只允许一个文档包含一个Type,7以上的版本会移除Type
+索引Index包含了许多相似的文档,比如商品索引,每个索引下又有多个Type.这个Type可以理解为给不同的文档分组,可以使用下面的命令查看index下的Type. ES6.0只允许一个文档包含一个Type,7以上的版本会移除Type,此处可以不加理解type
 
 ```shell
 curl '.../video/_mapping?pretty'
@@ -855,7 +855,7 @@ $$
 $$
 idf(t) = 1 + log(numDocs/(docFreq+1)) 
 $$
-字段归一值,numTerms为词在字段中出现的次数
+字段归一值,numTerms为词在文档中出现的次数
 $$
 norm(d) = 1 / \sqrt{numTerms}
 $$
@@ -864,6 +864,7 @@ $$
 最终score由[下列公式](https://www.elastic.co/guide/cn/elasticsearch/guide/2.x/practical-scoring-function.html)决定
 
 ```note
+# query document
 score(q,d)  =  
             queryNorm(q)  
           * coord(q,d)    
@@ -881,9 +882,13 @@ score(q,d)  =
 
 ## Advance
 
+选举算法采用 Raft
+
 ### 集群模式
 
-ES是典型的cluster模式和MS模式,即内部使用分片机制,集群发现,分片负载均衡请求路由.ES把一个完整的索引拆成多个分片(shard),把数据分布到不同的节点上.分片的数量不可动态伸缩,副本replica作为数据的高可用机制也被分配在不同的节点上.且replica可以被负载均衡,能提高数据系统的吞吐量.**shard的数量是不可以改的,但replica数量是可以更改的**,不同的shard不会被存放在本服务器上,为了容灾会放在其他服务器上.
+ES是**cluster模式和MS模式**,即内部使用分片机制,集群发现,分片负载均衡请求路由.ES把一个完整的索引拆成多个分片(shard),把数据分布到不同的节点上.分片的数量不可动态伸缩,副本replica作为数据的高可用机制也被分配在不同的节点上.且replica可以被负载均衡,能提高数据系统的吞吐量.**shard的数量是不可以改的,但replica数量是可以更改的**,不同的shard不会被存放在本服务器上,为了容灾会放在其他服务器上.
+
+**为什么不采用一致性hash算法进行分配?**
 
 我们讨论下负载均衡算法,当创建document的时候,使用如下的方式确定该放在哪个分片上,我们也可以看到数据分片被固定的原因.
 
