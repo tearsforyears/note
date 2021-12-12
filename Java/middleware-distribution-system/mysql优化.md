@@ -1362,9 +1362,32 @@ undo-log用来保证事务的原子性.
 
 #### MVCC
 
-MVCC(MultiVersion Concurrency Control)多版本并发控制.
+MVCC(MultiVersion Concurrency Control)多版本并发控制.InnoDB 是通过 undo log 实现的MVCC,通过undolog可以找回数据的历史版本,按照用户的隔离级别,看到对应的版本,回滚的时候覆盖数据页上的数据.MVCC多版本并发控制指的是 “维持一个数据的多个版本,使得**读写操作**没有冲突” 
 
->   InnoDB的 MVCC ,是通过在每行记录的后面保存两个隐藏的列来实现的.这两个列,一个保存了行的创建时间,一个保存了行的过期时间,存储的并不是实际的时间值,而是系统版本号.
+MVCC 不解决写写冲突之间的问题.读读之间没有冲突问题.
+
+>   MVCC模型在MySQL中的具体实现则是由 `3个隐式字段`，`undo日志` ，`Read View` 等去完成的
+
+##### 当前读和快照读
+
+-   当前读指的是select lock in share mode(`共享锁`), select for update ; update, insert ,delete(`排他锁`) 这种访问**最新**数据版本的读操作
+-   快照读是不加锁的 select,在非串行的前提下读到的内容,串行时,快照读退化成当前读
+
+##### 实现
+
+每行记录除了我们自定义的字段外，还有数据库隐式定义的`DB_TRX_ID`,`DB_ROLL_PTR`,`DB_ROW_ID`等字段
+
+-   `DB_TRX_ID`
+    6byte，最近修改(`修改/插入`)事务ID：记录创建这条记录/最后一次修改该记录的事务ID
+-   `DB_ROLL_PTR`
+    7byte，回滚指针，指向这条记录的上一个版本（存储于rollback segment里）
+-   `DB_ROW_ID`
+    6byte，隐含的自增ID（隐藏主键），如果数据表没有主键，InnoDB会自动以`DB_ROW_ID`产生一个聚簇索引
+-   实际还有一个删除flag隐藏字段, 既记录被更新或删除并不代表真的删除，而是删除flag变了
+
+![](https://img-blog.csdnimg.cn/20190313213705258.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L1NuYWlsTWFubg==,size_16,color_FFFFFF,t_70)
+
+
 
 #### 事务的实现
 
@@ -1625,7 +1648,7 @@ ALGORITHM=COPY
 
 
 
-### MVCC间隙锁
+### MVCC
 
 
 
