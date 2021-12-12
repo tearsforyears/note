@@ -1198,7 +1198,17 @@ Sharding-Proxy 属于和 Mycat 对标的产品，它定位为透明化的数据�
 
 ## mysql 服务器结构
 
+### 存储架构
 
+mysql 的存储架构主要分为以下几个点
+
+- [内存] change buffer / buffer pool 
+- [磁盘] ibd (innodb data)
+- [逻辑] tablespace 主要为一个表的命名空间,每个 space 都有一个 32 位的 int id
+
+![](https://dev.mysql.com/doc/refman/8.0/en/images/innodb-architecture.png)
+
+- page,page 是管理
 
 
 
