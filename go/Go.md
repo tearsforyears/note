@@ -4,7 +4,7 @@
 
 [TOC]
 
-go语言,又叫 golang 是应对高并发场景下一种面向过程的语言.go 是一门静态强类型,编译型的语言.其语法和 c语言相近,但又有以下特性,内存安全,**GC**,结构形态,并发计算.同时 go 自身内嵌了 dict 数据结构.Go可以直接被编译为机器码,所以意味着其有极高的执行效率.**go天生支持并发,可以充分发挥多核优势**,其可以**内嵌c的代码**.go的用途
+go语言,又叫 golang 是应对高并发场景下一种面向过程的语言.go 是一门静态强类型,编译型的语言.其语法和 c语言相近,但又有以下特性,内存安全,**GC**,结构形态,并发计算.同时 go 自身内嵌了 dict 数据结构.Go可以直接被编译为机器码,所以意味着其有极高的执行效率.**go天生支持并发,可以充分发挥多核优势**,其可以**内嵌c的代码,直接使用 I/O 多路复用的一些技术**.go的用途
 
 -   服务端代码
     -   虚拟机处理
@@ -917,6 +917,99 @@ for k, v := range kvs {
 }
 ```
 
+## socket
+
+
+
+### http
+
+
+
+## 排序
+
+需要重写函数,我们可以用 wrapper 转成其他语言 sorted 的形式
+
+```go
+type DataWrapper struct {
+	data []*Data
+	by   func(p, q *Data) bool
+}
+
+func (this DataWrapper) Len() int { // 重写 Len() 方法
+	return len(this.data)
+}
+func (this DataWrapper) Swap(i, j int) { // 重写 Swap() 方法
+	this.data[i], this.[j] = this.data[j], this.data[i]
+}
+func (this DataWrapper) Less(i, j int) bool { // 重写 Less() 方法
+	return this.by(this.data[i], this.data[j])
+}
+
+sort.Sort(DataWrapper{plugins, func(x, y *Data) bool {
+			return strings.Compare(x.Name, y.Name) > 0
+}})
+```
+
+
+
+## I/O
+
+I/O 的部分分为几类,文件 I/O,管道,socket
+
+[参考](https://www.jianshu.com/p/abc396787a32)
+
+-   io 存放操作系统原语
+-   io/ioutil 实用函数
+-   bufio 实现带缓冲的 io
+
+### 接口
+
+-   Reader
+-   Writer
+-   ReadAt
+-   WriteAt
+
+```go
+/*
+Read 将 len(p) 个字节读取到 p 中。它返回读取的字节数 n（0 <= n <= len(p)） 以及任何遇到的错误。
+即使 Read 返回的 n < len(p)，它也会在调用过程中占用 len(p) 个字节作为暂存空间。若可读取的数据不到 len(p) 个字节，
+Read 会返回可用数据，而不是等待更多数据。
+*/
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+type Writer interface {
+    Write(p []byte) (n int, err error)
+}
+/*
+ReadAt 从基本输入源的偏移量 off 处开始，将 len(p) 个字节读取到 p 中。它返回读取的字节数 n（0 <= n <= len(p)）以及任何遇到的错误。
+当 ReadAt 返回的 n < len(p) 时，它就会返回一个 非nil 的错误来解释 为什么没有返回更多的字节。在这一点上，ReadAt 比 Read 更严格。
+即使 ReadAt 返回的 n < len(p)，它也会在调用过程中使用 p 的全部作为暂存空间。若可读取的数据不到 len(p) 字节，ReadAt 就会阻塞,直到所有数据都可用或一个错误发生。 在这一点上 ReadAt 不同于 Read。
+*/
+type ReaderAt interface {
+    ReadAt(p []byte, off int64) (n int, err error)
+}
+type WriterAt interface {
+    WriteAt(p []byte, off int64) (n int, err error)
+}
+```
+
+实现
+
+```go
+var (
+    Stdin  = NewFile(uintptr(syscall.Stdin), "/dev/stdin")
+    Stdout = NewFile(uintptr(syscall.Stdout), "/dev/stdout")
+    Stderr = NewFile(uintptr(syscall.Stderr), "/dev/stderr")
+)
+```
+
+
+
+### io 多路复用
+
+[参考](https://www.cnblogs.com/luozhiyun/p/14390824.html),[参考](https://zhuanlan.zhihu.com/p/394872000)
+
 
 
 
@@ -931,7 +1024,7 @@ go 不支持隐式转换,其转换类型和 python 类型
 
 ```go
 var num float64 = 3.0
-int(num)
+int(num) // 或者 (int)(num)
 
 type msg struct {
 	Data  string
@@ -947,6 +1040,12 @@ fmt.Print(msg(data{Data: "2", Code: 300}))
 ```
 
 
+
+### 单引号双引号反引号
+
+- '',用于表示 byte 类型或 rune 类型,默认是 rune.byte 用强调数据是 raw data 不是数字,大小为uint8,rune用来表示 Unicode 的code point,大小为int32
+- "",字符串或者字符数组
+- \`\`,不转义,原样字符 raw literal string.相当于 python 中的 `"""`
 
 ### 结构体方法
 
@@ -1103,6 +1202,27 @@ type DataAOP interface {
 ```
 
 
+
+### 结构体 tag
+
+结构体 tag,如下用反引号括起来的内容`gorm:"column"`
+
+```go
+type Developer struct {
+	Id            int32
+	Name          string
+	Email         string
+	Password      string
+  PluginCount   int32 `gorm:"column:pluginCount" json:"pluginCount"`
+	DownloadCount int32 `gorm:"column:downloadCount"`
+	ReportCount   int32 `gorm:"column:reportCount"`
+	Status        int16
+}
+
+func (Developer) TableName() string {
+	return "developer"
+}
+```
 
 
 
@@ -1495,6 +1615,25 @@ func main() {
 
 
 
+### 交叉编译
+
+使用如下命令可以编译不同操作系统的二进制文件,下面是mac编译linux和windows的命令
+
+```go
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build test.go
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build test.go
+```
+
+除此之外
+
+```go
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build test.go
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build test.go
+
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build test.go
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build test.go
+```
+
 
 
 
@@ -1533,6 +1672,620 @@ func main() {
 }
 ```
 
+### unsafe
+
+普通指针 & uniptr & unsafe.Pointer
+
+>   -   *类型:普通指针类型，用于传递对象地址，不能进行指针运算。
+>   -   unsafe.Pointer:通用指针类型，用于转换不同类型的指针，不能进行指针运算，不能读取内存存储的值（必须转换到某一类型的普通指针）。
+>   -   uintptr:用于指针运算，GC 不把 uintptr 当指针，uintptr 无法持有对象。uintptr 类型的目标会被回收。
+
+简而言之就是 go 的**普通指针**不是 c++ 的指针可以那么随心所欲.而 **uintptr** 解放生产力,和 **unsafe.Pointer** 配合可以进行指针运算
+
+看下 unsafe 包的内容
+
+```go
+type ArbitraryType int
+type Pointer *ArbitraryType
+func Sizeof(x ArbitraryType) uintptr // 占用大小 Sizeof(int32(0)) 其和 c 基本一致
+func Offsetof(x ArbitraryType) uintptr // 相对结构体的偏移量 常见使用方式 a.x a为结构体
+func Alignof(x ArbitraryType) uintptr // 内存对齐地址的倍数 同上
+```
+
+我们来看个例子,最常见的 Pointer 构造和转换,联系下一章一起看吧-v-.
+
+```go
+package main
+
+import (
+	"fmt"
+	"unsafe"
+)
+
+/*
+void setInt(int addr,int val){
+	int* ptr = (int*)(addr);
+	*ptr = val;
+}
+int getInt(int addr){
+	int* ptr = (int*)(addr);
+	return *ptr;
+}
+*/
+import "C"
+
+const n = 4
+
+var s [n]int32 = [n]int32{1, 2, 3, 4}
+var offset int = (int)(unsafe.Sizeof(int32(0))) // 偏移量
+var head uintptr = uintptr(unsafe.Pointer(&s))  // 数组首地址
+
+func init() {
+	for i := 0; i < n; i++ {
+		C.setInt(C.int(int(head)+offset*i), C.int(i))                       // 用 c 的方法 set
+		*(*int32)(unsafe.Pointer(uintptr(int(head) + i*offset))) = int32(i) // 用 go 的方法 set
+	}
+}
+func main() {
+	fmt.Println(s)
+	fmt.Println(head)
+	for i := 0; i < n; i++ {
+		var val int32
+		val = int32(C.getInt(C.int(int(head) + i*offset)))             // c 的方法 get
+		val = *(*int32)(unsafe.Pointer(uintptr(int(head) + i*offset))) // go 的方法 get
+		fmt.Printf("%d,%d\n", i, val)
+	}
+}
+```
+
+由上可以看到数组的本质就是一段连续内存,同c的理解
+
+
+
+
+
+
+
+### go 内嵌 c++/c
+
+内嵌 c 的代码 可以使用上面的方式直接调用 c 的结构体
+
+```go
+package main
+
+/*
+#include <stdio.h>
+#include <stdlib.h>
+typedef struct {
+    int id;
+}ctx;
+
+ctx* createCtx(int id) {
+    ctx *obj = (ctx *)malloc(sizeof(ctx));
+    obj->id = id;
+    return obj;
+}
+*/
+import "C"
+import (
+	"fmt"
+	"reflect"
+)
+
+func main() {
+	var ctx *C.ctx = C.createCtx(100)
+	fmt.Println(reflect.TypeOf(ctx))
+	fmt.Printf("id : %d\n", ctx.id)
+}
+```
+
+内嵌 c++ 则需要 c++ 通过编译
+
+
+
+### 数组和切片
+
+这两者都是值复制,除非显示指定指针,否则可以人为所有数据结构是使用了值拷贝,其中 slice 和 map 使用了浅拷贝
+
+- `[5]int` 为数组类型
+- `[]int` 为切片类型
+
+```go
+func test() {
+	ints := [5]int{14, 14, 15}
+	testCopy(ints)
+	fmt.Println(ints)
+}
+
+func testCopy(arr [5]int) {
+	arr[1] = -1 // 不会发生改变
+}
+```
+
+### 值拷贝
+
+值拷贝在 golang 中和c++基本是一致的,除了指针以外所有拷贝都是值的复制,包括结构体和 array
+
+```go
+func test() {
+	a:=A{B{"1"}}
+	testCopy(a)
+  fmt.Println(a) // {{1}}
+}
+
+func testCopy(a A) {
+	a.B.message = "3"
+}
+```
+
+但如果传地址就不一样了
+
+```go
+type A struct {
+	b *B
+}
+type B struct {
+	message string
+}
+
+func test() {
+	a:=A{&B{"1"}}
+	testCopy(a)
+  fmt.Println(*a.b) // {{3}}
+}
+
+func testCopy(a A) {
+	a.b.message = "3"
+}
+```
+
+### make & new
+
+两者都是用于分配内存的
+
+- new 用于给**指针**变量分配内存
+- make 用于初始化 slice map 和 channel
+
+更简单的概括就是 make 会给内部的指针赋值进行更加复杂的初始化(slice).而 new 则是相当于 malloc
+
+
+
+### 数据结构详解
+
+[参考](https://tiancaiamao.gitbooks.io/go-internals/content/zh/02.3.html)
+
+### slice
+
+本章讲解 runtime 的数据结构源码,从 runtime 的结构不难看出整个 runtime 是由 c/asm 和 go 共同完成的
+
+```go
+type slice struct {
+	array unsafe.Pointer
+	len   int
+	cap   int
+}
+```
+
+扩容
+
+在对slice进行append等操作时,可能会造成slice的自动扩容.其扩容时的大小增长规则是:
+
+-   如果新的大小是当前大小2倍以上，则大小增长为新大小
+-   否则循环以下操作：如果当前大小小于1024，按每次2倍增长，否则每次按当前大小1/4增长。直到增长的大小超过或等于新大小。
+
+
+
+### map
+
+结合 unsafe 的理解不难看出来这段地址的排布,其len和cap排在结构体后半部分,我们来研究下 map
+
+```go
+type hmap struct {
+	// Note: the format of the hmap is also encoded in cmd/compile/internal/gc/reflect.go.
+	// Make sure this stays in sync with the compiler's definition.
+	count     int // # live cells == size of map.  Must be first (used by len() builtin)
+	flags     uint8
+	B         uint8  // log_2 of # of buckets (can hold up to loadFactor * 2^B items)
+	noverflow uint16 // approximate number of overflow buckets; see incrnoverflow for details
+	hash0     uint32 // hash seed
+
+	buckets    unsafe.Pointer // array of 2^B Buckets. may be nil if count==0.
+	oldbuckets unsafe.Pointer // previous bucket array of half the size, non-nil only when growing
+	nevacuate  uintptr        // progress counter for evacuation (buckets less than this have been evacuated)
+	extra *mapextra // optional fields
+}
+
+// mapextra holds fields that are not present on all maps.
+type mapextra struct {
+	// If both key and elem do not contain pointers and are inline, then we mark bucket
+	// type as containing no pointers. This avoids scanning such maps.
+	// However, bmap.overflow is a pointer. In order to keep overflow buckets
+	// alive, we store pointers to all overflow buckets in hmap.extra.overflow and hmap.extra.oldoverflow.
+	// overflow and oldoverflow are only used if key and elem do not contain pointers.
+	// overflow contains overflow buckets for hmap.buckets.
+	// oldoverflow contains overflow buckets for hmap.oldbuckets.
+	// The indirection allows to store a pointer to the slice in hiter.
+	overflow    *[]*bmap
+	oldoverflow *[]*bmap
+
+	// nextOverflow holds a pointer to a free overflow bucket.
+	nextOverflow *bmap
+}
+
+// A bucket for a Go map.
+type bmap struct {
+	// tophash generally contains the top byte of the hash value
+	// for each key in this bucket. If tophash[0] < minTopHash,
+	// tophash[0] is a bucket evacuation state instead.
+	tophash [bucketCnt]uint8 // bucketCnt 为 1<<3,tophash 翻译为 高位 hash
+	// Followed by bucketCnt keys and then bucketCnt elems.
+	// NOTE: packing all the keys together and then all the elems together makes the
+	// code a bit more complicated than alternating key/elem/key/elem/... but it allows
+	// us to eliminate padding which would be needed for, e.g., map[int64]int8.
+	// Followed by an overflow pointer.
+}
+```
+
+看到其数据结构,显然他的增长方式和 java 的 hashmap 一样,是2倍增长,且使用类似的 oldbuckets 进行赋值,且可以看出其桶位最大只有8,其桶位变大是通过 overflow 来实现的
+
+![](https://img.snaptube.app/image/em-video/10635a99c7989cfee6c816619f60c379_488_227.png)
+
+>   按key的类型采用相应的hash算法得到key的hash值。**将hash值的低位当作Hmap结构体中buckets数组的index**，找到key所在的bucket。将hash的高8位存储在了bucket的tophash中。
+>
+>   **注意，这里高8位不是用来当作key/value在bucket内部的offset的，而是作为一个主键，在查找时对tophash数组的每一项进行顺序匹配的**。
+
+上面引用自参考,解读下就是 桶位的计算 = hash(key) % bucketSize ,而 tophash 仅仅只是用**高8位加速判断**并没有其他用处
+
+看其查找算法
+
+```go
+func mapaccess1(t *maptype, h *hmap, key unsafe.Pointer) unsafe.Pointer {
+	if raceenabled && h != nil {
+		callerpc := getcallerpc()
+		pc := funcPC(mapaccess1)
+		racereadpc(unsafe.Pointer(h), callerpc, pc)
+		raceReadObjectPC(t.key, key, callerpc, pc)
+	}
+	if msanenabled && h != nil {
+		msanread(key, t.key.size)
+	}
+	if h == nil || h.count == 0 {
+		if t.hashMightPanic() {
+			t.hasher(key, 0) // see issue 23734
+		}
+		return unsafe.Pointer(&zeroVal[0])
+	}
+	if h.flags&hashWriting != 0 {
+		throw("concurrent map read and map write")
+	}
+	hash := t.hasher(key, uintptr(h.hash0))
+	m := bucketMask(h.B)
+	b := (*bmap)(add(h.buckets, (hash&m)*uintptr(t.bucketsize)))
+	if c := h.oldbuckets; c != nil {
+		if !h.sameSizeGrow() {
+			// There used to be half as many buckets; mask down one more power of two.
+			m >>= 1
+		}
+		oldb := (*bmap)(add(c, (hash&m)*uintptr(t.bucketsize))) // 取模方法真快
+		if !evacuated(oldb) {
+			b = oldb
+		}
+	}
+	top := tophash(hash) // 算出 tophash 值
+bucketloop:
+	for ; b != nil; b = b.overflow(t) { // 查找所有的 buckets,包括 overflow
+		for i := uintptr(0); i < bucketCnt; i++ {
+			if b.tophash[i] != top { // 快速试错,如果不等就下一个
+				if b.tophash[i] == emptyRest {
+					break bucketloop // 如果等于还是个空值就下一个
+				}
+				continue
+			}
+      // 这里已经从 tophash 中找到了值,获取 key,其key锁存放的位置是连续的
+			k := add(unsafe.Pointer(b), dataOffset+i*uintptr(t.keysize))
+			if t.indirectkey() {
+				k = *((*unsafe.Pointer)(k))
+			}
+			if t.key.equal(key, k) {
+				e := add(unsafe.Pointer(b), dataOffset+bucketCnt*uintptr(t.keysize)+i*uintptr(t.elemsize)) // element
+				if t.indirectelem() {
+					e = *((*unsafe.Pointer)(e))
+				}
+				return e
+			}
+		}
+	}
+	return unsafe.Pointer(&zeroVal[0])
+}
+```
+
+```go
+// data offset should be the size of the bmap struct, but needs to be
+// aligned correctly. For amd64p32 this means 64-bit alignment
+// even though pointers are 32 bit.
+dataOffset = unsafe.Offsetof(struct {
+  b bmap
+  v int64
+}{}.v)
+
+type maptype struct {
+	typ    _type
+	key    *_type
+	elem   *_type
+	bucket *_type // internal type representing a hash bucket
+	// function for hashing keys (ptr to key, seed) -> hash
+	hasher     func(unsafe.Pointer, uintptr) uintptr
+	keysize    uint8  // size of key slot
+	elemsize   uint8  // size of elem slot
+	bucketsize uint16 // size of bucket
+	flags      uint32
+}
+```
+
+从上面我们可以看到几行关键代码
+
+-   key:`unsafe.Pointer(b),dataOffset+i*uintptr(t.keysize)`
+-   value:`unsafe.Pointer(b),dataOffset+bucketCnt*uintptr(t.keysize)+i*uintptr(t.elemsize))`
+
+可以看到 key 的排布和 value 的排布是完全分开的,(好家伙您完全不告诉我指针放的是啥是吧)
+
+扩容使用了和 java 的 hashmap 类似的方法,扩容的size都是2的倍数,这样一来有两个好处
+
+-   扩容时候可以采用 rehash 的方法更快确定位置,高低1bit就可确认是否在原来的位子上
+-   mod 方法取模变成 and mask,效率增加
+
+go 中的扩容是增量扩容,rehash之后的旧的 pair 会随着 insert 和 remove 逐步扩容到新的 hashmap 上.扩容触发的条件是根据以下参数,如同 java 的 hashmap 有扩容因子的说法,java 的负载因子是 0.75,go 根据测试结果选择了 6.5,从这个值可以看出是查找不存在的 key 的平均查找长度
+
+```go
+        LOAD    %overflow  bytes/entry     hitprobe    missprobe
+        4.00         2.13        20.77         3.00         4.00
+        4.50         4.05        17.30         3.25         4.50
+        5.00         6.85        14.77         3.50         5.00
+        5.50        10.55        12.94         3.75         5.50
+        6.00        15.27        11.67         4.00         6.00
+        6.50        20.90        10.79         4.25         6.50
+        7.00        27.14        10.15         4.50         7.00
+        7.50        34.03         9.73         4.75         7.50
+        8.00        41.10         9.40         5.00         8.00
+
+ %overflow   = percentage of buckets which have an overflow bucket // 多少key-value需要额外空间
+ bytes/entry = overhead bytes used per key/value pair // 每个键值对需要的 bytes
+ hitprobe    = # of entries to check when looking up a present key
+ missprobe   = # of entries to check when looking up an absent key
+```
+
+```go
+// Maximum average load of a bucket that triggers growth is 6.5.
+// Represent as loadFactorNum/loadFactorDen, to allow integer math.
+loadFactorNum = 13
+loadFactorDen = 2
+
+
+// overLoadFactor reports whether count items placed in 1<<B buckets is over loadFactor.
+// 判断是否大于负载因子
+func overLoadFactor(count int, B uint8) bool {
+	return count > bucketCnt && uintptr(count) > loadFactorNum*(bucketShift(B)/loadFactorDen)
+}
+
+func hashGrow(t *maptype, h *hmap) {
+	// If we've hit the load factor, get bigger.
+	// Otherwise, there are too many overflow buckets,
+	// so keep the same number of buckets and "grow" laterally.
+	bigger := uint8(1)
+	if !overLoadFactor(h.count+1, h.B) {
+		bigger = 0
+		h.flags |= sameSizeGrow
+	}
+	oldbuckets := h.buckets
+	newbuckets, nextOverflow := makeBucketArray(t, h.B+bigger, nil)
+
+	flags := h.flags &^ (iterator | oldIterator)
+	if h.flags&iterator != 0 {
+		flags |= oldIterator
+	}
+	// commit the grow (atomic wrt gc)
+	h.B += bigger
+	h.flags = flags
+	h.oldbuckets = oldbuckets
+	h.buckets = newbuckets
+	h.nevacuate = 0
+	h.noverflow = 0
+
+	if h.extra != nil && h.extra.overflow != nil {
+		// Promote current overflow buckets to the old generation.
+		if h.extra.oldoverflow != nil {
+			throw("oldoverflow is not nil")
+		}
+		h.extra.oldoverflow = h.extra.overflow
+		h.extra.overflow = nil
+	}
+	if nextOverflow != nil {
+		if h.extra == nil {
+			h.extra = new(mapextra)
+		}
+		h.extra.nextOverflow = nextOverflow
+	}
+
+	// the actual copying of the hash table data is done incrementally
+	// by growWork() and evacuate().
+}
+```
+
+
+
+
+
+### painc 捕获
+
+有一些非 error 的捕获比较困难,我们会写出如下代码,又臭又长
+
+```go
+func (this *Controller) Search(ctx *gin.Context) {
+	type param struct {
+		Name   string `form:"name"`
+		Email  string `form:"email"`
+		Status string `form:"status"`
+		Limit  int    `form:"limit"`
+		Offset int    `form:"offset"`
+	}
+	par := param{}
+	err := ctx.BindQuery(&par)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Resp.ErrorOf(err))
+	}
+	if par.Limit == 0 {
+		par.Limit = 10
+	}
+	xxx,err := this.xxx.Search(par.Name, par.Email, par.Status, par.Limit, par.Offset)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Resp.ErrorOf(err))
+	} else {
+		ctx.JSON(http.StatusOK, Resp.OkOf(xx))
+	}
+}
+```
+
+这个时候就可以用 defer 进行全局的异常处理,这个两个异常可能看不出特别明显的点,但如果非常多的异常,这种方式就显得尤为有效,但这种方式也有其弊端就是,对于显式声明的异常不可以进行处理,所以需要层层 panic 用于 catch 
+
+```go
+func (this *Controller) Search(ctx *gin.Context) {
+  defer func(){
+      if err:=recover();err!=nil{
+          ctx.JSON(http.StatusOK, Resp.ErrorOf(err))
+			}
+  }()
+  
+	type param struct {
+		Name   string `form:"name"`
+		Email  string `form:"email"`
+		Status string `form:"status"`
+		Limit  int    `form:"limit"`
+		Offset int    `form:"offset"`
+	}
+	par := param{}
+	err := ctx.BindQuery(&par) // 这里抛出了异常不会执行上面的值
+	if par.Limit == 0 {
+		par.Limit = 10
+	}
+	xxx,err := this.xxx.Search(par.Name, par.Email, par.Status, par.Limit, par.Offset) // 这里也是
+	ctx.JSON(http.StatusOK, Resp.OkOf(xx))
+}
+```
+
+
+
+
+
+
+
+
+
+### go.mod 与依赖管理
+
+如同 pom.xml 一样是 go 的依赖管理文件,在1.6时可以使用 vender 进行管理,任何一个 https 可到达的目录即可使用 go get 进行拉取到本地的 GOPATH `go env GOPATH` 中.
+
+```go
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
+```
+
+`go mod tidy` 用于完成 `maven clean install` 的功能.
+
+- 在新建项目的时候 `go mod init [packageName]`
+- `go get -u []` 
+- `go mod tidy`
+
+go 的包管理官方采用 go.mod 文件,结束了之前用 vender goroot gopath 的混乱局面.
+
+### go文档查看
+
+```shell
+(base) ➜  ~ go doc unsafe
+package unsafe // import "unsafe"
+
+Package unsafe contains operations that step around the type safety of Go
+programs.
+
+Packages that import unsafe may be non-portable and are not protected by the
+Go 1 compatibility guidelines.
+
+func Alignof(x ArbitraryType) uintptr
+func Offsetof(x ArbitraryType) uintptr
+func Sizeof(x ArbitraryType) uintptr
+type ArbitraryType int
+type Pointer *ArbitraryType
+```
+
+
+
+
+
+
+
+## 内存分配管理
+
+### C 的内存分配
+
+我们看下c语言的内存分配一般是这种形式,栈往下长,堆往上涨
+
+![](https://upload-images.jianshu.io/upload_images/6328562-4df0b8ade52e88fd.png)
+
+>   Go是内置运行时的编程语言(runtime)，像这种内置运行时的编程语言通常会抛弃传统的内存分配方式，改为自己管理。这样可以完成类似预分配、内存池等操作，以避开系统调用带来的性能问题，防止每次分配内存都需要系统调用。
+
+### go 的内存分配
+
+Go的内存分配的核心思想可以分为以下几点：
+
+-   每次从操作系统申请一大块儿的内存，由Go来对这块儿内存做分配，减少系统调用
+-   内存分配算法采用Google的 **TCMalloc**算法。算法比较复杂，究其原理可自行查阅。其核心思想就是把内存切分的非常的细小，分为多级管理，以降低锁的粒度。
+-   回收对象内存时，并没有将其真正释放掉，只是放回预先分配的大块内存中，以便复用。只有内存闲置过多的时候，才会尝试归还部分内存给操作系统，降低整体开销
+
+go 会去申请一块虚拟内存,如下
+
+![](https://pic4.zhimg.com/80/v2-d5f5de4d6d22e67887ab4861ba5e721f_1440w.jpg)![img](https://pic4.zhimg.com/80/v2-d5f5de4d6d22e67887ab4861ba5e721f_1440w.jpg)
+
+其分为了3个区域
+
+-   arena 就是其他语言的堆区,go 的动态分配都是这个区域,把内存分割成 8kb 大小的页,一些页组合起来叫 mspan
+-   bitmap 用于标识 arena 区域中保存了哪些对象,4bit
+-   spans 
+
+
+
+### TCMalloc
+
+
+
+
+
+### gc
+
+首先来看使用 gc 的工具
+
+```shell
+GODEBUG=gctrace=1  go run main.go # 开启追踪 gc
+```
+
+快速实现监控线程
+
+```go
+import (
+    "net/http"
+    _ "net/http/pprof"
+)
+go func() {
+            log.Println(http.ListenAndServe("localhost:8081", nil))
+}()
+```
+
+
+
+
+
+
+
 ## 工具包
 
 ### time
@@ -1568,5 +2321,221 @@ func main() {
 	fmt.Printf("%s",regex.Find([]byte("123as23")))
 	//fmt.Print(regex.FindAllString("12321",-1))
 }
+```
+
+### strings
+
+保存字符串处理的类库,用的比较多的方法
+
+-   Join
+-   Split
+-   Replace
+
+### http
+
+```go
+func GetBody(url string) string {
+	res, _ := http.Get(url)
+	r, _ := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	return string(r)
+}
+```
+
+
+
+### gin
+
+go 的 web 框架,
+
+#### gin.H
+
+`gin.H`本质是 `map[string]interface{}`.下面两句语句等价
+
+```go
+c.JSON(http.StatusOK, gin.H{ "status": "登录成功"})
+```
+
+```go
+c.JSON(http.StatusOK, map[string]interface{}{ "status": "登录成功"})
+```
+
+#### demo
+
+```go
+func InitRouter() *gin.Engine {
+	r := gin.New()
+	r.GET("/", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, &map[string]string{"status": "200", "msg": "pong"})
+	})
+
+	r.GET("/", service.DevController.Get) // implement Get Method
+	r.DELETE("/:id", service.DevController.DeleteById)
+	return r
+}
+
+
+func main() {
+	r := router.InitRouter()
+	err := r.Run(":" + conf.Config.Port)
+	if err != nil {
+		panic(err)
+		return
+	}
+}
+```
+
+#### 获取参数
+
+`c *gin.Context`
+
+- `/user/:name`路径参数 `c.Param("name")` 
+
+- `c.Query("name")` 获取请求参数 `c.QueryDefault("name","jerry")`
+
+- `c.PostForm()`
+
+- 通用获取方法,`BindWith`
+
+    - 获取 body 中的 json
+
+    ```go
+    dev := model.Developer{}
+    err := ctx.BindWith(&dev, binding.JSON)
+    ```
+
+    - 获取 body 中的 form 表单
+
+    ```go
+    dev := model.Developer{}
+    err := ctx.BindWith(&dev, binding.Form)
+    ```
+
+    可选项有如下,功能相当强大,
+
+    ```go
+    var (
+    	JSON          = jsonBinding{}
+    	XML           = xmlBinding{}
+    	Form          = formBinding{}
+    	Query         = queryBinding{}
+    	FormPost      = formPostBinding{}
+    	FormMultipart = formMultipartBinding{}
+    	ProtoBuf      = protobufBinding{}
+    	MsgPack       = msgpackBinding{}
+    	YAML          = yamlBinding{}
+    	Uri           = uriBinding{}
+    	Header        = headerBinding{}
+    )
+    ```
+
+
+#### middleware
+
+中间件并不是指第三方的中间件,而是指 controller 和 router 层之间的中间处理函数,我们可以如下方式指定中间件函数,比如上面的函数直接让没有token,token解析失败的请求嗝屁
+
+```go
+func Auth() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		token := ctx.GetHeader("Authorization")
+		if "" == token {
+			ctx.JSON(http.StatusForbidden, gin.H{"msg": "please login"})
+			ctx.Abort() // 强制终止后续 ctx 传递流程
+			return // 结束函数
+		}
+		claims, err := util.ParseToken(token)
+		if err != nil {
+			ctx.JSON(http.StatusForbidden, gin.H{"msg": "token forbidden"})
+			ctx.Abort()
+			return
+		} else {
+			ctx.Set("claims", claims)
+		}
+	}
+}
+// router
+developer.GET("/", middleware.Auth(), service.DevController.Get)
+```
+
+### gorm
+
+gorm 可以说是天坑中的坑其代码简直恶心,下面只说明基本操作和脚本级操作,不涉及工程操作
+
+配置连接
+
+```go
+package db
+
+import (
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"st-plugin-developer/conf"
+	"time"
+)
+
+var Mysql *gorm.DB // 拿到了 db 对象就可以使用数据库了
+
+func init() {
+	var err error
+	mysqlUrl := conf.Config.Mysql
+	Mysql, err = gorm.Open("mysql", mysqlUrl)
+	if err != nil {
+		panic(err)
+	}
+	if conf.Config.Env != "prod" {
+		Mysql.LogMode(true)
+	}
+	Mysql.DB().SetConnMaxLifetime(time.Minute * 3)
+	Mysql.DB().SetMaxIdleConns(5)
+	Mysql.DB().SetMaxOpenConns(20)
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func CloseMysql() {
+	if Mysql != nil {
+		Mysql.Close()
+	}
+}
+```
+
+最常用的几个函数
+
+-   Raw
+-   Scan
+-   First
+
+```go
+db.Table("").Select("*").Where("?", str).Scan(&pluginsInfo).Limit(limit).Offset(offset).Error
+
+// in 语句 pkgs 是一字符串数组
+db.Raw("select * from xx where xx=?  "+
+		" and (xx,xx) in "+
+		" (select xx,max(xx) from xxx "+
+		" where xx=? and xx in (?) group by xx)", developer.Name, developer.Name, pkgs,
+	).Scan(&pluginsVersion)
+```
+
+开启事务
+
+```go
+tx := this.Db.Begin()
+for _, lang := range pluginLangs {
+  if err := tx.Table("...").Save(&lang).Error; err != nil {
+    tx.Rollback()
+    return err
+  }
+}
+if err := tx.Table("").Where("", str, str).Error; err != nil {
+  tx.Rollback()
+  return err
+}
+if err := tx.Table("").Where(str,str).Update(map).Error; err != nil {
+  tx.Rollback()
+  return err
+}
+tx.Commit()
 ```
 
