@@ -2174,12 +2174,6 @@ func (this *Controller) Search(ctx *gin.Context) {
 
 
 
-
-
-
-
-
-
 ### go.mod 与依赖管理
 
 如同 pom.xml 一样是 go 的依赖管理文件,在1.6时可以使用 vender 进行管理,任何一个 https 可到达的目录即可使用 go get 进行拉取到本地的 GOPATH `go env GOPATH` 中.
