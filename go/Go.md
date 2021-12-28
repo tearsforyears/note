@@ -892,6 +892,22 @@ countriesCpy := make([]string, len(neededCountries))
 copy(countriesCpy, neededCountries)
 ```
 
+创建新切片的时候
+
+```go
+arr := []int{1, 2, 3, 4, 5}
+tmp := arr[2:4]
+println(cap(tmp)) // 这个容量为3 因为拿到的事前一个长度的指针
+println(len(tmp))
+tmp = append(tmp,1)
+tmp = append(tmp,1)
+tmp = append(tmp,1)
+fmt.Println(tmp) // [3,4,1,1,1]
+fmt.Println(arr) // [1,2,3,4,1]
+```
+
+
+
 
 
 ## range
@@ -1046,6 +1062,76 @@ fmt.Print(msg(data{Data: "2", Code: 300}))
 - '',用于表示 byte 类型或 rune 类型,默认是 rune.byte 用强调数据是 raw data 不是数字,大小为uint8,rune用来表示 Unicode 的code point,大小为int32
 - "",字符串或者字符数组
 - \`\`,不转义,原样字符 raw literal string.相当于 python 中的 `"""`
+
+### == 比较符
+
+结构体比较 按照数据类型 按地址逐个比较各个成员变量
+
+```go
+s1 := struct {
+  a string
+  b int
+}{"1", 1}
+s2 := struct {
+  b int
+  a string
+}{1, "1"}
+println(s1 == s2) // 报错
+
+s1 := struct {
+  b int
+  a string
+}{1, "1"}
+s2 := struct {
+  b int
+  a string
+}{1, "1"}
+println(s1 == s2) // true
+```
+
+数组也是一样
+
+```go
+arr := [5]int{1, 2, 3, 4, 5}
+arr1 := [5]int{1, 2, 3, 4, 5}
+println(arr == arr1) // true
+```
+
+切片,数组不能比较
+
+```go
+arr := []int{1, 2, 3, 4, 5}
+arr1 := []int{1, 2, 3, 4, 5}
+println(arr == arr1) // 报错
+mp1:=map[string]string{}
+mp2:=map[string]string{}
+println(mp2 == mp1) // 报错
+```
+
+如果结构体含有不能比较的东西也不行
+
+```go
+s := struct {
+  b string
+  a []int
+}{"",[]int{1}}
+t := struct {
+  b string
+  a []int
+}{"",[]int{1}}
+println(s == t)
+```
+
+能比较的东西才可以作为map的 key
+
+```go
+mp:=map[[5]int]string{} // ok
+mp:=map[[]int]string{}
+```
+
+
+
+
 
 ### 结构体方法
 
@@ -2251,6 +2337,16 @@ go 会去申请一块虚拟内存,如下
 -   arena 就是其他语言的堆区,go 的动态分配都是这个区域,把内存分割成 8kb 大小的页,一些页组合起来叫 mspan
 -   bitmap 用于标识 arena 区域中保存了哪些对象,4bit
 -   spans 
+
+
+
+### 栈区
+
+go 调用方法的时候限制最大参数为 2000 byte
+
+
+
+
 
 
 
