@@ -969,6 +969,10 @@ where t1.pay_id=t2.pay_id
 
     SPATIAL
 
+对于普通索引，当我们找到k=1的记录之后，首先需要通过索引上的id字段"回表"查询聚集索引上其他字段的内容，然后要接着向后寻找其他k=1的值，重复这个过程。因为普通索引可能有重复的现象发生。
+
+对于唯一索引，查找到第一个满足条件的记录后，查找的过程就会停止。
+
 ---
 
 mysql 在建立表的时候已经为主键和外键建立了索引 剩下的查询字段我们自己手动建立索引
@@ -1244,6 +1248,57 @@ Code
 - https://github.com/mysql/mysql-server/tree/3e90d07c3578e4da39dc1bce73559bbdf655c28c/storage/temptable/src
 - https://github.com/mysql/mysql-server/tree/3e90d07c3578e4da39dc1bce73559bbdf655c28c/sql
 
+### 线程
+
+
+
+### tablespace
+
+space 是个主要的命名空间.又叫 tablespace.
+
+![](https://img-blog.csdnimg.cn/2020032114540277.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NDcwMzU=,size_16,color_FFFFFF,t_70#pic_center)
+
+如上图,我们可以知道 table space是表的元数据空间用于存储一些表的共有信息,
+
+#### system tablespace
+
+其主要内容包括，8.0之后 doible write buffer 和 undo log 不存储在这里,默认情况下每张表会创建一个 ibdata1 文件,innodb_file_per_table 用于控制其开关,避免 idbdata 过大.
+
+- 表数据页
+- 表索引页
+- 数据字典,表的元信息(结构索引列信息)组成的内部表
+- MVCC控制数据
+- Undo space （回滚段） 用于存放多个 undo log,如果自定义了 undo log space 即会失效
+- Double write buffer 用于作为恢复
+- Insert buffer
+
+![](https://img-blog.csdnimg.cn/2020032115580176.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NDcwMzU=,size_16,color_FFFFFF,t_70#pic_center)
+
+- 第0页是 FSP_HDR 页，主要用于跟踪表空间，空闲链表、碎片页以及区等信息。其只能保存 256 个extent 信息,所以**这样的结构在表空间会有很多个**
+- 第1页是 IBUF_BITMAP 页，保存Change Buffer的**位图**(在下会详述)。
+- 第2页是 INODE 页，用于存储区和单独分配的碎片页信息，包括FULL、FREE、NOT_FULL 等页列表的基础结点信息，这些结点指向的是 FSP_HDR 页中的项，用于记录页的使用情况，它们之间关系如下图所示。
+- 第3页开始是索引页 INDEX(B-tree node)，从 0xc000(每页16K) 开始，后面还有些分配的未使用的页。聚簇索引的root页
+- 第4页是二级索引的root页
+
+#### file-per-table space
+
+顾名思义就是一个表一个文件,由 innodb_file_per_table 控制
+
+![](https://img-blog.csdnimg.cn/20200321155727967.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NDcwMzU=,size_16,color_FFFFFF,t_70#pic_center)
+
+![](https://img-blog.csdn.net/20180819202403910?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+
+
+#####  怎么找到第一页
+
+系统表的Page 7
+这些系统表即数据字典SYS_TABLES,SYS_COLUMNS,SYS_INDEXES,SYS_FIELDS,SYS_TABLESPACES,SYS_TABLEFILES
+Page 7保存了这些表的根页面页号
+SYS_TABLES,SYS_COLUMNS,SYS_INDEXES,SYS_FIELDS
+
+
+
 ### Page / Block [磁盘]
 
 参考
@@ -1353,6 +1408,13 @@ Innodb 使用数据页来管理所有的结构,数据页是真实管理的数据
 
 ### buffer pool [内存]
 
+buffer pool 的最主要的功能是加速度和加速写,其主要的数据结构就是上面介绍的 page 16k
+
+- 读即是每次读取数据页面的时候有限访问已经存在的缓冲池,否则择取磁盘加载
+- 写是修改一个页面的时候,直接修改缓冲区,然后记录下相关的 redo-log 等待后台线程刷盘
+
+ 因为内存的使用原因,所以 buffer pool 设置了 LRU 算法进行淘汰提高缓存的命中率.页面在进行访问的时候.会先去buffer pool中找,根据 page_no 和 space_id 找到对应的 page_hash 进行快速校验,如果没有则表示要从磁盘读取快速失效.加入内存时需要访问空闲链表去找空闲块,如果没有 free 的内存则需要想办法生成空闲块
+
 ![](https://p1-jj.byteimg.com/tos-cn-i-t2oaga2asx/gold-user-assets/2020/7/3/17313a29a971c3fd~tplv-t2oaga2asx-watermark.awebp)
 
 - instance,每个 instance 有自己的信号量, 锁，可以并发读写
@@ -1375,9 +1437,13 @@ Innodb 使用数据页来管理所有的结构,数据页是真实管理的数据
 **innodb_old_blocks_pct**: 老区域占比，0-100，默认 37 即 3/8
 **innodb_old_blocks_time**: 首次加入链表后需要经过多长时间后才有资格加入 new sublist，毫秒值，默认是 0
 
+当一次读取大量数据进入到页面的时候,old sublist就进行了内部的环形缓冲他就不会让一部分热点页面失效,进而要刷新整个 buffer pool.
+
 #### 脏页刷新
 
-即时刷新,free list 为空时怎么办？
+[参考](https://zhuanlan.zhihu.com/p/65811829)
+
+即时刷新,free list 为空时怎么办?
 
 1. LRU 列表扫描可替换的页面，第一次最多扫描100 个，第二次会扫描整个列表
 2. 仍然没有找到可以替换的页，就进行单页刷新，即刷新一个脏页进入空闲列表(为了尽快获取空闲页面，所以只刷新一个)
@@ -1387,7 +1453,32 @@ Innodb 使用数据页来管理所有的结构,数据页是真实管理的数据
 
 后台刷新
 
-当脏页的占有率达到了innodb_max_dirty_pages_pct的设定值的时候，InnoDB就会强制刷新buffer pool pages。另外当free列表小于innodb_lru_scan_depth值时也会触发刷新机制，innodb_lru_scan_depth控制LRU列表中可用页的数量，该值默认为1024。
+当脏页的占有率达到了innodb_max_dirty_pages_pct (默认为75) 的设定值的时候，InnoDB就会强制刷新buffer pool pages。另外当free列表小于innodb_lru_scan_depth值时也会触发刷新机制，innodb_lru_scan_depth控制LRU列表中可用页的数量，该值默认为1024。
+
+刷新的具体过程
+
+> 1. 调用page_cleaner_flush_pages_recommendation建议函数，对每个缓冲池实例生成脏页刷新数量的建议。在执行刷新之前，会用建议函数生成每个buffer pool需要刷新多少个脏页的建议。
+> 2. 生成刷新建议之后，通过设置事件的方式，向刷新线程（Page Cleaner线程）发出刷新请求。后台刷新线程在收到请求刷新的事件后，会执行pc_flush_slot函数对某个缓存池进行刷新，刷新的过程首先是对lru列表进行刷新，执行的函数为buf_flush_LRU_list，完成LRU列表的刷新之后，就会根据建议函数生成的建议对脏页列表进行刷新，执行的函数为buf_flush_do_batch。
+> 3. 后台刷新的协调线程会作为刷新调度总负责人的角色，它会确保每个buffer pool都已经开始执行刷新。如果哪个buffer pool的刷新请求还没有被处理，则由刷新协调线程亲自刷新，且直到所有的buffer pool instance都已开始/进行了刷新，才退出这个while循环。
+> 4. 当所有的buffer pool instance的刷新请求都已经开始处理之后，协调函数（或协调线程）就等待所有buffer pool instance的刷新的完成，等待函数为pc_wait_finished。如果这次刷新的总耗时超过4000ms，下次循环之前，会在数据库的错误日志记录相关的超时信息。它期望每秒钟对buffer pool进行一次刷新调度。如果相邻两次刷新调度的间隔超过4000ms ，也就是4秒钟，MySQL的错误日志中会记录相关信息，意思就是“本来预计1000ms的循环花费了超过4000ms的时间。
+
+评估函数会使用下面两个参数估算本机I/O的能力,这两个值需要自己设置
+
+- innodb_io_capacity
+- innodb_io_capacity_max
+
+除此之外还会计算脏页的平均刷新速度 `平均值计算规则就是新平均速度=(当前的平均速度+最近这段期间平均速度)/2。`
+
+刷新的 checkpoint
+
+- Sharp Checkpoint
+  - 数据库关闭时将所有脏页刷新到磁盘
+- Fuzzy Checkpoint
+  - Master 线程以没每秒或每10秒的速度刷新一定比率脏页回磁盘
+  - 当脏页的占有率达到了innodb_max_dirty_pages_pct的设定值的时候，InnoDB就会强制刷新buffer pool pages。另外当free列表小于innodb_lru_scan_depth值时也会触发刷新机制，innodb_lru_scan_depth控制LRU列表中可用页的数量，该值默认为1024。
+  - 当前checkpoint lsn 落后redo log lsn 超过redo log 文件大小 75%、90%时，分别执行 sync/async flush，使得刷新后的脏页小于总大小的75%
+
+
 
 #### 预读
 
@@ -1438,23 +1529,200 @@ mysql> show global status like '%read_ahead%';
 3 rows in set (0.01 sec)
 ```
 
-### change buffer
+#### 预热
+
+Buffer Pool 预热.Buffer Pool 在一开始的时候并没有什么数据,所以在 mysql 关闭前,会把 Buffer Pool 的页面信息保存到磁盘,等 mysql 在启动时根据之前保存的信息把磁盘中的数据加载到 buffer pool 中.其主要分为两种操作
+
+- buffer pool dump
+- buffer pool load
+
+每个数据页的定位可以通过 space_id 和 page_no 唯一定位到,然后写到外部文件中,load 的时候会把所有数据读入到内存,然后使用归并排序对数据进行排序,以64个数据页(1个extent)为单位进行I/O合并,然后发起一次真正的读取操作.
+
+
+
+### change buffer [内存]
 
 ![](https://dev.mysql.com/doc/refman/8.0/en/images/innodb-architecture.png)
 
+> The change buffer is a special data structure that **caches changes to secondary index pages** when those pages are **not in the buffer pool**. The buffered changes, which may result from INSERT, UPDATE, or DELETE operations (DML), are merged later when the pages are loaded into the buffer pool by other read operations.
+>
+> 简而言之：Change buffer的主要目的是将对二级索引的数据操作缓存下来，以此减少二级索引的随机IO，并达到操作合并的效果。
+
+可以看到其实对二级索引页的缓冲池.所谓的二级索引就是非聚集索引或者辅助索引,在 innodb 中指的是除了主键索引以外的索引.值得注意的是,普通索引的更新会用到 change buffer,唯一索引不会用到 change buffer. change buffer 在读多写少的时候能发挥出很大的作用,其主要目的就是为了减少磁盘次数
+
+- innodb_change_buffer_max_size 指定占用 buffer pool 的百分比
+
+#### change buffer 的更改过程
+
+> **可以看到 insert 一条语句执行的时候, 如果数据页在内存中,那么就按照内存的修改就行.如果数据页不在内存中,那么更新的操作就会被缓存到 change buffer 中,当下次访问数据页时,就会应用 change buffer 上的操作,这种方式只要进行一次磁盘访问,没有数据一致性的问题.避免更新的时候读入需要更新的页,因为更新之后可能不会被读到,不用浪费磁盘空间.**
+>
+> ```mermaid
+> sequenceDiagram
+> participant U as User
+> participant B as Buffer Pool
+> participant C as Change Buffer
+> participant D as Disk
+> U ->> B: DML
+> alt 更改数据在内存
+> B -->> D: 写入磁盘
+> else
+> B ->> C: 保存在Buffer
+> end
+> U ->> B: SELECT 请求
+> B ->> D: 从磁盘读取
+> D ->> B: 返回数据
+> B -> C: Merge
+> ```
+
+上面的过程称之为 merge.merge 操作在下面的场景会触发,一次性 merge 的操作越多(访问磁盘I/O少)收益越大,需要注意写后读的场景使用 change buffer 会比较吃力.
+
+- 数据页访问的时候
+- 后台线程每秒都会 merge
+- 数据库正常关闭的情况下
+
+change buffer 的设计师为了应对读多写少的一种设计
+
+**为什么唯一索引不能使用 change buffer?** 
+
+因为唯一索引需要判断**唯一性**,那就会把数据加载到内存进行判断.(不能直接插入),所以还不如直接改这个被加入内存的页.
+
+**redo log & change buffer**
+
+![](https://img.snaptube.app/image/em-video/1eabb2397aa201eae151957c9c30ebf2_400_300.png)
+
+更新完change buffer后会在 redo log 记录下 change buffer的修改,事务计算完成了,后续binlog 落盘,redo log commit.在磁盘上索引一般是存在于表空间的idb文件中.
+
+> 当有许多受影响的行和许多要更新的二级索引时，Change Buffer合并可能需要几个小时。在此期间，磁盘I / O会增加，这会导致磁盘绑定查询显着减慢。在提交事务之后，甚至在服务器关闭并重新启动之后，更改缓冲区合并也可能继续发生
+
+#### change buffer btree
+
+[参考](https://blog.csdn.net/bohu83/article/details/81837872)
+
+ibuf (insert buffer) 简单理解即可看成 change buffer, insert buffer 是之前版本的叫法,我们所谓的索引就是颗B+树也是由于这个区域
+
+<img src="https://img-blog.csdnimg.cn/20190422232450491.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM2NjUyNjE5,size_16,color_FFFFFF,t_70" alt="50" style="zoom:80%;" />
+
+这个 counter 的初始值是 0xffff
+
+- 用户设置了选项innodb_change_buffering；（即ibuf_use != IBUF_USE_NONE）
+- 只有叶子节点才会去考虑是否使用ibuf；
+- 对于聚集索引，不可以缓存操作；
+- 对于唯一二级索引(unique key)，由于索引记录具有唯一性，因此无法缓存插入操作，但可以缓存删除操作；
+- 表上没有flush 操作，例如执行flush table for export时，不允许对表进行 ibuf 缓存 （通过dict_table_t::quiesce 进行标识）
+
+#### Change Buffer Bitmap
+
+该bitmap存储于 tablespace 中,**用于追踪每个 page 的空闲范围**.其大小为 16k,即其能追踪 16kb/4=4kb page
+
+>  当文件页在buffer pool中时，就直接操作文件页，而不会去考虑ibuf
+
+| 名称                 | 大小（bit） | 说明                                                         |
+| -------------------- | ----------- | ------------------------------------------------------------ |
+| IBUF_BITMAP_FREE     | 2           | 该辅助索引页可用空间数量: 0表示无可用空间 1表示可用空间大于1/32 2表示大于1/16 3表示大于1/8 |
+| IBUF_BITMAP_BUFFERED | 1           | 1表示该页有记录被保存在change buffer中                       |
+| IBUF_BITMAP_IBUF     | 1           | 1表示该页为change buffer B+树的索引页                        |
+
+- 优点
+  - 若相关数据页不在磁盘，会先保存的Buffer，减少磁盘访问，能够保证数据一致性
+  - 数据页读到内存需要占用空间，提供空间使用率
+- merge 时机
+  - 访问数据页
+  - 后台线程每秒进行一次
+  - 数据库正常关闭
+  - 检测到插入记录后所用空间小于1/32
+- 使用场景
+  - 写多读少
+  - 索引大部分都是非唯一索引
+  - 数据写入后会立马读取，建议不要使用
+- 更新完 change buffer，会在 redo log 进行相应记录
+
+change buffer 会对三种类型的操作进行缓存,`INSERT,DELETE-MARK,DELETE操作,前两种对应用户线程操作，第三种则由purge操作触发`.
+
+```c
+/** Allowed values of innodb_change_buffering */
+static const char* innobase_change_buffering_values[IBUF_USE_COUNT] = {
+        "none",         /* IBUF_USE_NONE */
+        "inserts",      /* IBUF_USE_INSERT */
+        "deletes",      /* IBUF_USE_DELETE_MARK */
+        "changes",      /* IBUF_USE_INSERT_DELETE_MARK */
+        "purges",       /* IBUF_USE_DELETE */
+        "all"           /* IBUF_USE_ALL */
+};
+```
+
+ innodb_change_buffering默认值为all,表示缓存所有操作.注意由于在二级索引上的更新操作总是先delete-mark,再insert新记录,因此其ibuf实际有两条记录IBUF_OP_DELETE_MARK+IBUF_OP_INSERT.
+
+![](https://img-blog.csdn.net/20180819211623886?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+![](https://img-blog.csdn.net/20180819212610304?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
 
 
-### log buffer
+
+
+
+### AHI
+
+Adaptive Hash Index 自适应 hash 索引
+
+> The adaptive hash index enables InnoDB to perform more like an in-memory database on systems with appropriate combinations of workload and sufficient memory for the buffer pool without sacrificing transactional features or reliability.
+>
+> 自适应哈希索引使 InnoDB 能够在具有适当的工作负载组合和缓冲池足够内存的系统上执行更像内存数据库,而不会牺牲事务特性或可靠性.
+
+AHI 为了解决的问题是
+
+> - 随着 MySQL 单表数据量增大，（尽管 B+ 树算法极好地控制了树的层数）索引 B+ 树的层数会逐渐增多；
+> - 随着索引树层数增多，检索某一个数据页需要沿着 B+ 树从上往下逐层定位，时间成本就会上升；
+> - 为解决检索成本问题，MySQL 就想到使用某一种缓存结构：根据某个检索条件，直接查询到对应的数据页，跳过逐层定位的步骤。这种缓存结构就是 AHI。
+
+其实就是作为二级索引的缓存.保存`条件->数据页`的映射.作为内存的缓存,其设计的核心的就是不能太大(二级缓存).所谓的自适应是其大小会根据实际情况发生变化.
+
+![](https://pic1.zhimg.com/80/v2-c5306994ed483755bdd37184f0890a44_720w.jpg)
+
+简单来说就是得使用到两列以上的索引且使用的次数足够多才会建立 AHI 索引.建立 AHI 对应三个条件
+
+- 某个索引树要被使用足够多次
+- 该索引树上的某个检索条件要被经常使用
+- 该索引树上的某个数据页要被经常使用
+
+建立起 AHI 后使用就如同传统的 map 结构
+
+![](https://pic1.zhimg.com/80/v2-d0728f73a388498d557465bd59b481a0_1440w.jpg)
+
+hash info 中三个字段
+
+- 检索条件与索引匹配的列数
+- 第一个不匹配的列中，两者匹配的字节数
+- 匹配的方向是否从左往右进行
+
+#### 使用时注意事项
+
+1. 只支持等值查询和 IN
+2. 数据保存在内存中，会占用 Buffer Pool 资源
+3. 开启后无法人为干预
+
+
+
+### log buffer [内存]
 
 ![](https://dev.mysql.com/doc/refman/8.0/en/images/innodb-architecture.png)
 
+> The log buffer is the memory area that holds data to be written to the log files on disk. Log buffer size is defined by the innodb_log_buffer_size variable. The default size is 16MB.
 
+可以通过 **innodb_log_buffer_size** 来控制日志缓冲区的大小.
 
+说起日志缓存可能就不得不提,关于日志的数据结构我们在此略过
 
+- redo log 预写日志
+- undo log 重做日志
 
+前两者和事务又有很大关系,较大的事务缓冲区可以运行大型事务.如果涉及到更新插入删除多行的事务则增加缓冲区的大小
 
-
-
+- innodb_flush_log_at_trx_commit 控制如何把日志缓冲区的内容写入并刷新到磁盘
+  - 0 每秒进行一次缓存写入和更新磁盘的操作，未完成刷盘的数据可能丢失
+  - 1 默认值。每次事务提交时会写入buffer并更新到磁盘
+  - 2 每次事务提交时会写入buffer，每秒进行一次刷盘操作
+- innodb_flush_log_at_timeout 控制日志刷新的频率
+- 只要缓冲区已满就会刷新到磁盘
 
 
 
