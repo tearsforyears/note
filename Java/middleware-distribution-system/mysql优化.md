@@ -1037,40 +1037,6 @@ explain  可以通过 `Using index condition` 来确定是否使用索引下推
 >组合索引满足最左匹配，但是遇到非等值判断时匹配停止。
 >name like '陈%' 不是等值匹配，所以 age = 20 这里就用不上 (name,age) 组合索引了。如果没有索引下推，组合索引只能用到 name，age 的判定就需要回表才能做了。5.6之后有了索引下推，age = 20 可以直接在组合索引里判定。
 
-### 索引优化例子
-
-索引优化的思路是尽可能多的**使用索引**,在毫无索引的情况下可以考虑 id
-
-表中的数据大概是千万级别,下面一句 sql 来自我司运营
-
-```sql
-select count(*) from
-(select id,a,creation,b from t
-order by id desc
-limit 2200000
-) tmp
-where date(creation) >='2021-08-01'
-and a >20
-and b is not null
-```
-
-上述 sql 犯病的地方在于以下几个,首先目测得上述 sql 在进行全表扫描, where 条件是优化的终点,上面的问题逐个分析
-
-- 全局范围差距,等值匹配仅有b
-- creation 这个字段一般也不会建立索引,还加个函数,嗯,全表扫描
-- a 这个字段具体含义是一个评分,根据业务逻辑,这个范围只包含四个值
-
-当范围查找不可避免的时候,我们就需要观测到是否有些记录可以利用顺序的特性,先看优化后的 sql
-
-```sql
-select count(1) from t 
-where id>=(select min(id) from t where creation between '2021-08-01 00:00:00' and '2021-08-01 00:05:00')
-and b is not null
-and (a =30 or a=80 or a=90 or a=100)
-```
-
-显然确定一个开始的 id 可以极大的降低搜索的成本,根据时间字段我们的问题就变成了找那一天最小的id,然后把范围查询化为等值查询,就有如上sql
-
 
 
 ### 在线DDL
@@ -1252,7 +1218,7 @@ Code
 
 
 
-### tablespace
+### tablespace [逻辑]
 
 space 是个主要的命名空间.又叫 tablespace.
 
@@ -1290,12 +1256,108 @@ space 是个主要的命名空间.又叫 tablespace.
 
 
 
-#####  怎么找到第一页
+#### 系统表
 
 系统表的Page 7
 这些系统表即数据字典SYS_TABLES,SYS_COLUMNS,SYS_INDEXES,SYS_FIELDS,SYS_TABLESPACES,SYS_TABLEFILES
 Page 7保存了这些表的根页面页号
 SYS_TABLES,SYS_COLUMNS,SYS_INDEXES,SYS_FIELDS
+
+在 Information_schema 库里面就保存着这些信息
+
+```sql
+use Information_schema
+select * from `COLUMNS` where TABLE_NAME='table_name'
+select * from COLUMN where column like 'download%'
+```
+
+```shell
+| TABLE_CATALOG | TABLE_SCHEMA | TABLE_NAME          | COLUMN_NAME    | ORDINAL_POSITION | COLUMN_DEFAULT | IS_NULLABLE | DATA_TYPE  | CHARACTE
+R_MAXIMUM_LENGTH | CHARACTER_OCTET_LENGTH | NUMERIC_PRECISION | NUMERIC_SCALE | DATETIME_PRECISION | CHARACTER_SET_NAME | COLLATION_NAME     |
+COLUMN_TYPE   | COLUMN_KEY | EXTRA | PRIVILEGES                      | COLUMN_COMMENT | GENERATION_EXPRESSION |
++---------------+--------------+---------------------+----------------+------------------+----------------+-------------+------------+---------
+-----------------+------------------------+-------------------+---------------+--------------------+--------------------+--------------------+-
+--------------+------------+-------+---------------------------------+----------------+-----------------------+
+| def           | Plugin       | developer           | downloadCount  | 6                | 0              | NO          | int        | <null>
+                 | <null>                 | 10                | 0             | <null>             | <null>             | <null>             |
+int(11)       |            |       | select,insert,update,references |                |                       |
+| def           | Plugin       | plugin              | downloadKey    | 25               | <null>         | YES         | varchar    | 255
+                 | 1020                   | <null>            | <null>        | <null>             | utf8mb4            | utf8mb4_general_ci |
+varchar(255)  |            |       | select,insert,update,references |                |                       |
+```
+
+| 表名                                  | 注释                                                         |
+| ------------------------------------- | ------------------------------------------------------------ |
+| SCHEMATA                              | 提供了当前mysql实例中所有数据库的信息。是show databases的结果取之此表 |
+| TABLES                                | 提供了关于数据库中的表的信息（包括视图）。详细表述了某个表属于哪个schema、表类型、表引擎、创建时间等信息。是show tables from schemaname的结果取之此表 |
+| COLUMNS                               | 提供了表中的列信息。详细表述了某张表的所有列以及每个列的信息。是show columns from schemaname.tablename的结果取之此表 |
+| STATISTICS                            | 提供了关于表索引的信息。是show index from schemaname.tablename的结果取之此表 |
+| USER_PRIVILEGES                       | 用户权限表:给出了关于全程权限的信息。该信息源自mysql.user授权表。是非标准表 |
+| SCHEMA_PRIVILEGES                     | 方案权限表:给出了关于方案（数据库）权限的信息。该信息来自mysql.db授权表。是非标准表 |
+| TABLE_PRIVILEGES                      | 表权限表:给出了关于表权限的信息。该信息源自mysql.tables_priv授权表。是非标准表 |
+| COLUMN_PRIVILEGES                     | 列权限表:给出了关于列权限的信息。该信息源自mysql.columns_priv授权表。是非标准表 |
+| CHARACTER_SETS                        | 字符集表:提供了mysql实例可用字符集的信息。是SHOW CHARACTER SET结果集取之此表 |
+| COLLATIONS                            | 提供了关于各字符集的对照信息                                 |
+| COLLATION_CHARACTER_SET_APPLICABILITY | 指明了可用于校对的字符集。这些列等效于SHOW COLLATION的前两个显示字段。 |
+| TABLE_CONSTRAINTS                     | 描述了存在约束的表。以及表的约束类型                         |
+| KEY_COLUMN_USAGE                      | 描述了具有约束的键列                                         |
+| ROUTINES                              | 提供了关于存储子程序（存储程序和函数）的信息。此时，ROUTINES表不包含自定义函数（UDF）。名为“mysql.proc name”的列指明了对应于INFORMATION_SCHEMA.ROUTINES表的mysql.proc表列 |
+| VIEWS                                 | 给出了关于数据库中的视图的信息。需要有show views权限，否则无法查看视图信息 |
+| TRIGGERS                              | 提供了关于触发程序的信息。必须有super权限才能查看该表        |
+
+可以看到在这个库里面还有 innodb 的信息
+
+```sql
+| INNODB_LOCKS                          |
+| INNODB_TRX                            |
+| INNODB_SYS_DATAFILES                  |
+| INNODB_FT_CONFIG                      |
+| INNODB_SYS_VIRTUAL                    |
+| INNODB_CMP                            |
+| RDS_EVENTS_THREADS_WAITS_CURRENT      |
+| INNODB_CMP_RESET                      |
+| INNODB_CMP_PER_INDEX                  |
+| INNODB_CMPMEM_RESET                   |
+| INNODB_FT_DELETED                     |
+| INNODB_BUFFER_PAGE_LRU                |
+| INNODB_LOCK_WAITS                     |
+| INNODB_TEMP_TABLE_INFO                |
+| INNODB_SYS_INDEXES                    |
+| INNODB_SYS_TABLES                     |
+| INNODB_SYS_FIELDS                     |
+| INNODB_CMP_PER_INDEX_RESET            |
+| INNODB_BUFFER_PAGE                    |
+| INNODB_FT_DEFAULT_STOPWORD            |
+| INNODB_FT_INDEX_TABLE                 |
+| INNODB_FT_INDEX_CACHE                 |
+| INNODB_SYS_TABLESPACES                |
+| INNODB_METRICS                        |
+| INNODB_SYS_FOREIGN_COLS               |
+| INNODB_CMPMEM                         |
+| INNODB_BUFFER_POOL_STATS              |
+| INNODB_SYS_COLUMNS                    |
+| INNODB_SYS_FOREIGN                    |
+| INNODB_SYS_TABLESTATS                 |
+```
+
+我们可以从 TABLESPACE 中可以看到相对应的文件信息
+
+```sql
+| SPACE | NAME                  | FLAG | FILE_FORMAT | ROW_FORMAT | PAGE_SIZE | ZIP_PAGE_SIZE | SPACE_TYPE | FS_BLOCK_SIZE | FILE_SIZE | ALLOCATED_SIZE |
++-------+-----------------------+------+-------------+------------+-----------+---------------+------------+---------------+-----------+----------------+
+| 3004  | mysql/plugin          | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 98304     | 98304
+| 5893  | video/Plugins         | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 229376    | 233472
+| 6291  | Plugin/plugin         | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 180224    | 184320
+| 6295  | Plugin/report         | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 98304     | 98304
+| 6310  | Plugin/pluginLang     | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 98304     | 98304
+| 6320  | Plugin/mail           | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 147456    | 151552
+| 6322  | Plugin/plugin_info    | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 114688    | 114688
+| 6323  | Plugin/plugin_version | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 131072    | 135168
+| 6328  | Plugin/developer      | 33   | Barracuda   | Dynamic    | 16384     | 0             | Single     | 4096          | 131072    | 131072
++-------+-----------------------+------+-------------+------------+-----------+---------------+------------+---------------+-----------+-------
+```
+
+另外一个比较重要的库是 sys
 
 
 
@@ -1478,7 +1540,7 @@ buffer pool 的最主要的功能是加速度和加速写,其主要的数据结�
   - 当脏页的占有率达到了innodb_max_dirty_pages_pct的设定值的时候，InnoDB就会强制刷新buffer pool pages。另外当free列表小于innodb_lru_scan_depth值时也会触发刷新机制，innodb_lru_scan_depth控制LRU列表中可用页的数量，该值默认为1024。
   - 当前checkpoint lsn 落后redo log lsn 超过redo log 文件大小 75%、90%时，分别执行 sync/async flush，使得刷新后的脏页小于总大小的75%
 
-
+从这里也可以也可以看出,刷新脏页落盘,可以定时调度去完成一部分,另一部分如 buffer pool 会根据阈值触发,log buffer会根据事务提交而进行落盘.
 
 #### 预读
 
@@ -1660,9 +1722,9 @@ static const char* innobase_change_buffering_values[IBUF_USE_COUNT] = {
 
 
 
-### AHI
+### Adaptive Hash Index
 
-Adaptive Hash Index 自适应 hash 索引
+(AHI)Adaptive Hash Index 自适应 hash 索引
 
 > The adaptive hash index enables InnoDB to perform more like an in-memory database on systems with appropriate combinations of workload and sufficient memory for the buffer pool without sacrificing transactional features or reliability.
 >
@@ -1726,9 +1788,38 @@ hash info 中三个字段
 
 
 
+### DML
+
+从上面我们知道了这些语句的执行过程,在此总结
+
+#### select 
+
+根据索引或者扫描到对应的起始数据页,把对应的数据页加入buffer pool,根据 page directory 进行二分查找,定位到需要的目录,然后再根据指针线性查找对应的记录或者是 page
+
+#### delete
+1. 如果是最后一条记录，直接初始化为空页
+2. 不是的话，首先记录 redo log
+3. 重置PAGE_LAST_INSERT和递增block的modify clock。后者主要是为了让乐观的查询失效。
+4. 找到记录的前驱和后驱记录，前驱指针指向后驱
+5. 如果有目录指向这条记录，将该目录指向这条记录的前驱，见效own值
+6. 把记录放到 Page_Free 链表头部，增加Page_Garbage 大小，减小Page_N_Recs的数量
+7. 重新均衡目录，可能需要删除某些目录。具体算法也比较简单，首先判断是否可以从周围的目录中挪一条记录过来，如果可以直接调整一下前后目录的指针即可。这种简单的调整要求被挪出记录的目录own的记录数量足够多，如果也没有足够的记录，就需要删除其中一个目录，然后把后面的目录都向前平移
+
+#### insert
+
+
+1. 从记录中获取记录长度的元数据
+2. 尝试从 Page_Free 链表获取空间，只会比较表头的一个节点
+3. 匹配不上就从*PAGE_HEAP_TOP*分配，如果仍然空间不足，就返回空。分配成功，则递增*PAGE_N_HEAP*
+4. 拷贝记录到指定空间，并修改前驱、后驱记录的next指针
+5. 若有目录超过最大值，则调整数据目录，算法比较简单，就是找到中间节点，然后用这个中间节点重新构建一个新的目录，为了给这个新的目录腾空间，需要把后续的所有目录都平移
+6. 写入redo log日志，持久化
+
 
 
 ## 日志系统
+
+[参考](https://blog.csdn.net/bohu83/article/details/81481184),[参考](https://blog.csdn.net/bohu83/article/details/81568341)
 
 主要分为以下几个日志
 
@@ -1736,20 +1827,37 @@ hash info 中三个字段
 - undo-log
 - binlog(归档日志,这个日志在server层的)
 
-![](https://www.linuxidc.com/upload/2018_11/181121105137362.png)
+<img src="https://www.linuxidc.com/upload/2018_11/181121105137362.png" alt="50" style="zoom:33%;" />
 
-我们看到server层面的东西都是mysql的sql实现
+Mysql 中 redolog 和  undolog 这两个日志是相对比较重要的,两者直接关系 mysql 事务的实现,
 
-### innodb存储日志
+- redo-log 保证其持久性,用于数据库数据异常回复和重启时数据页的同步回复
+- undo-log 保证原子性和 MVCC
 
-#### redo-log(内存/磁盘上)
+和大多数关系型数据库一样,Innodb 总是保证日志先行(WAL)(log write ahead),即日志的落盘要优先于数据的持久化.
+
+LSN(log sequence number) 用于记录日志的序列号,是一个不断递增的主键,**它既用于表示修改脏页时的日志序号，也用于记录checkpoint**,通过LSN可以定位其在 redo-log 中的具体位置.LSN的含义是储存引擎向重做日志系统写入的日志量（字节数）这个日志量包括写入的日志字节 + LOG_BLOCK_HDR_SIZE + LOG_BLOCK_TRL_SIZE.
+
+flush list 上的 page 按照修改这些 page 的LSN号进行排序,我们看到了这里脏页的刷新是从拥有最小LSN的page开始刷新到磁盘的,延迟脏页的刷新可以应用多次合并的结果避免多次写入造成性能问题.
+
+
+
+### redo-log(内存/磁盘上)
 
 - 内存中 redo-log-buffer 缓冲区
 - 磁盘上 redo log file 持久化在磁盘
 
 redo-log是存储引引擎层的日志,用于记录**事务**操作的变化,记录的是数据修改后的值,无论事务是否提交都会被记录下来.如果数据库宕机,redo-log就可以恢复.每条insert语句都会**被记录下来,然后更新内存**,这是条完整的语句执行.redo-log实在空闲时或者是按照设定的更新策略把redo-log的内容更新到磁盘,redo-log的缓冲区大小是固定的写完了就得从头写.从头写的时候数据库就会把日志持久化到磁盘上.一般触发持久化的条件为 512MB 即块的大小,由 `innodb_log_file_size` 控制
 
-#### undo-log回滚日志
+redo log是建立在在mini transaction基础上。数据库在执行事务时，通过minitransaction产生redo log来保证事务的持久性
+
+在 5.6 的时候 redo-log 可以以多份文件的形式存在,在 5.7移除了该特性.
+
+
+
+
+
+### undo-log回滚日志
 
 undo-log和redo-log是innodb事务的重要的实现基础.又叫回滚日志.提供向前滚的操作.同时其提供MVCC版本的读.
 
@@ -2257,21 +2365,15 @@ update Items set quantity=quantity-2 where id=100;
 
 
 
-## innodb 的存储结构
+## 事务
 
-- frm 文件是表的结构描述文件
-- idb 文件,innodb 特有的文件存储数据和索引
-- par 文件是分区之后的信息存储文件
-
-如果是 myisam 的结构,其数据和索引是分开存放的分别存放于 `MYD` 和 `MYI`文件中
+上面说了事务的一些基本特性,下面从设计事务的角度说明白事务.
 
 
 
 
 
-
-
-## 存储引擎和 sql 优化
+## sql 优化
 
 ### 谓词下推 ICP
 
@@ -2291,3 +2393,36 @@ on t1.id=t2.id
 
 这是因为我们写的sql被进行了优化,选择相关的条件尽可能的早做,这个优化在Spark Sql中有大量的应用.优化器自动帮我们实现了这种优化.
 
+### 关于扫描
+
+索引优化的思路是尽可能多的**使用索引**,在毫无索引的情况下可以考虑 id
+
+表中的数据大概是千万级别,下面一句 sql 来自我司运营
+
+```sql
+select count(*) from
+(select id,a,creation,b from t
+order by id desc
+limit 2200000
+) tmp
+where date(creation) >='2021-08-01'
+and a >20
+and b is not null
+```
+
+上述 sql 犯病的地方在于以下几个,首先目测得上述 sql 在进行全表扫描, where 条件是优化的终点,上面的问题逐个分析
+
+- 全局范围差距,等值匹配仅有b
+- creation 这个字段一般也不会建立索引,还加个函数,嗯,全表扫描
+- a 这个字段具体含义是一个评分,根据业务逻辑,这个范围只包含四个值
+
+当范围查找不可避免的时候,我们就需要观测到是否有些记录可以利用顺序的特性,先看优化后的 sql
+
+```sql
+select count(1) from t 
+where id>=(select min(id) from t where creation between '2021-08-01 00:00:00' and '2021-08-01 00:05:00')
+and b is not null
+and (a =30 or a=80 or a=90 or a=100)
+```
+
+显然确定一个开始的 id 可以极大的降低搜索的成本,根据时间字段我们的问题就变成了找那一天最小的id,然后把范围查询化为等值查询,就有如上sql
