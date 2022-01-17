@@ -1195,6 +1195,19 @@ Sharding-Proxy 属于和 Mycat 对标的产品，它定位为透明化的数据�
 
 ## mysql 服务器结构（innodb base）
 
+### 一些常见的问题
+
+- mysql 的刷盘时机
+  - buffer pool lfu (flush list) 无可用页面的时候刷盘,定期10s 刷盘
+  - redolog LSN 超过检查点太多 三个级别 0,1,2
+  - buffer pool lru 淘汰页面一般是读取的不会进行刷盘
+
+### introduction
+
+研究 mysql 的服务器架构主要关注以下一些点,内存管理,事务,其中内存管理的部分主要是与磁盘I/O相关的 buffer pool 包括 change buffer,宏观上看,服务器的本质无非是读和写,对 mysql 而言,重要的操作其实有四个,即所谓的CRUD,这四个操作除了 Select 是读操作之外,其他操作都是写操作
+
+读操作会利用到 buffer pool 的 LRU list 进行淘汰,而写操作一般涉及到 change buffer,事务,MTR(mini-transcation), buffer pool 的 LFU list.所以对于不同的操作应该分离来看,尤其是读和写之间的分离,他们的日志行为,锁的控制,缓存做法均不同,要特别注意 
+
 ### 存储架构
 
 mysql 的存储架构主要分为以下几个点
@@ -1215,6 +1228,11 @@ Code
 - https://github.com/mysql/mysql-server/tree/3e90d07c3578e4da39dc1bce73559bbdf655c28c/sql
 
 ### 线程
+
+- Master Thread 主要负责把 buffer pool 中的数据异步刷新到磁盘,包括脏页刷新,change buffer 合并,(undo-log 页回收)
+- IO Thread 负责 AIO 的回调,1.0 时使用 read,write,insert buffer,log IO Thread 四个线程
+- Purge Thread 事务被提交后 undo-log 可能不在被需要,purge 来回收 undo-log 页面,1.1之后独立出 master thread
+- Page Cleaner Thread 1.2 之后把脏页刷新独立出来进行单独刷新
 
 
 
@@ -1748,7 +1766,7 @@ AHI 为了解决的问题是
 
 建立起 AHI 后使用就如同传统的 map 结构
 
-![](https://pic1.zhimg.com/80/v2-d0728f73a388498d557465bd59b481a0_1440w.jpg)
+<img src="https://pic1.zhimg.com/80/v2-d0728f73a388498d557465bd59b481a0_1440w.jpg" alt="50" style="zoom:50%;" />
 
 hash info 中三个字段
 
@@ -1782,13 +1800,13 @@ hash info 中三个字段
 - innodb_flush_log_at_trx_commit 控制如何把日志缓冲区的内容写入并刷新到磁盘
   - 0 每秒进行一次缓存写入和更新磁盘的操作，未完成刷盘的数据可能丢失
   - 1 默认值。每次事务提交时会写入buffer并更新到磁盘
-  - 2 每次事务提交时会写入buffer，每秒进行一次刷盘操作
+  - 2 每次事务提交时会写入system cache，每秒进行一次刷盘操作
 - innodb_flush_log_at_timeout 控制日志刷新的频率
 - 只要缓冲区已满就会刷新到磁盘
 
 
 
-### DML
+### buffer pool 的角度看待 sql
 
 从上面我们知道了这些语句的执行过程,在此总结
 
@@ -1819,7 +1837,7 @@ hash info 中三个字段
 
 ## 日志系统
 
-[参考](https://blog.csdn.net/bohu83/article/details/81481184),[参考](https://blog.csdn.net/bohu83/article/details/81568341)
+[参考](https://blog.csdn.net/bohu83/article/details/81481184),[参考](https://blog.csdn.net/bohu83/article/details/81568341),[参考](http://mysql.taobao.org/monthly/2015/05/01/)
 
 主要分为以下几个日志
 
@@ -1829,7 +1847,7 @@ hash info 中三个字段
 
 <img src="https://www.linuxidc.com/upload/2018_11/181121105137362.png" alt="50" style="zoom:33%;" />
 
-Mysql 中 redolog 和  undolog 这两个日志是相对比较重要的,两者直接关系 mysql 事务的实现,
+Mysql 中 redolog 和  undolog 这两个日志是相对比较重要的,两者直接关系 mysql 事务的实现,所以可以简单认为所有搜索相关的都不涉及 redo-log 和 undolog 两个日志.
 
 - redo-log 保证其持久性,用于数据库数据异常回复和重启时数据页的同步回复
 - undo-log 保证原子性和 MVCC
@@ -1844,6 +1862,8 @@ flush list 上的 page 按照修改这些 page 的LSN号进行排序,我们看�
 
 ### redo-log(内存/磁盘上)
 
+redo-log 用于记录对**物理文件的数据变更**,按照 buffer pool 的理解 redo-log 是所有对页有变更的操作都会记录到该日志中.
+
 - 内存中 redo-log-buffer 缓冲区
 - 磁盘上 redo log file 持久化在磁盘
 
@@ -1851,24 +1871,197 @@ redo-log是存储引引擎层的日志,用于记录**事务**操作的变化,记
 
 redo log是建立在在mini transaction基础上。数据库在执行事务时，通过minitransaction产生redo log来保证事务的持久性
 
-在 5.6 的时候 redo-log 可以以多份文件的形式存在,在 5.7移除了该特性.
+在 5.6 的时候 redo-log 可以以多份文件的形式存在,在 5.7移除了该特性.Redo log 以顺序的方式写入文件文件,写满时则回溯到第一个文件,进行覆盖写,即环形缓冲区.
 
+![](https://img-blog.csdn.net/20180807180732199?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
 
+Redo log可能产生的速度非常快，导致频繁的刷脏操作，进而导致性能下降，通常在未做checkpoint的日志超过文件总大小的76%之后，InnoDB 认为这可能是个不安全的点，会强制的preflush脏页
+
+#### log block
+
+即日志的数据结构,日志的写入以 512 byte 为单位,以字节对齐的形式写入磁盘
+
+![](https://img-blog.csdn.net/20180807183324473?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+> Block no 的最高位是描述block是否flush磁盘的标识位.通过lsn可以blockno,具体的计算过程是lsn是多少个512的整数倍，也就是no = lsn / 512 + 1;为什么要加1呢，因为所处no的块算成clac_lsn一定会小于传入的lsn.所以要+1。其实就是block的数组索引值
+>
+> LOG_BLOCK_HDR_DATA_LEN   2个字节，表示当前页面存储日志的长度，通常是满的0X200，因为日志在相连的块上市连续存储的，中间不会有空闲空间，如果不满表示日志已经扫描完成（crash recovery的工作 ）
+>
+> LOG_BLOCK_FIRST_REC_GROUP 占用2个字节，表示log block中第一个日志所在的偏移量。如果该值的大小和LOG_BLOCK_HDR_DATA_LEN相同，则表示当前log block不包含新的日志
+
+#### checkpoint
+
+当日志缓冲区写入的日志LSN距离上一次生成检查点的LSN达到一定差距的时候，就会开始创建检查点，创建检查点首先会将**内存中的表的脏数据**写入到硬盘,让后再将**redo log buffer中小于本次检查点的LSN的日志**也写入硬盘
+
+所以我们其实可以看到 redo-log 并不是无限大的,所以需要 buffer pool 中的内存脏页和一个有限大小的日志,这及时检查点技术的使用场景.让日志失效(当page成功写回磁盘的时候它的redo-log就失效了),同时尽量减少对磁盘的I/O操作.
+
+#### MTR
+
+mini-transaction(mtr),是逻辑事务实现的基础,只要涉及到物理文件的修改,该事务就会使用
+
+![](https://img-blog.csdn.net/20180808124552157?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+```c
+/** Mini-transaction handle and buffer */
+struct mtr_t {
+ 
+  /** State variables of the mtr */
+  struct Impl {
+
+    /** memo stack for locks etc. */
+    mtr_buf_t	m_memo;
+
+    /** mini-transaction log */
+    mtr_buf_t	m_log;
+
+    /** true if mtr has made at least one buffer pool page dirty */
+    bool		m_made_dirty;
+
+    /** true if inside ibuf changes */
+    bool		m_inside_ibuf;
+
+    /** true if the mini-transaction modified buffer pool pages */
+    bool		m_modifications;
+
+    /** Count of how many page initial log records have been
+		written to the mtr log */
+    ib_uint32_t	m_n_log_recs;
+
+    /** specifies which operations should be logged; default
+		value MTR_LOG_ALL */
+    mtr_log_t	m_log_mode;
+    
+    #ifdef UNIV_DEBUG
+    /** Persistent user tablespace associated with the
+		mini-transaction, or 0 (TRX_SYS_SPACE) if none yet */
+    ulint		m_user_space_id;
+    #endif /* UNIV_DEBUG */
+    /** User tablespace that is being modified by the
+		mini-transaction */
+    fil_space_t*	m_user_space;
+    /** Undo tablespace that is being modified by the
+		mini-transaction */
+    fil_space_t*	m_undo_space;
+    /** System tablespace if it is being modified by the
+		mini-transaction */
+    fil_space_t*	m_sys_space;
+
+    /** State of the transaction */
+    mtr_state_t	m_state; // 包含 MTR_STATE_INIT、MTR_STATE_COMMITTING、 MTR_STATE_COMMITTED
+
+    /** Flush Observer */
+    FlushObserver*	m_flush_observer;
+
+    #ifdef UNIV_DEBUG
+    /** For checking corruption. */
+    ulint		m_magic_n;
+    #endif /* UNIV_DEBUG */
+
+    /** Owning mini-transaction */
+    mtr_t*		m_mtr;
+  };
+}
+```
+
+其中有 mtr_log_mode
+
+> MTR_LOG_ALL：默认模式，记录所有会修改磁盘数据的操作；
+>
+> MTR_LOG_NONE：不记录redo，脏页也不放到flush list上；
+>
+> MTR_LOG_NO_REDO：不记录redo，但脏页放到flush list上；
+>
+> MTR_LOG_SHORT_INSERTS：插入记录操作REDO，在将记录从一个page拷贝到另外一个新建的page时用到，此时忽略写索引信息到redo log中。
+
+**这里提前插一嘴,在 mysql 中 s 锁和 x 锁分别代表了共享锁和排他锁.**
+
+系统在载入页面的时候,需要开启一个 mtr,这个 mtr 需要知道开启的时候该页面是用来修改的还是用来读取的,会给该页面加上相应的 x 锁或者 s 锁.(也可以指定不加锁).获取到页面的访问权之后对页面进行操作,如果开启了日志记录则会记录日志.最后提交事务,物理事务的提交主要是将所有这个物理事务产生的日志写入到innodb的日志系统的日志缓冲区中,然后等待srv_master_thread线程定时将日志系统的日志缓冲区中的日志数据刷到日志文件中.如果一个物理事务的日志是不完整的,则它对应的所有日志都不会重做.在提交的时候会在日志后面写一些特殊日志代表事务结束.
+
+现在都已经知道这个数组中存储的是这个物理事务所有访问过的页面，并且都已经上了锁，那么在它提交时，如果发现这些页面中有已经被修改过的，则这些页面就成为了脏页，这些脏页需要被加入到innodb的buffer缓冲区中的更新链表中
+
+#### redolog刷盘
+
+之前我们说过了,日志刷盘的时机可能是提交事务或者是定时调度,我们细看下,有几种场景可能会触发redo log写文件：
+
+1. Redo log buffer空间不足时
+2. 事务提交
+3. 后台线程
+4. 做checkpoint
+5. 实例shutdown时
+6. binlog切换时
+
+![](https://img-blog.csdn.net/20180808132716515?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+我们所熟悉的参数innodb_flush_log_at_trx_commit 作用于事务提交时，这也是最常见的场景：
+
+- 当设置该值为1时，每次事务提交都要做一次fsync，这是最安全的配置，即使宕机也不会丢失事务；(默认)
+- 当设置为2时，则在事务提交时只做write操作，只保证写到系统的page cache，因此实例crash不会丢失事务，但宕机则可能丢失事务；
+- 当设置为0时，事务提交不会触发redo写操作，而是留给后台线程每秒一次的刷盘操作，因此实例crash将最多丢失1秒钟内的事务。
+
+这个值可以在高峰期设置事务的提交为2,保证写入到操作系统的缓存,用来提高性能.写入过程可以简化成下图
+
+<img src="https://img-blog.csdn.net/20180808133049184?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" alt="7" style="zoom:80%;" />
+
+看上面主要有三个指针控制
+
+- flushed_to_disk_lsn
+- write_lsn
+- buffer_free
+
+当 flushed_to_disk_lsn 和当前 lsn 的值相等时,则证明所有的 log 已经被全部刷到磁盘上了
+
+一个很形象的图,可以看到 log buffer 也使用了 page 字节对齐的设计,其所谓的指针指的是内部的逻辑连续而不是页之间地址的连续.
+
+<img src="https://img-blog.csdnimg.cn/20210220142446368.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L21hc2hhb2thbmcxMzE0,size_16,color_FFFFFF,t_70" alt="5" style="zoom:80%;" />
+
+除了 redo-log 的刷盘之外,修改后的页面会**根据 LSN 放到 flush list 的头部**,即可以看到页面的 LSN 可以确定其作为脏页被修改的顺序,LSN 越小就越容易被淘汰(刷盘).
+
+redo-log 不是全部记录的,在文件中也可以被覆盖,可以被覆盖的前提条件是 checkpoint,即**脏页已经被完全刷新到磁盘中**.脏页刷新的时候除了删除对应的 lfu list 上的 page 之外,还会删除对应的控制块,这个时候就可以覆盖对应的 redo-log,checkponit_lsn 该变量指示了哪些 redo-log 可以被覆盖.
+
+<img src="https://img-blog.csdnimg.cn/20210221101333116.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L21hc2hhb2thbmcxMzE0,size_16,color_FFFFFF,t_70" alt="50" style="zoom:80%;" />
+
+#### 恢复
+
+redo-log 最主要的作用就是故障恢复,前文有提到,是通过checkpoint然后通过 redo-log 进行重放来恢复数据.确定恢复的起点就是checkpoint对应的lsn,恢复的终点 LOG_BLOCK_HDR_DATA_LEN 可以确定恢复到哪一个 block.
+
+![](https://img-blog.csdnimg.cn/20210221103644841.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L21hc2hhb2thbmcxMzE0,size_16,color_FFFFFF,t_70)
+
+利用 hashtable 稍微进行加速,跳过已经刷新到磁盘里面的页面,需要注意的是,对于单一页面,其恢复的顺序需要用 redo-log 进行确定,如下,不然会发生错误
+
+![](https://img-blog.csdnimg.cn/20210221103946617.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L21hc2hhb2thbmcxMzE0,size_16,color_FFFFFF,t_70)
+
+page 中有个字段 FIL_PAGE_LSN 用于记录日志最近一次刷盘时候的LSN,这个时候就可以确定有哪些 page 在崩溃的时候被刷新进磁盘
 
 
 
 ### undo-log回滚日志
 
-undo-log和redo-log是innodb事务的重要的实现基础.又叫回滚日志.提供向前滚的操作.同时其提供MVCC版本的读.
+[undo tablespace truncate参考](http://mysql.taobao.org/monthly/2015/05/01/)
+
+#### introduce
+
+undo-log是innodb事务的重要的实现基础.**undo-log 的研究必须建立在对事物和MVCC版本控制有一定的理解上,如果读者不了解事物请回过头来读本章节的信息**。
+
+undo-log又叫回滚日志.提供向前滚的操作.同时其提供MVCC版本的读.undo-log是在表的记录发生变更的时候会记录的日志,在5.6之后也开始使用独立的 undo-log 空间而不是记录到 ibdata 的物理文件中.**insert**是不用维护undo-log的,因为 undo-log 维护的是 **数据变更的版本信息**,而 insert 没有之前的版本所以不需要维护 undo-log
 
 - redo-log通常是物理操作,记录的是数据页的物理修改.用它来恢复到提交后的物理数据页
-- undo用来回滚杭机路到某个版本,且undo-log是逻辑日志.
+- undo用来回滚到某个版本,且undo-log是逻辑日志.
 
 redo-log用来保证实物的持久性,防止有些脏页未写入磁盘,再重启mysql的时候,根据redo-log进行重做,从而达到实物持久性.undo-log保存了事务发生之前的版本用于回滚,同时提供MVCC,undo-log对于每一个insert存一个delete,update执行相反的update
 
-当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log，如隔离级别为 repeatable read 时，事务读取的都是开启事务时的最新提交行版本，只要该事务不结束，该行版本就不能删除，即 undo log 不能删除。
+当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log.但 redo-log 可以通过 LSN 和 page 刷新确定 redo-log 是或否会被覆盖掉.undo-log 的删除时机是在事务提交完成之后.
 
-当事务提交之后，undo log 并不能立马被删除，而是放入待清理的链表，由 purge 线程判断是否有其他事务在使用 undo 段中表的上一个事务之前的版本信息，决定是否可以清理 undo log 的日志空间。
+undo-log 在 5.6 存储在 tablespace 中(即idbdata中),在 5.7 之后也拥有了自己独立的空间
+
+undo-log 维护的对象其实是 update.delete语句,因为 insert 语句对当前事务可见在 innodb 中没有历史版本. update 和 delete 在 undo-log 的类型上都是属于 update_undo.
+
+**需要注意的是 undo-log 不存在单独的文件,在 innodb 中以回滚段的形式存在.**
+
+
+
+
+
+
 
 #### 一般一个事务的执行过程是
 
@@ -1904,9 +2097,11 @@ binlog 有三种格式
 
 
 
-## mysql的并发控制
+## mysql的并发控制 (old version)
 
 ---
+
+此处多部分图生效加之对 Mysql 理解的深入,此部分知识点分别在 mysql 服务器结构 日志系统以及下文的事务中去了.
 
 ### 事务实现原理
 
@@ -2282,12 +2477,6 @@ ALGORITHM=COPY
 
 
 
-### MVCC
-
-
-
-
-
 ### 死锁
 
 MyISAM是不会发生死锁的,因为他每次就用那一把锁,用完就释放,不存在其他行为,缺点就是性能低下.即deadlock free,显然InnoDB中获取到了对面事务资源需要的锁就会造成死锁.InnoDB自身可以检测到自己的死锁,并且回滚掉带较小的事务
@@ -2367,13 +2556,326 @@ update Items set quantity=quantity-2 where id=100;
 
 ## 事务
 
-上面说了事务的一些基本特性,下面从设计事务的角度说明白事务.
+上面说了事务的一些基本特性,下面从设计事务的角度说明白事务.注意到数据库是I/O密集型系统,对于该种系统提高其并发度则可以提高系统的吞吐量
+
+### 并发设计理念
+
+[参考](https://nxwz51a5wp.feishu.cn/docs/doccn9j1QIJp2f81Ty8Q2JHtEbg#KEdQD6)
+
+此章节无局限于 mysql ,讨论各类事务的并发协议,并非 mysql 的行为,需要注意
+
+对比传统并发的加锁逻辑,事务本身更多是维护了一种执行的偏序关系.尽量减少锁的使用,如序列化执行,其偏序关系即是事务设计考虑的点.设有下列两事务
+
+> 假设 用户A 余额 1000元，B 余额1000元
+>
+> T1： A给B转账100元
+>
+> T2：分别给A和B增加6%的利息
+
+```sql
+// T1
+BEGIN
+A = A - 100
+B = B + 100
+COMMIT
+// T2 
+BEGIN
+A = A * 1.06
+B = B * 1.06
+COMMIT
+```
+
+无所谓执行的先后,从直觉上我们说这个系统最终的钱不能变.如下操作不会让钱的总数发生改变
+
+<img src="https://img.snaptube.app/image/em-video/ebff270fd1f876ff2d719ad74ab15663_1536_850.png" alt="8" style="zoom:50%;" />
+
+<img src="https://img.snaptube.app/image/em-video/fdd8f2eeb4f25e05b285ff657fe520aa_1542_848.png" alt="80" style="zoom:50%;" />
+
+我们看到改变执行顺序不影响结果则可以被接受（类似重排序）,其和串行执行的结果一致这称为**可串行调度(serializable schedule)**.我们可以去考虑哪些情况造成不可串行调度.还是上面的例子
+
+什么情况会造成钱凭空出现呢？可以看到其原因是对**同一记录多次读取值不一致**,如上面 AB 转账的时候,B应该为开始的 1000 块,但是其读到了事务T2提交的1060块,这就造成了数据的不一致.这种情况称为 **不可重复读**. 我们假设 T1 开始的时候读到了A 1000 B 1000块,那么当事务T2读时,如果T1提交了,那么就是执行了T1,T2,如果T1没提交,那么最终执行的结果是 T1 或者 T2.类似上面的机制,MVCC 就是试图解决上面的问题.且上述情况还发生了**脏读**,即读到了未提交事务的数据
+
+这两者都是读写冲突,而还有一种情况是**幻读**即读到了insert进的数据,这种数据也是一种读写冲突
+
+除了读写冲突外,还有写写冲突,两句update语句放到一起,起先后就引起了写写冲突.其实这就是一种偏序问题.为了追求性能,有些不可串行的调度也是能被接受的,这被称之为**事务的隔离**,下图为事务的隔离级别
+
+<img src="https://img.snaptube.app/image/em-video/841cde60a21a248b825f229934cfd7c8_1538_868.png" alt="4" style="zoom:50%;" />
+
+对 CPU 或者开发者而言,只有知道当前所有将要执行的事务,才能确定他们的偏序关系,然后事务开启的特点,使得某一时刻执行的事务无法被确定,这个时候一个直觉的做法是加锁,读写锁用于提高并发.
+
+<img src="https://img.snaptube.app/image/em-video/8e5b7680bab1949bdccb50ab13c4463e_1642_862.png" alt="50" style="zoom:50%;" />
+
+但实际上哪怕是加锁也可能会出现上面的情况.对整个事务加锁又非常影响性能.
+
+#### 二阶段锁定
+
+> 锁在真正被使用时才会获取，同时在操作全部执行完毕后再释放保证了串行化的约束，因此2PL 并发控制协议可以保证调度的可串行化，但会引出级联终止的问题。
+>
+> A事务的终止事件会被广播到依赖A事务写入数据的其他事务上，由于DBMS要避免冲突行为(这里一般指脏读)，则必须将此事务同时终止，而终止有可能会被级联传递，对性能造成雪崩式影响。
+
+<div>
+  <img src="https://img.snaptube.app/image/em-video/50e9c94de9642b35c64731dab9cf214c_1162_1324.png" alt="5" style="zoom:40%;float:left" />
+  <img src="https://img.snaptube.app/image/em-video/b6484c32bc8f28d066d7cbeb46655cf1_1212_1332.png" alt="50" style="zoom:40%;" /></div>
+
+如上图分别为**两阶段锁定**和**严格的两阶段锁定**，可以看到上面的思路是使用到锁才加释放锁要么是在完全不使用资源A之后要么在事务的最后才一起释放.
+
+用到多种锁就一定会遇到死锁问题,mysql 的解决方式是维护了一个wait-graph结构,当出现环的时候就会死锁.事务尝试获取其它事务持有的锁时直接决定是否需要将其中一个事务中止.事务的时间戳越老其优先级越高.可以按照这个优先级指定淘汰策略.其实就是一个锁的使用策略排序.
+
+我们看到一些中间件的设计是少加锁,尽量使用无锁结构(例如JDK的偏向锁),事务中使用了时间戳作为这一机制的实施.和MVCC中LSN一样,在实际环境中,使用事务绝大多数都不会发生冲突.
+
+#### Timestamp Ordering (T/O) 
+
+这是一种乐观的并发控制协议,其优点是无锁,T/O 的优势在于不会死锁,但对于OLAP负载大量事务之间冲突数据的占比过高,乐观策略会导致大量执行了很长时间的事务回滚,重试成本过高,因此不适用于长事务过多的情况
+
+> **如果 TS(Ti)<TS(Tj) ，那么数据库必须保证实际的 schedule 与先执行 Ti ，后执行 Tj 的结果等价**
+>
+> **如果 TS(Ti)<TS(Tj) ，那么数据库必须保证实际的 schedule 与先执行 Ti ，后执行 Tj 的结果等价**
+>
+> **如果 TS(Ti)<TS(Tj) ，那么数据库必须保证实际的 schedule 与先执行 Ti ，后执行 Tj 的结果等价**
+
+那么需要做的唯一控制就是保证事务的执行顺序和事务开始的时间顺序一致.
+
+##### Basic T/O
+
+1. 每个**数据记录**都要携带两个时间戳，RT标示最后一次读发生的时间，WT标示最后一次写发生的时间
+2. 在事务结束的时候，检查该事务中每个操作是否存在读取或写入了未来的数据，一旦发生立即中止
+
+```go
+// WT 表示最后一次写的时间 RT 表示最后一次读的时间
+/**
+如果事务 Ti 发生在 W-TS(X) 之前，即尝试读取未来的数据，则中止 Ti ；
+如果事务 Ti 发生在 W-TS(X) 之后，意味着它正在读取过去的数据，符合规范。
+Ti 读取数据后，如果有必要，则更新 R-TS(X)，同时保留一份 X 的副本，
+用来保证 Ti 结束之前总是能读到相同的 X。
+*/
+func read(X) val {
+  	// TS 表示事务的时间戳,W_TS 表示要写的这条记录的时间戳
+  	// 如果下面的不等号成立则证明写入了未来的数据
+    if TS(T_i) < W_TS(X) {
+        abort_and_restart(T_i)
+    } else {
+        val := read_data(X)
+        R_TS(X) = max(R_TS(X), TS(T_i))
+        // make a local copy of X to ensure repeatable reads for T_i
+        return val
+    }
+}
+
+/**
+如果事务 Ti 发生在 W-TS(X) 或 R-TS(X) 之前，
+即尝试写入已经被未来的事务读取或写入的数据，则中止 Ti ；
+反之，意味着它正尝试修改过去的数据，符合规范。 Ti 写入数据后，
+如果有必要，则更新 W-TS(X)，同时保留一份 X 的副本，
+用来保证 Ti 结束之前总是能读到相同的 X。
+*/
+func write(X, val) {
+     if TS(T_i) < R_TS(X) || TS(T_i) < W_TS(X) {
+         abort_and_restart(T_i) 
+     } else {
+         X = val
+         W_TS(X) = max(W_TS(X), TS(T_i))
+     // make a local copy of X to ensure repeatable reads for T_i
+     }
+}
+```
+
+T/O 的优势在于不会死锁,但对于OLAP负载大量事务之间冲突数据的占比过高,乐观策略会导致大量执行了很长时间的事务回滚，重试成本过高,因此不适用于长事务过多的情况,实际上 mysql 也没有采用这样的设计方式.因为T/O 还有一个致命的缺点**无法产生可恢复的事务**.
+
+#### Optimistic Concurrency Control (OCC)
+
+> OOC 将所有被读取的数据都维护到自己的私有空间中，所有的修改都在私有空间中完成。
+
+OOC 分为3个控制阶段
+
+1. Read Phase：追踪、记录每个事务的读、写集合，并存储到私有空间中
+2. Validation Phase：当事务提交时，检查冲突
+3. Write Phase：如果校验成功，则合并数据；否则中止并重启事务
+
+看下图可知 OOC 就是 CAS 的变种,其事务结束的时候就会校验自己的时间戳是不是和数据库的数据有冲突,如果有冲突则终止重启事务,否则就会合并数据
+
+<img src="https://img.snaptube.app/image/em-video/8a1f9d81c4f936c8ff0f7ef4504fd41b_1560_924.png" alt="4" style="zoom:50%;" />
+
+其和上面的T/O思想其实类似,其适用范围和OOC类似
+
+- 大部分事务都是读事务
+- 大部分事务之间访问的数据间没有交集
+
+其是一种无锁的设计,但其开销会几种在数据合并上,事务的终止成本比较高.
+
+#### insert 对数据集的影响
+
+上面两种事务的考虑多是在静态数据集上的,然而实际上根据CRUD会有更多情况.Insert 就是一种需要上锁的记录.自然可以想到在每条插入时上锁.
+
+##### Predicate Locking
+
+每条数据记录条件都需要判断,但这种方式非常消耗性能,一般的DBMS都不采用这种形式去做.
+
+##### index locking
+
+>  如果在 `status` 字段上有索引，那么我们可以锁住满足 `status = 'lit'` 的 index page，如果尚未存在这样的 index page，我们也需要能够找到可能对应的 index page，锁住它们
+
+##### 全局的锁
+
+如果在 status 上没有索引,则会执行如下操作
+
+> 如果在 `status` 字段上没有索引，那么事务就需要执行以下操作：
+>
+> - 获取 table 的每个 page 上的锁，防止其它记录的 `status` 被修改成 `lit` 
+>
+> - 获取 table 本身的锁，防止满足 `status = 'lit'` 的记录被插入或删除
+
+#### MVCC
+
+多版本并发控制,也是 mysql 采用的并发控制协议
+
+参考
+
+> - [Snapshot Isolation综述](https://zhuanlan.zhihu.com/p/54979396)
+> - [快照隔离](https://zh.wikipedia.org/wiki/快照隔离)
+
+##### 快照隔离
+
+- 事务的读操作从Committed快照中读取数据，快照时间可以是事务的第一次读操作之前的任意时间，记为StartTimestamp
+- 事务准备提交时，获取一个CommitTimestamp，它需要比现存的StartTimestamp和CommitTimestamp都大
+- 事务提交时进行冲突检查，如果没有其他事务在[StartTS, CommitTS]区间内提交了与自己的WriteSet有交集的数据，则本事务可以提交；这里阻止了Lost Update异常
+- SI允许事务用很旧的StartTS来执行，从而不被任何的写操作阻塞，或者读一个历史数据；当然，如果用一个很旧的CommitTS提交，大概率是会Abort
+
+##### 可串行快照隔离
+
+> 是指两个事务(T1与T2)并发读取一个数据集(例如包含 V1 与 V2)，然后各自修改数据集中不相交的数据项(例如 T1 修改 V1, T2 修改 V2)，最后并发提交事务。如果事物是串行执行，这种异常不会发生。而快照隔离允许这种异常发生。例如，设想 V1 与 V2是 Phil的个人银行账户。银行允许V1或V2是空头账户，只要两个账户总和非负(即 V1 + V2 ≥ 0). 两个户头的初值各是 $100. Phil启动两个事务，T1从V1取出$200，T2从V2取出$200。
+
+SSI 解决了写倾斜问题.而 MVCC 是 SSI 的具体实现.
+
+简而言之，实现 MVCC 的 DBMS 在内部维持着单个逻辑数据的多个物理版本，当事务修改某数据时，DBMS 将为其创建一个新的版本；当事务读取某数据时，它将读到该数据在事务开始时刻之前的最新版本，通过之前的描述我们知道多个副本在 mysql 中 通过 LSN 在 redo-log 中串联起来成为了可提供多版本读的数据结构.如下则是使用MVCC的数据库
+
+<img src="https://img.snaptube.app/image/em-video/8e55b6af412d8a5ea40ba15e2261aedb_1856_678.png" alt="50" style="zoom:50%;" />
 
 
 
 
 
-## sql 优化
+
+
+### 实验方法和记录
+
+开多个数据库链接然后开启事务执行观察其可见性.下面观察到一些现象,只有基于这些可见到的事实才能去推演 mysql 为何如此设计
+
+```sql
+select @@global.tx_isolation
++-----------------------+
+| @@global.tx_isolation |
++-----------------------+
+| REPEATABLE-READ       | # 默认隔离级别
++-----------------------+
+1 row in set
+Time: 0.068s
+```
+
+```sql
+show engine innodb status # 可以看到事务的多少和锁的使用状态等
+```
+
+#### 测试脏读不可重复读
+
+等值 where
+
+-  **[锁的现象]**开启事务1,2, 1 执行 update,2 执行 update,这个时候2就卡住了不在往下执行,等提交1的时候2才能够提交
+  - 可见MVCC对数据的修改(删除属于同一类型)是有加锁的.
+
+- **[数据可见性]** 开启事务1,2, 1 执行 select, 2 update 然后执行提交,1 执行 select 可以看到使用的是快照读, 1 执行 update 同行数据的不同字段,可以看到被事务 2 修改的数据,此时进行回滚,可以看到事务 2 的修改,回滚了事务 1 的修改,**仅限于两个事务都修改同一行的数据记录**
+  - MVCC 在事务写入的时候刷新了**写入行**的快照读的版本
+  - 结合上面锁的现象,写入的时候,如果是修改同一行的记录不提交的话,先修改的获取到了锁,后修改的等待,如果是修改了不同行的数据则根据锁持有的不同其会不进行修改.
+
+- **[不同数据记录]** 可以测得是互不影响的,可读性也是不更新的.
+
+范围 where
+
+- 其行为特性和每条数据记录加了锁是一样的
+
+#### 测试幻读
+
+幻读的影响主要是 insert 语句,我们可以用插入数据看看可不可读以及有没有加锁来确认该数据锁的控制权等.
+
+- **[数据可见性]** 开启事务1,2 事务1 进行查询,事务2 中 insert,事务1进行查询,可以发现事务1查不到 insert 的语句
+  - **[间隙锁]** 此时在事务1中更新不存在的行,发现程序进入阻塞,insert 语句有给数据加锁,事务1获取不到在进行等待了一段时间后放弃获得锁
+  - **[间隙锁]** 在事务1中范围更新行(id>=1),此时事务2 insert 会尝试获取锁,此时如果事务不提交则修改不会成功
+  - 从上面我们也能看到间隙锁的作用就是对某个范围的数据进行加锁的这么一个逻辑
+
+综上我们可以看到 RR 在整体的处理逻辑
+
+- insert 和 update 都要去获取对应的锁来获取更新,锁的粒度到行的级别
+- MVCC 多版本当前可见的版本为事务开始时或读取数据时的最新版本
+
+#### mysql RR 有没有解决幻读问题?
+
+显然利用上面的知识我们知道只要在 insert 完成后,在查询的事务里面 update 到这一行记录, RR 就会存在幻读问题,单纯的读写 mysql 是不会存在上面的幻读问题的.可以说 mysql 解决了幻读问题但没有完全解.
+
+
+
+#### 从现象的角度再理解隔离级别
+
+我们主要讨论 RR 和 RC, RU 并不需要多版本控制,Serializable 的完全串行是两个不同的极端.
+
+首先,两者都解决了脏读问题,其通过的手段是MVCC/快照读取完成这一目的的.
+
+RC 在其他事务提交之后的行为是能读到其他事务提交到的数据,所以显然其读到的还是数据库中最新的数据.而 RR 只有在写该数据的时候会刷新当前行的快照读,不可重复读会在READ COMMIT情况下出现,可以参照上面的测试去看到这一现象.**写操作会使得RR更新数据版本,从而获得最新的快照.**
+
+
+
+### 锁
+
+[参考](https://www.cnblogs.com/yang417/p/14882256.html),[参考](cnblogs.com/janehoo/p/5621241.html)
+
+主要针对 RR,RC 级别用到的锁算法,锁本身的是什么的理解不在赘述,在 mysql 中,锁主要维持事务的部分偏序关系使得事务执行满足业务需要.完全偏序关系(序列化)的维持是一种性能损失行为,使用锁本质上要使用CPU空转资源(CAS)或者操作系统调度信号量(内核态切换).
+
+锁有以下三种
+
+- Record Lock：单个行记录上的锁
+- Gap Lock：锁定一个范围，但不包含记录本身
+- Next-Key Lock：Gap Lock + Record Lock，锁定一个范围，并且锁定记录本身
+
+间隙锁的表现是允许 update **不允许 insert**. 而 record lock 则是会都锁住,不允许 update 也不允许 insert
+
+我们利用`show engine innodb status`查看即可看到使用的 lock mode,就有我们树熟知的 X 锁和 S 锁.
+
+```sql
+---TRANSACTION 6974, ACTIVE 90 sec
+2 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 14, OS thread handle 0x7fdfc8c19700, query id 242 10.0.0.51 root cleaning up
+TABLE LOCK table `test`.`l` trx id 6974 lock mode IX
+RECORD LOCKS space id 11 page no 3 n bits 80 index `PRIMARY` of table `test`.`l` trx id 6974 lock_mode X locks rec but not gap # 这个表示在主索引上加锁,都能看到其 tablespace 和 page no
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 6; compact format; info bits 0
+ 0: len 4; hex 8000000f; asc     ;; --表示主键a，4个字节，hex 8000000f表示十进制15
+ 1: len 6; hex 000000001b13; asc       ;; --6个字节事务id
+ 2: len 7; hex 90000001560110; asc     V  ;; --固定7个字节回滚指针
+ 3: len 4; hex 8000000f; asc     ;;  --表示b列，hex 8000000f表示十进制15
+ 4: len 4; hex 8000000f; asc     ;;  --表示c列，hex 8000000f表示十进制15
+ 5: len 4; hex 8000000f; asc     ;;  --表示d列，hex 8000000f表示十进制15
+```
+
+IX 锁表示,在锁定一条记录时需要在对应的表上加入 IX 锁.可以枚举下我们遇到的情况,用 for update 即可用select 简单测试加锁
+
+等值索引
+
+- 默认的加锁单位是 Next-Key Lock,等值查询会从 Next-Key Lock 退化为行锁.
+- 主键唯一索引,加 record lock
+- 普通索引,加 next key lock,即会有间隙锁,因为无法做到唯一性,会访问下一个值,接着会加一个 next lock,比如 col = 10,那么 next lock 会访问 col = 10 然后会向右扫描,访问二级索引,最终加的索引是回表主键索引col=10的 record lock,以及二级索引上(10,下一个值)的间隙锁,从语义上理解就是不允许插入这个范围的数据
+
+总结起来就是
+
+- 不加索引的等值查找,加 next key lock,会通过主键进行全表扫描(类似全表锁)索引把每个 gap 都锁起来
+- 二级索引上的等值查询，向右遍历时且最后一个值不满足等值条件的时候，next-key lock退化为间隙锁
+- 二级索引上加了Record Lock 或Next-Key Lock ，则对应的主键加Record Lock ；
+- 二级索引加Gap Lock ，则对应的主键不加锁
+- 在 RR 的隔离级别下，**当查询的列没有索引时，会锁住所有记录**
+
+相对来讲范围索引就要简单很多,其会对相应的区间加上 next-lock,而插入索引使用的是 record 也可以简单想到.从这个角度下来说,我们看下 RC 做了什么,RC 只有 **record lock**.所以我们能够理解为什么 RC 会出现幻读的现象.认识到这点之后可以回过头在看日志系统会有不一样的理解.
+
+
+
+
+
+## 存储引擎优化
 
 ### 谓词下推 ICP
 
