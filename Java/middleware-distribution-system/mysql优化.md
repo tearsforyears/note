@@ -163,6 +163,14 @@ SHOW STATUS LIKE '%slow_queries%' # 查看慢查询状态
 
 需要开启慢查询日志 `slow_query_log = on`,然后通过慢查询日志 tail -f 就可以分析相应的状态,慢查询的时间可以自己定义,默认是10秒,但可以进行设置 `long_query_time`
 
+#### 其他
+
+- show full columns from table
+- show index from table 
+- show variables like '%char%'
+- show variables like '%bin%'
+- show engine innodb status 查看锁的状态等
+
 
 
 ## JDBC
@@ -2036,57 +2044,120 @@ page 中有个字段 FIL_PAGE_LSN 用于记录日志最近一次刷盘时候的L
 
 ### undo-log回滚日志
 
-[undo tablespace truncate参考](http://mysql.taobao.org/monthly/2015/05/01/)
+[undo tablespace truncate参考](http://mysql.taobao.org/monthly/2015/05/01/),[参考](http://mysql.taobao.org/monthly/2015/04/01/)
 
-#### introduce
-
-undo-log是innodb事务的重要的实现基础.**undo-log 的研究必须建立在对事物和MVCC版本控制有一定的理解上,如果读者不了解事物请回过头来读本章节的信息**。
+undo-log是innodb事务的重要的实现基础.**undo-log 的研究必须建立在对事物和MVCC版本控制有一定的理解上,如果读者不了解事物请回过头来读本章节的信息**。undo-log 又名回滚日志,用来保存多版本信息.
 
 undo-log又叫回滚日志.提供向前滚的操作.同时其提供MVCC版本的读.undo-log是在表的记录发生变更的时候会记录的日志,在5.6之后也开始使用独立的 undo-log 空间而不是记录到 ibdata 的物理文件中.**insert**是不用维护undo-log的,因为 undo-log 维护的是 **数据变更的版本信息**,而 insert 没有之前的版本所以不需要维护 undo-log
 
 - redo-log通常是物理操作,记录的是数据页的物理修改.用它来恢复到提交后的物理数据页
 - undo用来回滚到某个版本,且undo-log是逻辑日志.
 
-redo-log用来保证实物的持久性,防止有些脏页未写入磁盘,再重启mysql的时候,根据redo-log进行重做,从而达到实物持久性.undo-log保存了事务发生之前的版本用于回滚,同时提供MVCC,undo-log对于每一个insert存一个delete,update执行相反的update
+redo-log用来保证事物的持久性,防止有些脏页未写入磁盘,再重启mysql的时候,根据redo-log进行重做,从而达到实物持久性.undo-log保存了事务发生之前的版本用于回滚,同时提供MVCC,undo-log对于每一个insert存一个delete,update执行相反的update，当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log.但 redo-log 可以通过 LSN 和 page 刷新确定 redo-log 是或否会被覆盖掉.undo-log 的删除时机是在事务提交完成之后.undo-log 在 5.6 存储在 tablespace 中(即idbdata中),在 5.7 之后也拥有了自己独立的空间。undo-log 维护的对象其实是 update.delete语句,因为 insert 语句对当前事务可见在 innodb 中没有历史版本. update 和 delete 在 undo-log 的类型上都是属于 update_undo. undo-log 实际存放的事修改了哪些字段的值. redo-log 更像记录执行了何种语句
 
-当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log.但 redo-log 可以通过 LSN 和 page 刷新确定 redo-log 是或否会被覆盖掉.undo-log 的删除时机是在事务提交完成之后.
+**需要注意的是 undo-log 不存在单独的文件,在 innodb 中以回滚段的形式存在.**我们看事务中两个重要机制
 
-undo-log 在 5.6 存储在 tablespace 中(即idbdata中),在 5.7 之后也拥有了自己独立的空间
+#### 活跃事物链表
 
-undo-log 维护的对象其实是 update.delete语句,因为 insert 语句对当前事务可见在 innodb 中没有历史版本. update 和 delete 在 undo-log 的类型上都是属于 update_undo.
+事务链表`trx_sys->rseg_array`中保存的都是未提交的事务,其大小为128,一旦事务被提交则会从事务链表中去除,RR 下在每个事务开启的时候会维护这么一个链表,RC 状态下每个语句开始的时候会维护这么一个链表.事务提交后需要purge的回滚段会被放到回滚队列上.
 
-**需要注意的是 undo-log 不存在单独的文件,在 innodb 中以回滚段的形式存在.**
+#### readview
+
+其是一个结构体 read_view_struct
+
+```c
+/** The read should not see any transaction with trx id >= this
+value. In other words, this is the "high water mark". */
+trx_id_t    m_low_limit_id; // 前者表示事务id大于此值的行记录都不可见
+/** The read should see all trx ids which are strictly
+smaller (<) than this value.  In other words, this is the
+low water mark". */
+trx_id_t    m_up_limit_id; // 后者表示事务id小于此值的行记录都可见
+/** trx id of creating transaction, set to TRX_ID_MAX for free
+views. */
+trx_id_t    m_creator_trx_id;
+```
+
+![](https://img-blog.csdn.net/20180706150245253?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2JvaHU4Mw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
+- low_limit_id 前者表示事务id大于此值的行记录都不可见
+- up_limit_id  后者表示事务id小于此值的行记录都可见.
+- (up_trx_id, low_trx_id) 中的事务id需要根据隔离级别来定是否看到
+  - read-uncommit 是中间间都可见
+  - read-commit 是提交后的事务课件
+  - read-repeatable 会根据写某一行的记录去更新 read-view
+
+从这个角度看,所有的数据 innodb 都会存一分,只是如何去读写是由不同字段去控制的.数据和控制变成了数据结构.
+
+#### 文件结构
+
+回滚段一般存储在第6个页面,用于存储事务相关信息的,主要包括
+
+- TRX_SYS 系统保留字段
+- TRX_SYS_TRX_ID_STORE 持久化的最大的事务ID
+- TRX_SYS_FSEG_HEADER 管理事务系统的段所在的位置
+- TRX_SYS_RSEGS 128 个混辊锻的位置
+
+innodb 的回滚段可以在 ibdata 中,也可以在独立的 undo 表空间中,或者在 ibtmp临时表空间中.
+
+![](http://mysql.taobao.org/monthly/pic/2015-04-01/01.png)
+
+回滚段的实质就是 undo-log slot 的组织形式.每个 slot 则可以对应一个 undo-log 对象,默认是`TRX_RSEG_N_SLOTS = 1024`,前32个回滚段放在表空间中,往后的97个回滚段则放在额外的undo-log空间中.我们看下 header 信息
+
+<img src="http://mysql.taobao.org/monthly/pic/2015-04-01/03.png" style="zoom:75%;" />
+
+insert log
+
+![](http://mysql.taobao.org/monthly/pic/2015-04-01/04.png)
+
+update log
+
+![](http://mysql.taobao.org/monthly/pic/2015-04-01/05.png)
+
+可以看到其可以找到新旧两个值.
 
 
 
 
 
+### binlog 复制日志
 
-
-#### 一般一个事务的执行过程是
-
-1. 开启事务
-2. 查询待更新的记录到内存，并加 X 锁
-3. 记录 undo log 到内存 buffer
-4. 记录 redo log 到内存 buffer
-5. 更改内存中的数据记录
-6. 提交事务，触发 redo log 刷盘**真正写入表中**
-7. 记录 bin log
-8. 事务结束
-
-所以观看其存储设计,我们会发现内存文件和磁盘文件的结构和ES很类似.所有文件都以内存和磁盘两种形式去存储
-
-
-
-### binlog日志 记录所有更新语句 用于复制
-
-其本身是以二进制形式记录这个语句的原始逻辑.binlog可以用作为数据恢复使用,主从复制搭建.即类比redis的rdb和aof,rdb对应redo-log,aof对应binlog.
+binlog,即二进制日志,其记录了所有数据库的改变,以二进制形式保存在磁盘中.其用于查看数据库变更历史,增量备份和恢复,mysql 的主从复制.
 
 binlog 有三种格式
 
 - Row 记录下每行的修改细节,不记录上下文信息,alter table的时候每行数据都会发生改变就会产生大量数据
 - Statement 每一条修改的语句会记录下,减少日志的记录,缺点就是需要执行所有的语句需要上下问信息
 - Mixed 上面两种的混合,例如在alter语句使用 Statement
+
+#### statement
+
+每一条会修改数据的 sql 都会记录到 binlog,优点是不需要记录每一行的变化,缺点是,记录语句时需要保存一些相关信息,保证所有语句能在 slave得到和master执行相同的结果.
+
+#### row
+
+row 顾名思义,保存那条记录被更改,优点是不需要记录了上下文的相关信息,缺点是,记录时候可能需要保存非常多的数据
+
+#### mixed
+
+这是上面两种模式的结合,取上面两者的优点,MIXED 一般修改语句会用 statement 保存,如一些函数无法用 statement 完成则使用 row 格式进行保存,Mysql 对于日志保存的粒度是每句sql,会在 Statement 和 Row 之间选择一种格式进行保存.
+
+`show variables like 'binlog_format'`可以看到其存储的格式
+
+<img src="https://upload-images.jianshu.io/upload_images/12619159-eea89551711c22be.png?imageMogr2/auto-orient/strip|imageView2/2/w/1200/format/webp" alt="50" style="zoom:50%;" />
+
+#### 主从复制
+
+- Master 把数据变更记录记录到二进制日志中(主节点必须启用二进制日志)
+- Slave 通过 I/O线程读取 Master 中 bin-log events 并写入中继日志(relay log),这个过程中是可以带位置参数,如果不带则是发送全部
+- Slave 重做中继日志中的事件,会记录到具体哪一个二进制日志的哪一个位置
+- Slave 开启另一个线程,把中继日志的时间一条条在本地执行(数据重放)
+
+![](https://img2018.cnblogs.com/blog/1297933/201907/1297933-20190705153223795-497941446.png)
+
+其实我们看下主从同步,就是一种典型的增量同步的实现过程
+
+
 
 ### Others
 
@@ -2746,13 +2817,88 @@ OOC 分为3个控制阶段
 
 SSI 解决了写倾斜问题.而 MVCC 是 SSI 的具体实现.
 
-简而言之，实现 MVCC 的 DBMS 在内部维持着单个逻辑数据的多个物理版本，当事务修改某数据时，DBMS 将为其创建一个新的版本；当事务读取某数据时，它将读到该数据在事务开始时刻之前的最新版本，通过之前的描述我们知道多个副本在 mysql 中 通过 LSN 在 redo-log 中串联起来成为了可提供多版本读的数据结构.如下则是使用MVCC的数据库
+简而言之，实现 MVCC 的 DBMS 在内部维持着单个逻辑数据的多个物理版本，当事务修改某数据时，DBMS 将为其创建一个新的版本；当事务读取某数据时，它将读到该数据在事务开始时刻之前的最新版本，通过之前的描述我们知道多个副本在 mysql 中 通过 LSN 在 redo-log 中串联起来成为了可提供多版本读的数据结构.如下则是使用MVCC的数据库,如 undo-log 中所介绍
 
 <img src="https://img.snaptube.app/image/em-video/8e55b6af412d8a5ea40ba15e2261aedb_1856_678.png" alt="50" style="zoom:50%;" />
 
+其实这里可以考虑一个问题是,MVCC 是否能够不需要锁,既然都维护了一个稳定的版本链条,那我完全可以采用读旧版本,无视 insert 的语句(LSN太大),修改的时候只需要产生该行记录即可,答案是可以的,但为什么不这样做呢,因为如同上面T/O的做法一样,其可以看做一种大型的 CAS,大量事务的修改会被 abort 掉重来(为了保证一致性),对于mysql的使用场景(多个事务共同活跃修改同一个数据)不如靠锁进行等待.
 
+MVCC 可以通过 T/O 或者 OOC 实现,但在业务逻辑上得加一些限制,mysql 就是通过锁的方式去解决.MVCC 需要实现下面 4 点
 
+> 1. 并发控制协议
+> 2. 版本的存储
+> 3. 垃圾收集
+> 4. 索引管理
 
+并发控制协议如上面所讲
+
+##### 版本的存储
+
+Append-Only Storage
+
+新版本以追加的方式存在同一张表中
+
+- 写的时候追加,读的时候就需要遍历整个链表
+- 写的时候更新索引指针,读的时候就不需要遍历整个链表(最新数据)
+
+<img src="https://img.snaptube.app/image/em-video/21509666dde028e217aafefb39c689bb_1538_1184.png" style="zoom:30%;" />
+
+Time-Travel Storage
+
+老版本被存在同一张表中,pointer 被指向另一张表,然后根据另一张表去查询版本.
+
+<img src="https://img.snaptube.app/image/em-video/7e7fa9393a0f4b329c7a36063132dd26_1558_470.png" alt="4" style="zoom:50%;" />
+
+Delta Storage
+
+值记录字段的修改.DBMS 会根据这张表逆向修改恢复历史版本的数据(undo-log)
+
+<img src="https://img.snaptube.app/image/em-video/97e2d73095e72e90478b5668dd4f404c_1534_458.png" style="zoom:50%;" />
+
+##### 垃圾回收 GC
+
+旧版本的数据需要被回收不然使用的空间会无限大.下列就是可被回收的,其实这是一种冷热分离的思想,
+
+- 已经没有活跃的事务需要看到该版本
+- 该版本是被一个已经中止的事务创建
+
+和 jvm 的垃圾回收思想一致,其需要明确两个问题,如何查找过期的数据版本,如何确定某版本数据是否可以被安全回收,在 jvm 中使用的是 gc-root trace 的标记算法.MVCC 的 GC 从下面出发
+
+1. Tuple-level
+   - Background Vacuuming 直接检查每条数据的旧版本数据,小于当前活跃事务的最小版本的数据,  线程在后台清理这些数据,DBMS 采用了bitmap对上述过程就进行了加速,这个bitmap 用于维护最近修改的数据.
+   - Cooperative Cleaning 读取时候顺便删除这些数据
+2. Transaction-level
+   - 每个事务负责跟踪数据的旧版本,DBMS 不需要亲自检查单条数据,由事务自己决定要删哪些数据,等删除时候根据事务的read/write set 进行删除即可
+
+##### MVCC 数据结构
+
+为了实现 MVCC , Innodb 会把每个行记录增加三个字段,这三个字段能在 page 定义的 row 中看到
+
+- DB_ROW_ID,行 id 用于指示主键,主键没有这行数据
+- DB_TRX_ID,事务 id
+- DB_ROLL_PTR,回滚指针,该字段写于首记录和 undo-log ,每次更新该行则会记录到 undo-log 用于形成版本链条,结构如下
+
+<img src="https://img-blog.csdnimg.cn/img_convert/63b1dbd65c2e9a08e07a29664c11047f.png" alt="5" style="zoom:70%;" />
+
+##### 写操作的理解
+
+基于上面的理解我们看看 mysql 的写操作做了什么事
+
+**更新数据**
+
+- 加锁, gap lock 或者 record lock
+- 写 undo-log
+- 更新 row 上的数据,回滚指针等
+- 写 redo-log
+- 释放锁
+
+**删除**
+
+和更新一致,标志状态为删除即可,也是用的版本链
+
+**插入**
+
+和更新数据一样会带有 lock,同样需要写入 redo-log 和 undo-log.
 
 
 
@@ -2800,6 +2946,22 @@ show engine innodb status # 可以看到事务的多少和锁的使用状态等
   - **[间隙锁]** 此时在事务1中更新不存在的行,发现程序进入阻塞,insert 语句有给数据加锁,事务1获取不到在进行等待了一段时间后放弃获得锁
   - **[间隙锁]** 在事务1中范围更新行(id>=1),此时事务2 insert 会尝试获取锁,此时如果事务不提交则修改不会成功
   - 从上面我们也能看到间隙锁的作用就是对某个范围的数据进行加锁的这么一个逻辑
+
+#### 死锁
+
+innodb 是有死锁检测的
+
+```sql
+(1213, 'Deadlock found when trying to get lock; try restarting transaction')
+```
+
+- 开启两个事务 T1,T2,分别执行
+- update mail set email='bbb' where id>=5,update mail set email='bbb' where id<=2
+- update mail set email='aaab' where id=2,update mail set email='bbba' where id=5
+
+其实我们看这个就能看到死锁现象了,mysql 对死锁自己维护了 wait-lock 的数据结构进行检测
+
+
 
 综上我们可以看到 RR 在整体的处理逻辑
 
