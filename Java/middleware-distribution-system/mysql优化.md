@@ -2157,6 +2157,38 @@ row 顾名思义,保存那条记录被更改,优点是不需要记录了上下�
 
 其实我们看下主从同步,就是一种典型的增量同步的实现过程
 
+#### binlog redolog 二阶段提交
+
+|          |                           redo log                           | Binglog                                                      |
+| -------- | :----------------------------------------------------------: | ------------------------------------------------------------ |
+| 日志类型 |   物理日志 物理日志即数据页中的真实二级制数据，恢复速度快    | 逻辑日志 即sql语句，因需要逐条执行，恢复速度慢               |
+| 存储格式 | innodb存储引擎数据的单位是页，redo log也是基于页进行存储，一个默认16K大小的页中存了很多512Byte的log block，log block的存储格式如下[log block header 12Byte，log block body 492 Bytes，log block tailer 8 Bytes] | statement：SQL语句的形式row：记录相关行的每一列的值（官方推荐） |
+| 用途     |                          重做数据页                          | 数据复制                                                     |
+| 所处层级 |                       innodb存储引擎中                       | 存储引擎的上层，因此不管用什么存储引擎，都可以开启binlog     |
+
+我们知道写的大致顺序是 undo-log,redo-log.binlog,我们也能很清楚看到区别,redo-log 是物理日志,binlog 是逻辑日志.WAL 技术依赖 redo-log 进行修复.逻辑日志不能用来恢复的原因是,insert和同步时候锁的使用问题,如果逻辑日志有多条insert那么插入的顺序就会不一致.
+
+![](https://img-blog.csdnimg.cn/20200320093349450.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2RhaWppZ3Vv,size_16,color_FFFFFF,t_70#pic_center)
+
+二阶段提交是用来保证redo-log,undo-log两个日志的一致性.顾名思义二阶段分为两个阶段
+
+- prepare：redolog写入log buffer，并fsync持久化到磁盘，在redolog事务中记录2PC的XID，在redolog事务打上prepar标识
+- commit：binlog写入log buffer，并fsync持久化到磁盘，在binlog事务中记录2PC的XID，同时在redolog事务打上commit标识
+  其中，prepare和commit阶段所提到的“事务”，都是指内部XA事务，即2PC
+- rollback: 把 prepare 的回滚到原来的状态
+
+redo-log恢复过程如下
+
+> Step1. 按顺序扫描redolog，如果redolog中的事务既有prepare标识，又有commit标识，就直接提交（复制redolog disk中的数据页到磁盘数据页）
+>
+> Step2 .如果redolog事务只有prepare标识，没有commit标识，则说明当前事务在commit阶段crash了，binlog中当前事务是否完整未可知，此时拿着redolog中当前事务的XID（redolog和binlog中事务落盘的标识），去查看binlog中是否存在此XID
+>
+>  a. 如果binlog中有当前事务的XID，则提交事务（复制redolog disk中的数据页到磁盘数据页）
+>
+>  b. 如果binlog中没有当前事务的XID，则回滚事务（使用undolog来删除redolog中的对应事务）
+
+
+
 
 
 ### Others
