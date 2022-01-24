@@ -70,8 +70,6 @@ heap是对象的存放区域也是管理最麻烦的一个区域,具体内容会
 
 其他常量池还是在永久代或者元空间中.
 
-
-
 ### JMM
 
 JMM是指java-memory-model,相比于内存区域,JMM更关注并发上的问题,本章节虽然作为JVM的解析,但JMM的前置知识是对多线程有深入的理解,可以参考另一文档中对于多线程的理解再来阅读本章节可能会更加容易,当然可以直接阅读.
@@ -1881,4 +1879,59 @@ TLAB的缺点
 ### 字节码
 
 -   未完待续
+
+
+
+### 堆外内存的使用
+
+堆外内存的使用方法一共有以下几种
+
+- C/C++ 操作操作系统给 JVM 分配的内存块
+- Unsafe 换汤不换药
+- NIO Byte Buffer 本质上是调用了 Unsafe 去分配内存
+
+```java
+//直接操作堆外内存
+unsafe.allocateMemory(100);
+unsafe.reallocateMemory(100, 200);
+unsafe.freeMemory(100);
+
+// NIO
+ByteBuffer buffer = ByteBuffer.allocateDirect(10 * 1024 * 1024);
+```
+
+#### 堆外内存的回收
+
+使用堆外内存就意味着需要回收这一块内存,回收由JVM完成,对于`DirectByteBuffer`对象,其只有在创建时伴生的`Cleaner`对象才知道堆外内存的地址.`Unsafe.invokeCleaner(buffer),即可清理对应的内存块.
+
+#### OHC
+
+[参考](https://github.com/snazy/ohc)
+
+OFF-HEAP-CACHE,堆外缓存,缓存数据量比较大时可以使用此种方法
+
+> When using a very huge number of objects in a very large heap, Virtual machines will suffer from increased GC pressure since it basically has to inspect each and every object whether it can be collected and has to access all memory pages. A cache shall keep a hot set of objects accessible for fast access (e.g. omit disk or network roundtrips). The only solution is to use native memory - and there you will end up with the choice either to use some native code (C/C++) via JNI or use direct memory access.
+
+堆外内存的优点
+
+- 减少了垃圾回收,堆外内存不受GC影响,由程序员自身分配内存 OHC-jemelloc
+- 加快了内存复制的速度
+
+使用堆外内存做缓存
+
+```xml
+<dependency>
+    <groupId>org.caffinitas.ohc</groupId>
+    <artifactId>ohc-core</artifactId>
+    <version>0.7.0</version>
+</dependency>
+```
+
+```java
+OHCache<String, String> ohCache = OHCacheBuilder.<String, String>newBuilder()
+                .keySerializer(new StringSerializer())
+                .valueSerializer(new StringSerializer())
+                .eviction(Eviction.LRU)
+                .build();
+```
 
