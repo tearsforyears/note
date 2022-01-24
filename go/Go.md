@@ -2279,6 +2279,8 @@ import (
 
 go 的包管理官方采用 go.mod 文件,结束了之前用 vender goroot gopath 的混乱局面.
 
+
+
 ### go文档查看
 
 ```shell
@@ -2297,82 +2299,6 @@ func Sizeof(x ArbitraryType) uintptr
 type ArbitraryType int
 type Pointer *ArbitraryType
 ```
-
-
-
-
-
-
-
-## 内存分配管理
-
-### C 的内存分配
-
-我们看下c语言的内存分配一般是这种形式,栈往下长,堆往上涨
-
-![](https://upload-images.jianshu.io/upload_images/6328562-4df0b8ade52e88fd.png)
-
->   Go是内置运行时的编程语言(runtime)，像这种内置运行时的编程语言通常会抛弃传统的内存分配方式，改为自己管理。这样可以完成类似预分配、内存池等操作，以避开系统调用带来的性能问题，防止每次分配内存都需要系统调用。
-
-### go 的内存分配
-
-Go的内存分配的核心思想可以分为以下几点：
-
--   每次从操作系统申请一大块儿的内存，由Go来对这块儿内存做分配，减少系统调用
--   内存分配算法采用Google的 **TCMalloc**算法。算法比较复杂，究其原理可自行查阅。其核心思想就是把内存切分的非常的细小，分为多级管理，以降低锁的粒度。
--   回收对象内存时，并没有将其真正释放掉，只是放回预先分配的大块内存中，以便复用。只有内存闲置过多的时候，才会尝试归还部分内存给操作系统，降低整体开销
-
-go 会去申请一块虚拟内存,如下
-
-![](https://pic4.zhimg.com/80/v2-d5f5de4d6d22e67887ab4861ba5e721f_1440w.jpg)![img](https://pic4.zhimg.com/80/v2-d5f5de4d6d22e67887ab4861ba5e721f_1440w.jpg)
-
-其分为了3个区域
-
--   arena 就是其他语言的堆区,go 的动态分配都是这个区域,把内存分割成 8kb 大小的页,一些页组合起来叫 mspan
--   bitmap 用于标识 arena 区域中保存了哪些对象,4bit
--   spans 
-
-
-
-### 栈区
-
-go 调用方法的时候限制最大参数为 2000 byte
-
-
-
-
-
-
-
-### TCMalloc
-
-
-
-
-
-### gc
-
-首先来看使用 gc 的工具
-
-```shell
-GODEBUG=gctrace=1  go run main.go # 开启追踪 gc
-```
-
-快速实现监控线程
-
-```go
-import (
-    "net/http"
-    _ "net/http/pprof"
-)
-go func() {
-            log.Println(http.ListenAndServe("localhost:8081", nil))
-}()
-```
-
-
-
-
 
 
 

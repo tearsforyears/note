@@ -1261,7 +1261,7 @@ space 是个主要的命名空间.又叫 tablespace.
 - 数据字典,表的元信息(结构索引列信息)组成的内部表
 - MVCC控制数据
 - Undo space （回滚段） 用于存放多个 undo log,如果自定义了 undo log space 即会失效
-- Double write buffer 用于作为恢复
+- Double write buffer 用于作为恢复,于刷盘时会详述
 - Insert buffer
 
 ![](https://img-blog.csdnimg.cn/2020032115580176.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NDcwMzU=,size_16,color_FFFFFF,t_70#pic_center)
@@ -1568,6 +1568,24 @@ buffer pool 的最主要的功能是加速度和加速写,其主要的数据结�
 
 从这里也可以也可以看出,刷新脏页落盘,可以定时调度去完成一部分,另一部分如 buffer pool 会根据阈值触发,log buffer会根据事务提交而进行落盘.
 
+#### double write
+
+双写源自于一个磁盘刷新的问题,tablespace 中有128个区(2MB).把数据写到磁盘是要用 page(4k) 为单位进行操作的,mysql 的 page 默认大小是 16k.在断电情况下往往不能保证这操作的原子性,在发生系统断电或者 crash 的时候会存在一部分写入成功,这就是 partial page write 问题.mysql 会在恢复过程中检查 page 的 checksum,即事务号,page 如果损坏就无法恢复.
+
+为了解决这个问题,需要用 tablespace 中的,double write buffer,这个结构存在于内存.当 mysql 将脏数据 flush 到data file的时候,先使用memcopy 将脏数据复制到内存中的double write buffer,之后通过 double write buffer 再分2次,每次写入1MB到共享表空间,然后马上调用fsync函数,同步到磁盘上.
+
+<img src="https://images2015.cnblogs.com/blog/824142/201706/824142-20170603221342133-465947557.png" style="zoom:80%;" />
+
+该特性默认是关闭
+
+```shell
+show variables like '%double%' # write
+```
+
+
+
+
+
 #### 预读
 
 ```shell
@@ -1868,7 +1886,7 @@ flush list 上的 page 按照修改这些 page 的LSN号进行排序,我们看�
 
 
 
-### redo-log(内存/磁盘上)
+### redo-log 物理日志 故障恢复日志
 
 redo-log 用于记录对**物理文件的数据变更**,按照 buffer pool 的理解 redo-log 是所有对页有变更的操作都会记录到该日志中.
 
@@ -1987,7 +2005,7 @@ struct mtr_t {
 
 现在都已经知道这个数组中存储的是这个物理事务所有访问过的页面，并且都已经上了锁，那么在它提交时，如果发现这些页面中有已经被修改过的，则这些页面就成为了脏页，这些脏页需要被加入到innodb的buffer缓冲区中的更新链表中
 
-#### redolog刷盘
+#### redolog 刷盘
 
 之前我们说过了,日志刷盘的时机可能是提交事务或者是定时调度,我们细看下,有几种场景可能会触发redo log写文件：
 
@@ -2040,13 +2058,17 @@ redo-log 最主要的作用就是故障恢复,前文有提到,是通过checkpoin
 
 page 中有个字段 FIL_PAGE_LSN 用于记录日志最近一次刷盘时候的LSN,这个时候就可以确定有哪些 page 在崩溃的时候被刷新进磁盘
 
+##### 恢复与备份同步
+
+这里需要注意下**恢复**和**备份**的不同,恢复指的是从某一个点开始往后的日志丢失进行的恢复,备份则是从任意时刻开始重放数据库的所有数据.其次 binlog 是 mysql server 实现的,而 redo-log 则是 innodb 实现的.mysql 在上层提供了同步的功能,而 redo-log 更多的是物理日志,这堆的事数据页的修改,redo-log 记录的内容是**未刷入磁盘的物理页的修改**.redo-log 在内容上也不全,仍然需要某一时间点的内存快照,从这点看起来,bin-log 更适合做同步(需要完整数据),而 redo-log 更适合从故障点的前一个 checkpoint 进行日志恢复.
 
 
-### undo-log回滚日志
+
+### undo-log 回滚日志 MVCC 版本日志
 
 [undo tablespace truncate参考](http://mysql.taobao.org/monthly/2015/05/01/),[参考](http://mysql.taobao.org/monthly/2015/04/01/)
 
-undo-log是innodb事务的重要的实现基础.**undo-log 的研究必须建立在对事物和MVCC版本控制有一定的理解上,如果读者不了解事物请回过头来读本章节的信息**。undo-log 又名回滚日志,用来保存多版本信息.
+undo-log是innodb事务的重要的实现基础,其保存着数据的版本信息.**undo-log 的研究必须建立在对事物和MVCC版本控制有一定的理解上,如果读者不了解事物请回过头来读本章节的信息**。undo-log 又名回滚日志,用来保存多版本信息.
 
 undo-log又叫回滚日志.提供向前滚的操作.同时其提供MVCC版本的读.undo-log是在表的记录发生变更的时候会记录的日志,在5.6之后也开始使用独立的 undo-log 空间而不是记录到 ibdata 的物理文件中.**insert**是不用维护undo-log的,因为 undo-log 维护的是 **数据变更的版本信息**,而 insert 没有之前的版本所以不需要维护 undo-log
 
@@ -2120,7 +2142,7 @@ update log
 
 
 
-### binlog 复制日志
+### binlog 复制同步日志
 
 binlog,即二进制日志,其记录了所有数据库的改变,以二进制形式保存在磁盘中.其用于查看数据库变更历史,增量备份和恢复,mysql 的主从复制.
 
@@ -3003,6 +3025,12 @@ innodb 是有死锁检测的
 #### mysql RR 有没有解决幻读问题?
 
 显然利用上面的知识我们知道只要在 insert 完成后,在查询的事务里面 update 到这一行记录, RR 就会存在幻读问题,单纯的读写 mysql 是不会存在上面的幻读问题的.可以说 mysql 解决了幻读问题但没有完全解.
+
+
+
+#### read-committed 的测试
+
+read-committed 使用的是行锁,而且其逻辑相对比较简单,事务在 insert 和 update 的时候都会加锁(record lock),其他事务会阻塞在加锁相应的行,等到其他事务提交后才能提交,修改结果按照后修改的事务来.需要注意的一点是,因为没有间隙锁只有行锁
 
 
 
