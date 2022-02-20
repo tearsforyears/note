@@ -1935,3 +1935,5 @@ OHCache<String, String> ohCache = OHCacheBuilder.<String, String>newBuilder()
                 .build();
 ```
 
+![](https://img-blog.csdnimg.cn/img_convert/4c3c0fddf7b40850aabbf756c91de6b8.png)
+
