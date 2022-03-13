@@ -964,6 +964,8 @@ Reactor 模型分为几种
 - 单 Reactor 多线程 epoll
 - 多 Recator 多线程 epoll
 
+单线程 Reactor 指的是所有的I/O 在同一个线程内完成,该线程接受客户端的TCP请求,对传输数据进行编码和解码,而多线程的 Reactor 模式值得是有个专门的 Acceptor 用来处理 I/O 请求用来提高 acceptor 的并发量.且是一种无锁化的思想,同一个I/O线程可以处理多个 SocketChannel 的事件.
+
 每个 Reactor 模型中有如下组件
 
 - **Reactor**：把IO事件分配给对应的handler处理
@@ -977,15 +979,21 @@ Reactor 模型分为几种
 - reactor 所有请求打过来这,没有前方路由不能多线程,有前方路由多实例,这里只是作为一个中转的功能去设计
 - accepor accept请求,这个会产生一个socket,本身不是阻塞的
 
-
-
 ![](https://pic1.zhimg.com/80/v2-d60a5c2c930e3ec611855d387d2429ec_720w.jpg)
 
 单reactor多线程模型改进是把处理请求的部分利用线程池进行了多线程的处理.Reactor承担所有线程的监听和相应.这也体现了对于无关乎调度状态的操作可以交给后续的并发的线程池去处理.
 
 ![](https://pic2.zhimg.com/80/v2-ca0ee6f64ec8654ba143c30548874095_720w.jpg)
 
-上面其实还可以拆分,注意到只有连接是需要等待三次握手完成才能accept出socket,所以单线程去处理连接请求,多线程去处理其他请求,可以尽可能的减少阻塞的部分.
+上面其实还可以拆分成主从 reactor,注意到只有连接是需要等待三次握手完成才能accept出socket,所以单线程去处理连接请求,多线程去处理其他请求,可以尽可能的减少阻塞的部分.
+
+> mainReactor : 监听 ServerSocketChannel 、建立与 SocketChannel 的连接、将完成建立连接之后的 Socket 交给 subReactor
+>
+> subReactor : 监听SocketChannel的 I/O事件，完成编解码、相应的业务处理（默认为CPU个数）
+
+可以看到主从 reactor 的拆分是吧 Accept 这件事单独抽出来去处理.即是所谓的I/O多路复用的思想.
+
+
 
 #### redis 的线程模型
 
