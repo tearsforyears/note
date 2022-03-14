@@ -225,9 +225,170 @@ Leader发生故障后，会从ISR中选出一个新的leader，之后，为了�
 
 ## Kafka Streaming
 
+我们来看下实际使用
 
+```java
+@Configuration
+public class KafkaConsumerConfig {
 
+  @Value("${spring.kafka.bootstrap-servers}")
+  private String bootstrapServers;
 
+  @Value("${spring.kafka.consumer.group-id}")
+  private String groupId;
+
+  @Value("${spring.kafka.consumer.auto-offset-reset}")  // lastest
+  private String autoOffsetReset;
+
+  @Bean
+  ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
+    ConcurrentKafkaListenerContainerFactory<String, String> factory =
+        new ConcurrentKafkaListenerContainerFactory<>();
+    factory.setConsumerFactory(consumerFactory());
+    factory.setConcurrency(3);
+    factory.setBatchListener(true);
+    factory.getContainerProperties().setAckMode(AckMode.MANUAL);
+    return factory;
+  }
+
+  @Bean
+  public ConsumerFactory<String, String> consumerFactory() {
+    return new DefaultKafkaConsumerFactory<>(consumerConfigs());
+  }
+
+  @Bean
+  public Map<String, Object> consumerConfigs() {
+    Map<String, Object> props = new HashMap<>(16);
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+    props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1000);
+    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+    props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+    props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
+    return props;
+  }
+}
+```
+
+```yml
+spring: 
+  kafka:
+    bootstrap-servers: 
+    consumer:
+      group-id: prod-behavior-data
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+```
+
+我们先来看下手动确认机制,消费者可以用如下方法手动提交 ack
+
+```java
+@KafkaListener(topics = "${kafka.topics.xxxx}",
+      containerFactory = "kafkaListenerContainerFactory")
+public void listenSnaptube(List<String> msgs, Acknowledgment ack) {
+  if (CollectionUtils.isEmpty(msgs)) {
+    ack.acknowledge();
+    return;
+  }
+
+  List<DataEvent> events;
+
+  if (CollectionUtils.isEmpty(behaviorEvents)) {
+    ack.acknowledge(); // 手动提交该信息的确认
+    return;
+  }
+
+  //userStatisticsDataEventHandler.handle(behaviorEvents, app);
+  videoStatisticsDataEventHandler.handle(behaviorEvents, app);
+  creatorStatisticsDataEventHandler.handle(behaviorEvents, app);
+  udidStatisticsDataEventHandler.handle(behaviorEvents, app);
+  ack.acknowledge();
+  return;
+}
+```
+
+这其实就是监听实时流的代码,从上面其实我们可以看到 kafka 希望通过监听消息队列一样去监听实时流进行计算任务,下面我们看 kafka 是如何投放实时流的
+
+```java
+final Properties props;
+
+StreamsBuilder builder = new StreamsBuilder();
+KStream<String, String> textLines = builder.stream("TextLinesTopic");
+KTable<String, Long> wordCounts = textLines
+  .flatMapValues(textLine -> Arrays.asList(textLine.toLowerCase().split("\\W+")))
+  .groupBy((key, word) -> word)
+  .count(Materialized.<String, Long, KeyValueStore<Bytes, byte[]>>as("counts-store"));
+wordCounts.toStream().to("WordsWithCountsTopic", Produced.with(Serdes.String(), Serdes.Long()));
+
+KafkaStreams streams = new KafkaStreams(builder.build(), props);
+
+```
+
+### KTable,KStream,State store
+
+> KTable和KStream是Kafka Stream中非常重要的两个概念，它们是Kafka实现各种语义的基础。因此这里有必要分析下二者的区别。
+>
+> KStream是一个数据流，可以认为所有记录都通过Insert only的方式插入进这个数据流里。而KTable代表一个完整的数据集，可以理解为数据库中的表。由于每条记录都是Key-Value对，这里可以将Key理解为数据库中的Primary Key，而Value可以理解为一行记录。可以认为KTable中的数据都是通过Update only的方式进入的。也就意味着，如果KTable对应的Topic中新进入的数据的Key已经存在，那么从KTable只会取出同一Key对应的最后一条数据，相当于新的数据更新了旧的数据。
+>
+> 流式处理中，部分操作是无状态的，例如过滤操作（Kafka Stream DSL中用filer方法实现）。而部分操作是有状态的，需要记录中间状态，如Window操作和聚合计算。State store被用来存储中间状态。它可以是一个持久化的Key-Value存储，也可以是内存中的HashMap，或者是数据库。Kafka提供了基于Topic的状态存储。
+>
+> Topic中存储的数据记录本身是Key-Value形式的，同时Kafka的log compaction机制可对历史数据做compact操作，保留每个Key对应的最后一个Value，从而在保证Key不丢失的前提下，减少总数据量，从而提高查询效率。
+>
+> 构造KTable时，需要指定其state store name。默认情况下，该名字也即用于存储该KTable的状态的Topic的名字，遍历KTable的过程，实际就是遍历它对应的state store，或者说遍历Topic的所有key，并取每个Key最新值的过程。为了使得该过程更加高效，默认情况下会对该Topic进行compact操作。
+>
+> 另外，除了KTable，所有状态计算，都需要指定state store name，从而记录中间状态
+
+### why kafka streaming
+
+- 简单,相比于 flink 和 storm 部署成本极低
+- spark streaming kafka , storm 等其他平台的支持,换言之大部分数据系统已经部署 kafka 的流处理
+
+![](https://img-blog.csdnimg.cn/20210311095842895.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzI3MDkzNDY1,size_16,color_FFFFFF,t_70)
+
+上图的 task 即是 kafka streaming 的代码逻辑,我们可以看到其作为流处理/消息队列的能力.
+
+### processor topology
+
+> 基于Kafka Stream的流式应用的业务逻辑全部通过一个被称为Processor Topology的地方执行。它与Storm的Topology和Spark的DAG类似，都定义了数据在各个处理单元（在Kafka Stream中被称作Processor）间的流动方式，或者说定义了数据的处理逻辑。
+
+```java
+
+public class WordCountProcessor implements Processor<String, String> {
+  private ProcessorContext context;
+  private KeyValueStore<String, Integer> kvStore;
+  @SuppressWarnings("unchecked")
+  @Override
+  public void init(ProcessorContext context) {
+    this.context = context;
+    this.context.schedule(1000);
+    this.kvStore = (KeyValueStore<String, Integer>) context.getStateStore("Counts");
+  }
+  @Override
+  public void process(String key, String value) {
+    Stream.of(value.toLowerCase().split(" ")).forEach((String word) -> {
+      Optional<Integer> counts = Optional.ofNullable(kvStore.get(word));
+      int count = counts.map(wordcount -> wordcount + 1).orElse(1);
+      kvStore.put(word, count);
+    });
+  }
+  @Override
+  public void punctuate(long timestamp) {
+    KeyValueIterator<String, Integer> iterator = this.kvStore.all();
+    iterator.forEachRemaining(entry -> {
+      context.forward(entry.key, entry.value);
+      this.kvStore.delete(entry.key);
+    });
+    context.commit();
+  }
+  @Override
+  public void close() {
+    this.kvStore.close();
+  }
+}
+```
 
 ## 集群和同步
 
