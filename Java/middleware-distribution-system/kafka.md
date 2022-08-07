@@ -87,6 +87,24 @@ sh kafka-topics.sh --create --zookeeper broker.kafka.dev.mobiu.space --replicati
 sh kafka-topics.sh --delete --zookeeper broker.kafka.dev.mobiu.space --topic test # 阐述topic
 ```
 
+多节点操作
+
+```shell
+kafka-topics.sh --list --zookeeper recommend-stream-mobiukafka01.meta.aws:2181,recommend-stream-mobiukafka02.meta.aws:2181,recommend-stream-mobiukafka03.meta.aws:2181,recommend-stream-mobiukafka04.meta.aws:2181,recommend-stream-mobiukafka05.meta.aws:2181
+```
+
+查看分区的 replica
+
+```shell
+./kafka-topics.sh --zookeeper recommend-stream-mobiukafka01.meta.aws:2181,recommend-stream-mobiukafka02.meta.aws:2181,recommend-stream-mobiukafka03.meta.aws:2181,recommend-stream-mobiukafka04.meta.aws:2181,recommend-stream-mobiukafka05.meta.aws:2181 --describe --topic prod-cover-recall
+```
+
+```shell
+./kafka-reassign-partitions.sh --zookeeper recommend-stream-mobiukafka01.meta.aws:2181,recommend-stream-mobiukafka02.meta.aws:2181,recommend-stream-mobiukafka03.meta.aws:2181,recommend-stream-mobiukafka04.meta.aws:2181,recommend-stream-mobiukafka05.meta.aws:2181 --reassignment-json-file tmp.json --execute
+```
+
+
+
 模拟测试的生产者
 
 ```shell
@@ -179,14 +197,65 @@ Leader发生故障后，会从ISR中选出一个新的leader，之后，为了�
 
 - 顺序写日志落盘(预读,比随机写内存要快)
 - 零复制技术(内核优化),即把需要拷贝到内核中的数据直接变成了流去处理
-  - 基于 mmap 的索引
-  - 日志文件读写所用的 TransportLayer
-
+  - 基于 mmap + write 的持久化
+  - 基于 sendFile 的读写数据
+  - 日志文件读写所用的 [TransportLayer](https://github.com/apache/kafka/blob/99b9b3e84f4e98c3f07714e1de6a139a004cbc5b/clients/src/main/java/org/apache/kafka/common/network/PlaintextTransportLayer.java#L26) 即所使用的技术是 java nio 中的 socketChannel 这是个多线程的 reactor/单线程的 acceptor,仅在处理网络请求的时候使用到了多线程,显然 redis 是主从 reactor 而 kafka 是单 reactor
+  
 - Pull 在消费端根据能力去拉取相应的数据
 
 > mmap是一种内存映射文件的方法，即将一个文件或者其它对象映射到进程的地址空间，实现文件磁盘地址和进程虚拟地址空间中一段虚拟地址的一一对映关系。实现这样的映射关系后，进程就可以采用指针的方式读写操作这一段内存，而系统会自动回写脏页面到对应的文件磁盘上，即完成了对文件的操作而不必再调用read,write等系统调用函数。相反，内核空间对这段区域的修改也直接反映用户空间，从而可以实现不同进程间的文件共享。如下图所示：
 >
 > ![](https://images0.cnblogs.com/blog2015/571793/201507/200501092691998.png)
+
+
+
+### I/O
+
+[参考](http://t.zoukankan.com/liuche-p-15455808.html)
+
+#### I/O 模型
+
+<img src="https://img2020.cnblogs.com/blog/371129/202110/371129-20211025224845192-1901510990.png" alt="50%" style="zoom:60%;" />
+
+- 读文件: 当用户程序read的系统调用发生时,会切换到内核态.这时候由内核发生缺页中断/或从缓冲区 pageCache 中获取把对应的磁盘页的数据读到内核态的缓冲区中,然后再把数据拷贝/映射到用户空间,完成读取文件的操作.
+- 写文件: 用户发生write的系统调用,指定用户空间的地址,会切换到内核态,然后由 cpu 把用户空间中的数据拷贝到 pageCache 中.而 pageCache 会根据操作系统的策略进行落盘
+- DMA: DMA 对用户不可见,其为系统内核的一个机制/硬件设施,如果只是拷贝到内核/pageCache 那么其实没有DMA还好,但是如果要传送到网卡之类的I/O设备上会浪费CPU时间进行拷贝,其在内核态会对 DMA 控制器发出指令,等DMA传送完后会对cpu剔除中断请求用来处理数据.
+
+在程序方面下图可以代表与磁盘打交道的程序锁使用的结构,fd用户程序操作的数据结构,inode操作系统操作的数据结构/磁盘
+
+![](https://img-blog.csdn.net/20140910162254875)
+
+#### page cache 写入时机
+
+<img src="https://img-blog.csdnimg.cn/cd9590818e104a8b8ed5c362f6707a08.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBAcmF5eWxlZQ==,size_20,color_FFFFFF,t_70,g_se,x_16" alt="50%" style="zoom:75%;" />
+
+由 pdflush 进程写入脏页,周期为`cat /proc/sys/vm/dirty_writeback_centisecs` ,显式调用 fsync 进行回写的话,会唤醒 pdflush 直到所有的脏页都写到磁盘为止,内存不足或者脏页到达阈值也会触发回写.
+
+#### 顺序读写和随机读写
+
+其实本质上随机读写很浪费性能,因为要花时间去找到对应的数据块存在磁盘的具体物理地址,当然通过INode信息我们也能算出逻辑偏移量,到物理块去读取,但其终究不是物理意义上的顺序,而顺序读写实现的则是物理块上的有序,读取的时候不用频繁移动磁头,所以其会快.
+
+
+
+为什么内存映射 mmap 会快呢 因为其少了内核态的调度
+
+#### 传统 I/O
+
+![](https://img-blog.csdnimg.cn/20210321140643521.png)
+
+#### mmap + wrtie
+
+![](https://img-blog.csdnimg.cn/20210321140713210.png)
+
+#### sendFile
+
+![](https://img-blog.csdnimg.cn/20210321140933706.png)
+
+
+
+#### sendfile+DMA Scatter/Gather
+
+![](https://img-blog.csdnimg.cn/2021032114095685.png)
 
 
 
