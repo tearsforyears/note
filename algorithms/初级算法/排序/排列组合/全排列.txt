@@ -1,7 +1,0 @@
-def arrange(lis,cur):
-    if cur==len(lis):
-        return lis    	
-    for i in range(len(lis)):
-        swap(lis,cur,i)
-	arrange(lis.cur+1)
-        swap(lis,cur,i)

@@ -1,9 +1,0 @@
-# 远程连接数据库开放权限 
-	grant all privileges on test.* to user_name@'%' identified by 'password'
-
-	user_name 是 mysql 自己定义的用户 不是本机用户
-	test表示数据库的名字
-	test.* 表示数据库中所有的表都开放给user_name
-	password是登陆时候密码的验证 这个东西用户自己设置
-	在连接的时候使用就可以了
-	
