@@ -1,0 +1,48 @@
+﻿搭建科学计算的开发环境
+使用的是 anaconda python2.7(由于历史原因残留到2020年被废用) 作为底层
+我学习的时候选择的是python2.7 但因为版本的迭代 现在用的环境都是3.6
+
+接下来 直接用anaconda的库作为IDE的解释器 python2.7给anaconda提供环境 当然也可以直接装anaconda
+就可以用anaconda的库了。
+anaconda中有两个库十分重要 numpy 和scipy 分别是除了矩阵和一般科学计算的
+tensorflow 对这些库的操作进行的优化和封装
+下面介绍 python2.7+anaconda+tensorflow的环境
+python2.7到官网上下 可以使用python3.6的anaconda
+在选项中把 add to path 勾选 pip 勾选 不然到后面手动来比较麻烦
+提供手动构建路径的方法 如图(群相册)
+删除python2.7原本添加的路径 添加anaconda库的路径 主要是python.exe
+anaconda是一个十分强大的工具 如图中5个库确保都添加到path中
+这个不熟悉的可以去百度 我在安装anaconda的时候基本把anaconda的所有版本给测试了一遍
+总的来说anaconda使用的困难程度大于安装 这一步需要大家去熟悉系统变量等
+学会使用anaconda里面的工具 比如 jupyter
+
+测试下numpy和scipy
+打开cmd 输入python
+import numpy as np
+impoty scipy as sp
+如果没有出错那么恭喜你成功了
+一般前期的回归测试到numpy和scipy就够用了 可以跳过下面这繁琐的安装过程
+
+下面介绍很麻烦的一个东西 tensorflow的安装
+PS:麻烦程度和SSM框架相差无几
+tensorflow的
+
+
+首先确保你有张好的显卡(不知道的可以去英伟达官网搜索cuda 看自己显卡的计算能力)
+首先安装cuda和cudnn
+cuda和cudnn在官方网站上也有下载
+最新的是
+cuda9.1 cudnn9 
+我选择的是这个架构 事实上可以选择稍微低点的架构以保证运行
+cuda 会帮你自动添加好路径
+而cudnn9则需要自己去覆盖路径
+cuda 和 cudnn9的安装过程与anaconda 类似所以没啥特别难得
+有不懂的点参考官方文档(不懂英语的话自己百度看看中文教程吧 顺带一提 谷歌浏览器自动翻译也不错)
+
+https://blog.csdn.net/qq_36556893/article/details/79433298
+这是我当是脑抽的安装过程
+其实都大同小异
+
+步骤其实就2个
+用anaconda创建虚拟环境(python3.6不需要 直接下就行)
+执行pip命令 下载 tensorflow 测试通过就行

@@ -1,0 +1,26 @@
+特征工程
+# 数据清洗:
+	1.选取简单特征
+	2.分布具有典型性
+	3.避免线性相关
+# 数据平衡处理方法:
+	1.获取更多数据
+	2.F1 score去评价
+		Confusion Matrix(混淆矩阵)：
+			predict
+				   c1 c2 c3			P  N
+				c1 43  2  0		 P  43  2
+			gt	c2  5 45  1  --> N	 7 98
+				c3  2  3 49
+			# 表示c1有43个预测正确 5个预测成c2
+		TP,FP,TN,FN Positive Nagative
+			根据上面例子 c1而言
+			TP = 43 FP = 7 TN = 98 FN = 2
+			TP the result is True use classfier P
+		F1 Score:
+			F1 = 2*(p*r)/(p+r)
+			# p for precision,r for recall
+			# precision = accaury 
+# 自然语言处理
+	文本预处理:
+		分词,取出语言停止词

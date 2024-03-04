@@ -1,0 +1,685 @@
+# SpringMVC
+
+---
+
+springmvc是spring自己封装servlet的api
+
+spirngmvc在耦合性和路由配置上比纯servlet来的要好不少
+
+本篇涉及web部署过程idea配置部署过程,配置文件,启动顺序等
+
+[TOC]
+
+## index
+
+-   基本配置 DispatchServlet.xml beans.xml web.xml
+-   核心控制器Dispatchservlet配置 @Component @Controllor
+-   controller/handler 
+    -   @RequestMapping
+    -   @GetMapping/@PostMapping/@HeadMapping/@PostMapping
+    -   @ResponseBody
+    -   @RequestParam
+    -   @ModelAttribute
+    -   @RequestBody
+    -   @PathVariable
+    -   @InitBinder 初始化绑定解析器 校验器
+-   数据校验 (标注在Pojo对象上的注解)
+-   拦截器 implements HandlerInterceptor/extends HandlerInterceptorAdaptor
+-   文件上传 MultipartFile file .transferTo(new File())
+-   异常解析器 implements HandlerExceptionResolver
+
+## 基本配置
+
+-   部署过程细节
+  
+-   配置启动
+  
+  重要的配置文件放WEB-INF里面是为了打包时候被更加方便 而不用maven本身的resources
+  
+  这里我们人为忽略mybatis的配置留后面整合时使用的一些依赖
+  
+#### /webapp/WEB-INF/web.xml
+
+```xml
+  <web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd" id="WebApp_ID" version="3.1">
+    <!-- 利用spring自己的filter配置响应编码-->
+  <!-- 设置post请求编码和响应编码 -->
+  <filter>
+      <filter-name>characterEncodingFilter</filter-name>
+      <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+    <init-param>
+          <param-name>encoding</param-name>
+          <param-value>UTF-8</param-value>
+      </init-param>
+      <init-param>
+        <!-- 为true时也对响应进行编码 -->
+          <param-name>forceEncoding</param-name>
+          <param-value>true</param-value>
+      </init-param>
+</filter>
+  <filter-mapping>
+      <filter-name>characterEncodingFilter</filter-name>
+      <url-pattern>/*</url-pattern>
+  </filter-mapping>
+  
+</web-app>
+```
+
+  #### /webapp/WEB-INF/beans.xml/applicationContext.xml
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns:context="http://www.springframework.org/schema/context"
+         xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+      <context:component-scan base-package="org.example.Component"/>
+  </beans>
+  ```
+
+#### /pom.xml
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  
+  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+  
+      <groupId>org.example</groupId>
+      <artifactId>SpringMVCTest</artifactId>
+      <version>1.0-SNAPSHOT</version>
+      <packaging>war</packaging>
+  
+    <name>SpringMVCTest Maven Webapp</name>
+      <!-- FIXME change it to the project's website -->
+      <url>http://www.example.com</url>
+  
+      <properties>
+          <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+          <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+      </properties>
+  
+      <dependencies>
+          <!-- spring最基本的环境支持依赖，会传递依赖core、beans、expression、aop等基本组件，以及commons-logging、aopalliance -->
+          <dependency>
+              <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+              <version>4.3.2.RELEASE</version>
+          </dependency>
+  
+          <!-- 提供了对其他第三方库的内置支持，如quartz等 -->
+          <dependency>
+              <groupId>org.springframework</groupId>
+            <artifactId>spring-context-support</artifactId>
+              <version>4.3.2.RELEASE</version>
+          </dependency>
+  
+          <!-- spring处理对象关系映射的组件，传递依赖了jdbc、tx等数据库操作有关的组件 -->
+          <dependency>
+              <groupId>org.springframework</groupId>
+            <artifactId>spring-orm</artifactId>
+              <version>4.3.2.RELEASE</version>
+          </dependency>
+  
+          <!-- spring对面向切面编程的支持，传递依赖了aspectjweaver -->
+          <dependency>
+              <groupId>org.springframework</groupId>
+              <artifactId>spring-aspects</artifactId>
+              <version>4.3.2.RELEASE</version>
+          </dependency>
+  
+          <!-- spring处理前端表现层的组件,即springMVC，传递依赖了web操作有关的组件 -->
+          <dependency>
+              <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+              <version>4.3.2.RELEASE</version>
+          </dependency>
+  
+          <!-- 数据校验，springMVC需要用到 -->
+          <dependency>
+              <groupId>org.hibernate</groupId>
+              <artifactId>hibernate-validator</artifactId>
+              <version>5.2.4.Final</version>
+          </dependency>
+  
+          <!-- json解析，springMVC需要用到 -->
+          <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.36</version>
+          </dependency>
+
+          <!-- 文件上传，springMVC需要用到 -->
+          <dependency>
+              <groupId>commons-fileupload</groupId>
+              <artifactId>commons-fileupload</artifactId>
+              <version>1.3.1</version>
+          </dependency>
+  
+          <!-- junit -->
+          <dependency>
+              <groupId>junit</groupId>
+              <artifactId>junit</artifactId>
+              <version>4.11</version>
+          </dependency>
+          <!--log4j-->
+          <dependency>
+              <groupId>org.slf4j</groupId>
+              <artifactId>slf4j-log4j12</artifactId>
+              <version>1.8.0-alpha0</version>
+              <scope>test</scope>
+          </dependency>
+  
+          <!--mybatis/spring 包-->
+          <dependency>
+              <groupId>org.mybatis</groupId>
+              <artifactId>mybatis-spring</artifactId>
+              <version>1.2.2</version>
+          </dependency>
+          <dependency>
+              <groupId>org.mybatis</groupId>
+              <artifactId>mybatis</artifactId>
+              <version>3.3.0</version>
+          </dependency>
+          <dependency>
+              <groupId>mysql</groupId>
+              <artifactId>mysql-connector-java</artifactId>
+              <version>5.1.37</version>
+          </dependency>
+  
+        <!--j2ee相关包 servlet、jsp、jstl-->
+        <dependency>
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+          <version>3.1.0</version>
+          <scope>provided</scope>
+        </dependency>
+        <dependency>
+          <groupId>javax.servlet.jsp</groupId>
+          <artifactId>jsp-api</artifactId>
+          <version>2.2</version>
+        </dependency>
+        <dependency>
+          <groupId>javax.servlet</groupId>
+          <artifactId>jstl</artifactId>
+          <version>1.2</version>
+        </dependency>
+      </dependencies>
+      <build>
+          <plugins>
+              <!-- 指定JDK编译版本 -->
+              <plugin>
+                  <groupId>org.apache.maven.plugins</groupId>
+                  <artifactId>maven-compiler-plugin</artifactId>
+                  <version>3.1</version>
+                  <configuration>
+                      <source>1.8</source>
+                      <target>1.8</target>
+                  </configuration>
+              </plugin>
+          </plugins>
+      </build>
+  </project>
+  ```
+
+-   启动顺序
+
+    spring->springMVC,mybatis等web组件
+
+## 核心控制器DispatcherServlet
+
+​	DispatcherServlet负责统一调度servlet(简化了好多配置代码等)
+
+​	DispatcherServlet处理流程
+
+​		DispatcherServlet->HandlerMapping->HadlerInterceptor->Handler
+
+​	DispatcherServlet结构
+
+​		url->Interceptor-mapping-handler
+
+-   HandlerMapping: url-Interceptor,url-mapping 映射表
+-   HandlerAdapter: 类型转换器,校验器
+-   文件上传解析器
+-   视图解析器
+-   异常解析器
+
+除了beans.xml以外springMVC还有专门的配置文件dispatcher-servlet.xml用来配置springMVC
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!--此文件负责整个mvc中的配置-->
+
+    <!--启用spring的一些annotation -->
+    <context:annotation-config/>
+
+    <!-- 配置注解驱动 可以将request参数与绑定到controller参数上 -->
+    <mvc:annotation-driven/>
+
+    <!--静态资源映射-->
+
+    <!--本项目把静态资源放在了webapp的static目录下，资源映射如下-->
+    <mvc:resources mapping="/css/**" location="/static/css/"/>
+    <mvc:resources mapping="/js/**" location="/static/js/"/>
+    <mvc:resources mapping="/image/**" location="/static/images/"/>
+    <mvc:default-servlet-handler />  <!--这句要加上，要不然可能会访问不到静态资源，具体作用自行百度-->
+
+    <!-- 对模型视图名称的解析，即在模型视图名称添加前后缀(如果最后一个还是表示文件夹,则最后的斜杠不要漏了) 使用JSP-->
+    <!-- 默认的视图解析器 在上边的解析错误时使用 (默认使用html)- -->
+    <bean id="defaultViewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"/>
+        <property name="prefix" value="/WEB-INF/views/"/><!--设置JSP文件的目录位置-->
+        <property name="suffix" value=".jsp"/>
+        <property name="exposeContextBeansAsAttributes" value="true"/>
+    </bean>
+
+    <!-- 文件上传解析器 -->
+    <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+        <!--整个请求的最大大小，用来限制上传的文件大小-->
+        <property name="maxUploadSize" value="20971520" />
+        <property name="defaultEncoding" value="UTF-8" />
+        <!--延迟解析，以便捕获文件大小超出限制的异常，方便生成错误提示信息-->
+        <property name="resolveLazily" value="true"/>
+    </bean>
+
+    <!-- 自动扫描装配 -->
+    <context:component-scan base-package="org.example.Component"/>
+
+</beans>
+```
+
+可以看到里面配置了一些web用的组件,包扫描器静态资源等
+
+spring中也有类似的包扫描 但一般而言与web相关的用此处的包扫描
+
+其他一些组件用spring的包扫描配置到系统中
+
+这个包扫描是Spring3 MVC特有的其也开启了SpringMVC的注解
+
+@Service @Controllor @Repository @Component 
+
+@RequestMapping("/menu") @GetMapping() @PostMapping()
+
+## Handler/Controllor
+
+​	标注@Controllor在Spring中管理其对象
+
+​	标注@ResquestMapping("/path") 配置路由 用于方法上
+
+​	该注解除了可以标注在类上也可以标注在方法上用于配置路由
+
+​	类不用继承任何东西只用返回modelandview或者字符串就行了
+
+​	而controller的方法字段如果不做特殊标识的话 springMVC会去目录找相应的视图(前后端分离GG)
+
+@ResonseBody 这个注解可以实现json字符串的返回
+
+​	用于标注@RequestMapping或者@GetMapping等的方法
+
+```java
+@Controller
+@RequestMapping("/test")
+public class TestController {
+
+//    @RequestMapping("/")
+//    public String method() {
+//        return "welcome to test namespace"; // 默认会访问视图层
+//        // 作为前后端核心的字符串则直接爆炸 什么鬼东西是
+//    }
+
+    @RequestMapping("/json",produces = "text/html;charset=utf-8") 
+  	// url:/test/json 指定返回的字符串编码
+    @ResponseBody
+    public String returnValue(HttpServletRequest req,HttpServletResponse resp){
+        return "{'state':'200'}";
+    }
+  @RequestMapping(value = "/s", produces = "text/html;charset=utf-8", method = RequestMethod.GET)
+    @ResponseBody
+    public String resolveRequestParameter(HttpServletRequest request, HttpServletResponse response) {
+        Enumeration<String> keys = request.getParameterNames();
+        HashMap<String, String> dict = new HashMap<String, String>();
+        while (keys.hasMoreElements()) { 
+          // 遍历这个结构也一言难尽 但后面我们会看到spring的智能
+            String key = keys.nextElement();
+            dict.put(key, request.getParameter(key));
+        }
+        return dict.toString();
+    }
+}
+```
+
+​	有一说一 这玩意的路由配置比Flask不知道好了多少nmb的blueprint
+
+​	除了通过默认参数的方法 还可通过下面这种方法拿到request对象
+
+```java
+HttpServletRequest request =((ServletRequestAttributes)RequestContextHolder.getRequestAttributes()).getRequest();
+```
+
+​	参数注解动态取值 @RequestParam @RequestHeader @CookieValue @SessionAttribute
+
+​	分别相当于req.getParameter req.getHeader cookie.getValue sess.setAttribute
+
+​	用于参数注入,具体用法如下
+
+```java
+@RequestMapping("/")
+@ResponseBody
+public String test(@CookieValue("JSESSIONID") String jsessionId) {
+  System.out.println(jsessionId);
+	return null;
+}
+
+@RequestMapping("/")
+@ResponseBody
+public String test(@RequestParam("age") Integer age) {
+  System.out.println(age);
+	return null;
+}
+
+@RequestMapping(value="/p",produces = "text/html;charset=utf-8", method = RequestMethod.GET)
+@ResponseBody
+public String testRequestParameterAnotation(HttpServletRequest request, HttpServletResponse response,@RequestParam("age") Integer age){
+  System.out.println(age);
+  return age+" years old";
+}
+
+@GetMapping("/ps")
+@ResponseBody
+public String testParameter(String age) { 
+  // 卧槽 spring可以智能获取 /ps?age=3的时候spring直接获取注入到了age
+  return age;
+}
+```
+
+@PathVariable 可以获取定义在url里面的值 用于参数
+
+```java
+@RequestMapping("/{name:[a-zA-Z0-9]*}")
+@ResponseBody
+public void testSendRedirect(HttpServletRequest request, HttpServletResponse response, @PathVariable("name") String name) throws IOException {
+  response.sendRedirect("https://www." + name + ".com");
+  // 动态访问baidu等
+}
+```
+
+@ModelAttribute 
+
+其主要功能是把数据添加到模型对象里 其执行时机是Controller执行之前 有AdapterHandler执行
+
+-   应用到无参方法上 感觉没啥用 整理参数 提前拦截 用model存取中间量
+
+    jsp时代用的挺多的前后端分离基本等于废物
+
+```java
+@ModelAttribute
+public void myModel(@RequestParam(required = false) String par, Model model) {
+  //        System.out.println("execute"); // 事实这玩意会在所有url执行前执行
+  model.addAttribute("par", par);
+}
+
+@GetMapping("/method")
+@ResponseBody
+public String method(Model m) {
+  return m.asMap().toString();
+}
+// 其实上面的写法等价于下面的写法
+@GetMapping(value = "/method")
+public String method(@RequestParam(required = false) String par, Model model) {
+    model.addAttribute("par", par);
+    return model.asMap().toString();
+}
+```
+
+-   标注到带有返回值的方法 基本不会用 等同于 model.addAttribute("string",par); 不做示例
+-   标注到参数上
+
+```java
+@RequestMapping(value = "/helloWorld2")
+public String helloWorld(@ModelAttribute("myUser") User user) {
+  user.setName("老王");
+  return "helloWorld";
+}
+// 这句话 等同于 先给user注入值 model.addAttribute("myUser",user);
+// 其实隐含了 RequestParam("user") 在里面
+```
+
+@InitBinder
+
+spring把请求参数绑定到Handler方法的时候会进行类型转换 (HandlerAdapter的工作内容) 借助的就是WebDataBinder帮助实现数据类型的转换 这里是利用了spring已经定义好的方法进行类型转换,用binder.registerCustomEditor 注册到全局中 像上面有些@RequestParam 就是利用这个进行转化的
+
+```java
+@InitBinder
+protected void initBinder(WebDataBinder binder) {
+  SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+  binder.registerCustomEditor(Date.class, new CustomDateEditor(dateFormat, true));
+}
+// public void registerCustomEditor(Class<?> requiredType, PropertyEditor propertyEditor)
+// public CustomDateEditor(DateFormat dateFormat, boolean allowEmpty) 
+```
+
+​	可以自定义editor
+
+```java
+import org.springframework.beans.propertyeditors.PropertiesEditor;
+
+public class DoubleEditor extends PropertyEditorSupport {
+    @Override
+    public void setAsText(String text) throws IllegalArgumentException {
+        if (text == null || text.equals("")) {
+            text = "0";
+        }
+        setValue(Double.parseDouble(text));
+    }
+ 
+    @Override
+    public String getAsText() {
+        return getValue().toString();
+    }
+}
+```
+
+@RequestParam、@RequestBody和@ModelAttribute异同
+
+​	都是标注在参数上
+
+@RequestParam用于接收请求参数 不一致时候得传入值 一般默认配置
+
+@RequestBody
+
+-   用于接收json格式的数据 <font color=#FF0000>并可以转化相应的成对象</font> 
+-   可接受json数据转换成map格式
+-   可接受HttpEntity数据 就是表格的submit 
+-   HandlerMethodArgumentResolver 可定制个性化数据
+
+@ModelAttribute
+
+-   前后端分离后这个方法有点鸡肋 这个隐含@RequestParam 多一步注入到 model而已
+
+## 数据校验器
+
+​	org.hibernate.validator.constraints.* 引入如下的检验注解 标注在字段名上
+
+​	@NotEmpty 此字段不能为null，也不能为空字符串
+
+​	@Length 可以指定字符串的最小、最大长度
+
+​	@Min 指定数值的最小值
+
+​	@Max 指定数值的最大值
+
+​	@Range 指定数值的范围
+
+​	@Size 指定数组、集合的元素范围
+
+​	@AssertTrue 断定boolean值为true
+
+​	@AssertFalse 
+
+​	@Email 指定字符串符合email格式
+
+​	@Pattern 字符串符合指定的正则表达式
+
+## 拦截器 Interceptor
+
+​	拦截器和sevlet中的filter差不多 只不过简化了代码 增加了成功后相应
+
+​	filter的调用逻辑是 filter1->filter2->...->service->...->filter2->filter1
+
+​	而加入了拦截器后的调用逻辑是 filter->interceptor->service->interceptor->filter
+
+​	其本质上的区别的就是filter基于servlet实现 而interceptor基于AOP完成对方法的拦截
+
+​	doChain方法相当于类似栈的端点
+
+​	springMVC中拦截器的调用逻辑是和上面的一致 只不过不用doChain来写了
+
+​	preHandle 用于执行调用前的逻辑 然后执行handler
+
+​	postHandle 倒序执行后处理 然后生成响应 如果流程正常执行返回true
+
+​	afrerCompletion 倒序响应生成后处理
+
+​	实现HandlerInterceptor接口 或者继承HandlerInterceptorAdapter 就可以实现拦截器
+
+​	然后在dispatcher-servlet.xml中进行配置即可(暂时没发现可以像@WebFilter的配置方式)
+
+```xml
+<mvc:interceptors>  
+	<mvc:interceptor>
+		<mvc:mapping path="/xx/*" />
+		<mvc:exclude-mapping path="/xx/xx.do"/>
+		<bean class="xx"/>
+	</mvc:interceptor>
+</mvc:interceptors>
+```
+
+## 文件上传
+
+​	springMVC封装成MultipartFile的方式去操作上传文件
+
+```java
+@PostMapping("/upload")
+@ResponseBody
+public String testUpload(MultipartFile file) throws IOException {
+  System.out.println(file.getContentType());
+  System.out.println(file.getOriginalFilename());
+  System.out.println(file.getSize());
+  file.transferTo(new File("/Users/zhanghaoyang/IdeaProjects/SpringMVCTest/uploads/" + UUID.randomUUID() + file.getOriginalFilename()));
+  // 实际上我们保存到文件服务器而不是简单的存在本地服务器
+  return "{'state':200}";
+}
+//---------------------------文件服务器上传-----------------------------//
+// 上传到hdfs时用hdfs的api 
+String path = "http://localhost:9090/Fileserver/uploads/";
+//上传文件项
+String filename = upload.getOriginalFilename();
+String uuid = UUID.randomUUID().toString().replace("-", "");
+String saveName = uuid + "_" + filename.substring(filename.lastIndexOf(File.separator) + 1);
+//创建客户端对象
+Client client = Client.create();
+//和图片服务器进行连接
+WebResource webResource = client.resource(path + saveName);
+//上传文件
+webResource.put(upload.getBytes());
+
+//----------------------------原生实现---------------------------------//
+//解析request对象
+DiskFileItemFactory factory = new DiskFileItemFactory();
+ServletFileUpload upload = new ServletFileUpload(factory);
+List<FileItem> items = upload.parseRequest(request);
+//遍历
+for (FileItem item : items) {
+  if (item.isFormField()) {
+    //普通表单向
+  } else {
+    //上传文件项
+    String filename = item.getName();
+    String uuid = UUID.randomUUID().toString().replace("-", "");
+    String saveName = uuid + "_" + filename.substring(filename.lastIndexOf(File.separator) + 1);
+    item.write(new File(path, saveName));
+    //删除临时文件
+    item.delete();
+  }
+}
+```
+
+​	文件的大小编码限制可以用解析器去配置DispatcherServlet.xml
+
+```xml
+<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+  <!--整个请求的最大大小，用来限制上传的文件大小-->
+  <property name="maxUploadSize" value="20971520" />
+  <property name="defaultEncoding" value="UTF-8" />
+  <!--延迟解析，以便捕获文件大小超出限制的异常，方便生成错误提示信息-->
+  <property name="resolveLazily" value="true"/>
+</bean>
+```
+
+​	如果想要限制类型则要自己写一个Interceptor去实现
+
+## 异常解析器
+
+​	实现HandlerExceptionResolver接口则可解析异常
+
+​	其捕获的是全局异常
+
+```java
+@Component
+public class MyHandlerExceptionResolver implements HandlerExceptionResolver {
+public class SgccExceptionResolver implements HandlerExceptionResolver {
+
+  private Logger logger = Logger.getLogger(this.getClass());
+
+  public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler,
+                                       Exception ex) {
+    logger.info("==============Exception Start 000000=============");
+    if (ex instanceof BaseException) {
+      logger.debug(ex, ex);
+    }else {
+      logger.error(ex, ex);
+    }
+    logger.info("==============Exception End 000000=============");
+    if (NetworkUtil.isAjax(request)) {
+      String msg = null;
+      String code = null;
+      String detail = null;
+      if (ex instanceof BaseException) {
+        msg = ((BaseException) ex).getErrorMsg();
+        code = ((BaseException) ex).getErrorCode();
+        detail = ((BaseException) ex).getMsgDetail();
+      }else{
+        FSTErrorCode fc = FSTErrorCode.SYS_ERROR_000000;
+        msg = fc.getErrorMsg();
+        code = fc.getErrorCode();
+        detail = fc.getMsgDetail();
+      }
+      try {
+        Map<String, Object> map = new HashMap<String, Object>();
+        map.put("msg", msg);
+        map.put("code", code);
+        map.put("detail", detail);
+        JSONObject json = JSONObject.fromObject(map);
+        response.setContentType("text/html;charset=utf-8");
+        response.getWriter().print(json);
+      }catch (IOException e) {
+        e.printStackTrace();
+      }
+      return null;
+    }else {
+      ModelAndView mv = new ModelAndView();
+      mv.setViewName("error/error");
+      mv.addObject("exception", ex.toString().replaceAll("\n", "<br/>"));
+      return mv;
+    }
+  }    
+}
+```
+

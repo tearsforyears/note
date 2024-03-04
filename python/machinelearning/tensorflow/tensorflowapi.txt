@@ -1,0 +1,246 @@
+﻿tensorflow api
+tf.Session() # 创建会话
+sess.run() # 进行计算返回运行结果
+tf.global_variables_initializer().run() # 初始化所有变量
+
+#基本操作
+	计算api
+	tf.matmul(w1,x)#矩阵乘法
+	tf.constant(1)
+	tf.Variable(init_value,name=)# 变量尽量写名字
+	tf.all_variables() # 得到一个变量列表可迭代
+	tf.placeholder(dtype,shape,name)#等run时用feed_dict={}去填充值
+	tf.placeholder(tf.float32,[4,None])# None可以填充任意长度 用于训练集数目m
+	tf.get_variable(name,shape,initializer=tf.random_normal_initializer())
+	# initializer 不应该传入一个实数 应该传入一个初始化生成器
+# ndarray和tensor的转换
+	tf.convert_to_tensor() # 转化为tensor
+	ndarray=tensor.eval() # 在有session的前提下可以转换 同时记得初始化变量
+	ndarray=sess.run(tensor) # 和上面效果相同
+	feed_dict 里面不能装tensor!
+#杂项tf.fft() tf.reduce_mean() tf.log() ......
+	tf.clip_by_value(data,min,max)
+	tf.nn.sigmoid()
+	tf.nn.relu()
+#感知机相关
+	train=tf.train.AdamOptimizer(learning_rate).minimize(cost_function)
+	tf.nn.softmax() #softmax激活单元 其实可以手写映射到exp(p(xi)),求和对应占比就为softmax
+	learn_rate_decayed
+		decayed_learning_rate = learing_rate * decay_rate^(global_step / decay_steps)
+		lr = tf.train.exponential_decay(0.01,\
+		global_step=global_step, decay_steps=10000, decay_rate=0.95, staircase=False)
+# cnn
+	tf.nn.conv2d()
+	tf.nn.max_pool() 
+	# padding = same 和 vaild的不同
+	vaild 在到边缘的时候发现卷积核不够长直接丢弃
+	same 直接填充0进行最后一次卷积
+# rcnn
+    tf.slice(input,begin,size)
+# rnn
+	# apis:
+		tf.contrib.rnn. ...
+		tf.nn.rnn_cell.BasicRNNCell(hidden_nums)
+		tf.nn.rnn_cell_BasicLSTMCell(hidden_nums)
+	# rnn编程实例:
+		# 单层情况和基本框架
+			input = tf.placeholder(tf.float32,[None, n_steps, n_inputs])
+			cell = tf.contrib.rnn.BasicRNNCell(n_neurons)
+			init_state = cell.zero_state(batch_size, dtype=tf.float32)
+			output, final_state = tf.nn.dynamic_rnn(
+				cell,
+				input, 
+				init_state, # 默认为None 应该是用0填充
+				time_major=True
+			)
+			output.shape = (None,n_step,n_neurons)
+			final_state = (None,n_neurons)
+		# 多层情况
+			1.实现堆叠变成更大的网络
+			layers = [tf.contrib.rnn.BasicRNNCell(num_units=n_neurons,
+			                                      activation=tf.nn.relu)
+			          ] * n_layers # 比列表生成式更快
+			multi_layer_cell = tf.contrib.rnn.MultiRNNCell(layers)
+			2.实现迭代,可以同时进行
+			for i in range(n):
+				input_,state=multi_layer_cell(input,state)
+	# api解析:
+		tf.nn.dynamic_rnn( 
+			cell, 
+			inputs, 
+			sequence_length=None,
+			# 指定了尾部不够全填0 
+			initial_state=None, 
+			dtype=None, 
+			parallel_iterations=None, 
+			swap_memory=False, 
+			time_major=False,
+			scope=None 
+		)
+		如果time_major==True，outputs形状为
+		[max_time, batch_size, cell.output_size ]（要求rnn输入与rnn输出形状保持一致）
+		如果time_major==False（默认），outputs形状为 
+		[ batch_size, max_time, cell.output_size ]
+		# max_time 又可以称之为时间步,cell.output_size也是state的shape
+
+		tf.nn.rnn_cell.BasicRNNCell( 
+			num_units, 
+			activation=None, # 默认用 tanh
+			reuse=None 
+		)
+		tf.nn.rnn_cell.BasicLSTMCell( 
+			num_units, 
+			forget_bias=1.0, # 遗忘门的阈值 
+			state_is_tuple=True, 
+			activation=None, 
+			reuse=None
+		)
+# 基本控制
+	#变量定义
+		tf.get_variable(name,shape,initializer=tf.random_normal_initializer())
+		tf.Variable(init_value,name=)
+	#命名空间
+		tf.name_scope("scope_name") # 对于操作的命名空间
+		tf.variable_scope("scope_name",reuse=True)# 对于变量的命名空间
+		variable_scope 用来实现共享变量
+		name_scope 用来实现图的可视性结构化
+	#图的控制
+		g = tf.Graph()
+		g.as_default()
+		g.device('/gpu:0') # 指定gpu使用
+		tf.get_default_graph() # 得到默认图
+# collection
+	collection 提供了全局存储变量的机制 并不受命名空间的影响
+	tf.Graph.add_to_collection(name, value) # 存入数据
+	tf.add_to_collection(name, value) # 给默认图使用
+	# 同一个name添加时可添加多个值
+	tf.Graph.get_collection(name, scope=None)# 获得数据
+	tf.GraphKeys # 包含图中所有集合
+	tensorflow 自身维护一些集合
+# 持久化模型
+	ckpt模型
+	saver = tf.train.Saver(max_to_keep=1)#保留最后一代的模型
+	saver.save(sess,'ckpt/mnist.ckpt',\
+	global_step=step,\
+	keep_checkpoint_every_n_hours=2) 
+	#step表示训练次数 第二个参数是路径 第三是没多少小时保存一次
+
+	pb模型(用作迁移学习用,一个模型,相当好用)
+	from tensorflow.python.framework import graph_util
+	constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph_def, ['output'])
+	# 最后这个list存变量的名字 只是用于迁移学习的话可以存output
+  	with tf.gfile.FastGFile(pb_file_path, mode='wb') as f:
+    	f.write(constant_graph.SerializeToString())
+# 恢复模型 (涉及计算图的一些操作)
+	ckpt模型
+	tf.get_default_graph().get_tensor_by_name() # 获得加载好的图中的变量
+	saver = tf.train.import_meta_graph(r'ckpt/softmax.ckpt-10000.meta')
+	saver.restore(sess, tf.train.latest_checkpoint('ckpt/'))
+	#加载完了图和计算的变量
+	
+	ckpt实现断点学习,	
+	ckpt = tf.train.get_checkpoint_state(MODEL_SAVE_PATH)
+    if ckpt and ckpt.model_checkpoint_path:
+        saver.restore(sess, ckpt.model_checkpoint_path)
+    else:
+        print("first train of this model")
+
+	pb模型
+	from tensorflow.python.platform import gfile
+	with gfile.FastGFile(pb_file_path, 'rb') as f:
+	    graph_def = tf.GraphDef()
+	    graph_def.ParseFromString(f.read())# graph_def 是一个类json结构 保存图的信息
+	    sess.graph.as_default()
+	    tf.import_graph_def(graph_def, name='')
+	with tf.Session() as sess:
+	    input = sess.graph.get_tensor_by_name("input:0")
+        output = sess.graph.get_tensor_by_name("output:0")
+        sess.run(output, feed_dict={input:x}) # 为输入的数据 这样可以做迁移学习
+# 进阶操作
+	数据增强(Data Augmentation)
+	tf.image.random_flip_left_left_right
+	tf.image.random_contrast
+	tf.image.per_image_whitening
+# 迁移学习:
+	一般利用pb模型进行迁移学习
+	tf.get_default_graph().as_graph_def().node 可以得到所有节点的名字
+# Tensorboard
+	Tensorboard可以记录与展示以下数据形式： 
+		（1）标量Scalars 
+		（2）图片Images 
+		（3）音频Audio 
+		（4）计算图Graph 
+		（5）数据分布Distribution 
+		（6）直方图Histograms 
+		（7）嵌入向量Embeddings
+	启动tensorboard 默认启动在6006端口 可以通过命令行修改端口
+		tensorboard --logdir log/ #
+	个人感觉训练时间长了好多
+	基本操作:
+		tf.summary.scalar(name,variable)
+		tf.summary.image
+		tf.summary.scalar
+		tf.audio
+		tf.FileWriter(PATH,)
+	训练时数据:
+		train_writer = tf.summary.FileWriter(path,sess.graph)
+		summary =  sess.run(tf.summary.merge_all())
+		train_writer.add_summary(summary, i) # 实测感觉很耗费时
+
+	对于需要统计分析的数据:
+		def variable_summaries(var):
+		    with tf.name_scope('summaries'):
+		        mean = tf.reduce_mean(var)
+		        tf.summary.scalar('mean', mean)
+		        with tf.name_scope('stddev'):
+		            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+		        tf.summary.scalar('stddev', stddev)
+		        tf.summary.scalar('max', tf.reduce_max(var))
+		        tf.summary.scalar('min', tf.reduce_min(var))
+		        tf.summary.histogram('histogram', var)
+
+	加载pb模型进tensorboard进行分析
+		graph = tf.get_default_graph()
+	    graph_def = graph.as_graph_def()
+	    graph_def.ParseFromString(tf.gfile.FastGFile(MODEL_PATH, 'rb').read())
+	    tf.import_graph_def(graph_def, name='graph')
+	    writer = tf.summary.FileWriter(SUMMARY_DATA_PATH, graph)
+	    # 其中最后一句话可以加载图文件进入tensorboard 
+	    # SUMMARY_DATA_PATH 生成tensorboard文件的路径
+		# tf.FileWriter()进行IO把图写进文件
+# 多设备部署加速计算
+	基本知识:
+		/cpu:0 /gpu:0 /gpu:n # 默认cpu不做区别
+		# 获取可用的gpu设备
+		def get_available_gpus():
+		    from tensorflow.python.client import device_lib as _device_lib
+		    local_device_protos = _device_lib.list_local_devices()
+		    return [x.name for x in local_device_protos if x.device_type == 'GPU']
+		tf.device('/gpu:0') # 指定gpu运行、
+		with tf.device('/gpu:0'):
+			a=tf.constant([1.0,2.0,3.0])
+			b=tf.constant([1.0,2.0,3.0])
+		with tf.device('/gpu:1'):
+			c=a+b
+		默认都在gpu:0上运行
+	日志输出:
+		tf.Session(config=tf.ConfigProto(log_device_placement=True))
+	同步和异步计算:
+		同步计算指的是同时开始,同时结束(一次梯度下降)把结果进行平均更新参数
+		异步计算是不同时读取,不同时更新参数
+
+		因为深度学习算法主要优化器是SGD,就近似而言异步计算也是一种近似,
+		而同步计算则更接近最优解,两者在工业界都有广泛应用
+
+	关于一些计算的细节:
+		# 单gpu梯度下降的写法
+		opt=tf.train.GradientDescentOptimizer(learning_rate)
+		train_op=opt.minimize(loss_function)
+		# gradient=opt.compte_gradients(loss) 可以计算梯度
+		# opt.apply_gradients(graidents,global_step) 把梯度应用到最小化
+		# 多gpu梯度下降 利用上述api完成
+
+				
+
+
+

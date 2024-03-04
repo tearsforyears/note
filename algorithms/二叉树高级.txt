@@ -1,0 +1,59 @@
+# 高级二叉树
+	BST binary search tree
+		一种简单的二叉树组织方式 中序遍历为树的投影即是排序
+		实现思路就是小的放左边,大的放右边
+	平衡二叉树AVL Tree:平衡的BST,Balance Binary Tree
+		平衡二叉树性质:
+		任意一个结点的key，比它的左孩子key大，比它的右孩子key小 # BST
+		任意结点的孩子结点之间高度差距最大为1 # 平衡
+		class AVLNode {
+			AVLNode left;
+			AVLNode right;
+			int height;
+			int key;
+			ArrayList<Object> values;
+		}
+		# 接口
+		interface AVLTree {
+			AVLNode insert(int key, Object value);
+			AVLNode delete(int key);
+			AVLNode search(int key);
+			ArrayList<AVLNode> allNodes();
+			AVLNode next(AVLNode node); # successor
+			AVLNode prev(AVLNode node); # predecessor
+		}
+		平衡因子(balanced factor):左-右
+			某个结点的平衡因子等于该节点的左孩子的高度减去右孩子的高度
+		根据定义AVL Tree的平衡因子在 -1,0,1是正常的,否则需要平衡
+		对于BST来说每次插入的节点只可能在叶子节点(只能影响某个子树),对其他子树不会有影响
+		所以只要从孩子节点往祖先找,就能找到不平衡的节点,如果找不到则认为插入依然维持平衡
+		重平衡:
+			如果发现了不平衡的节点需要对节点平衡,实现平衡的方法是
+			对该节点的子树进行旋转(rotation)
+			重平衡的意义:加速查找,使得BST查找速度变快
+		
+		BST的平衡:AVL Tree
+			BST的平衡会遇到4种情况:左左、左右、右右、右左
+			这四种情况都是在距离插入节点最近的不平衡节点上进行旋转的操作的
+			左左:BST.add([10,8,7])->右旋 # 不平衡节点10
+			左右:BST.add([10,8,9])->先左旋在右旋 # 先对8进行左旋,在对10进行右旋
+			右左:BST.add([10,12,11])->先右旋在左旋
+			右右:BST.add([1,2,3])->左旋
+			# 左旋和右旋的本质:
+				本质上都是把根节点旋转到左(右)边,从而使树达到平衡
+				如果根或者旋转节点位置已经有节点,按照BST规则对相应子树进行"嫁接"
+			# 注意四种情况的判断要有先后
+		平衡因子的更新:
+			BF = 左子树高度 - 右子树高度 
+			插入元素时,元素往下走,左走当前节点BF+=1,右走当前节点BF-=1
+
+
+# 其他重要的二叉树数据结构
+	数据结构核心: 映射(hash,线性,),内存分配,
+	1.堆heap 优先队列的核心机制解决top-n问题
+	2.huffman tree 最优编码树
+	# 需要去进阶的数据结构
+		1.hashmap实现
+		2.树状数组/线段树
+		3.Treap树堆
+		4.skiplist

@@ -1,0 +1,43 @@
+conda install mingw4
+//安装gcc编译环境
+
+gcc -DMS_WIN64 -c fact.c fact_wrap.c -IC:\Miniconda\include
+gcc -DMS_WIN64 -shared fact.o fact_wrap.o -LC:\Miniconda\libs -lpython27 -o example.pyd
+
+//这两个命令第一个是编译 第二个是指定相对版本 然后文件名
+
+cython 将源代码转换成扩展模块
+优点：避免了gcc手动编译
+
+编译过程
+.pyx->.c->.so(.pyd)
+//前一个是cython 后一个是gcc
+//换句话说我们这时候写的不是c程序
+而是写了一个后缀名为pyx的cython程序
+按照python语法写cython没问题
+定义变量类型cdef int a,b,c;
+
+python path:su.py build_ext --inplace
+//运行python文件 让其编译cython文件 生成c
+
+import语句可以像java一样相互调用类方法
+以及能被称之为模块的文件比如pyd py pyo pyc so dll
+但是在其文件的路径下一定要有一个__init__.py
+这个所在的文件夹才会被认为是可以用import去引用的类
+
+from libc.math cimport sin
+from libc.stdlib cimport malloc, free
+调用c的库
+
+在setup中用language='c++'可以指定c++编译
+
+
+
+//python编译程序的内容
+from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
+
+ext = Extension("hello", sources=["D:/pythonWorkspace/python/cython/hello.pyx"])
+
+setup(ext_modules=[ext], cmdclass={'build_ext': build_ext})

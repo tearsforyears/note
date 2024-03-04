@@ -1,0 +1,634 @@
+## MyBatis
+
+---
+
+an orm framework for mysql use java api and xml
+
+Mybatis  的前身是ibatis 由apache基金会维护 由Google进行二次开发
+
+同一般ORM框架一样 需要建立起Object和Table的映射
+
+mybatis的优势是根据sql可以灵活请求,只要sql优化到位速度比纯orm要快
+
+劣势是基本要根据结果集去设计Pojo而不是表对应类的这种关系
+
+当然表对应类的关系也可以用来维系 总的来说mybatis适合针对结果集进行设计
+
+[TOC]
+
+### code-review
+
+-   mybatis-config.xml <mapper>
+    -   namespace : interface class path
+-   mapper.xml <insert> <delete> <update>
+    -   Sql:#{field_name} 用于表示类中的属性 用于充当查询条件
+    -   id :interfaceName
+    -   parameterType: 接口参数类型 Pojo.Class integer string
+-   mapper.xml <select>
+    -   @Param 标注到参数上对应类名
+    -   <result> 
+        -   property 注入类的字段名
+        -   column 查询出来结果集的列名 可以用 sql as 改变列明
+    -   <resultSet>
+        -   id 对应select的名字
+        -   type Pojo.class 结果注入类的路径
+-   维护表的关系<collection> <association>
+    -   property field_name
+    -   javaType pojo.class
+-   分页插件PageHelper
+-   一级缓存和二级缓存<cache>
+    -   eviction :LRU FIFO 置换算法
+    -   flushInterval:刷新时间
+    -   readOnly:只读与否
+    -   size:缓存大小
+-   整合spring和mybatis
+-   底层与工作原理(not implements)
+
+### 工作流程
+
+全局配置文件 mybatis-config.xml 创建 -> SqlSessionFactory -> SqlSession
+
+class Pojo implements PojoMapper 的配置文件 PojoMapper.xml
+
+PojoMapper -> SqlSession
+
+ mybatis-config.xml 管理 PojoMapper.xml
+
+### jdbc.properties 相关
+
+在xml文件中可以引用
+
+在mybatis-config.xml中可以用
+
+<properties resource="jdbc.properties"></properties>
+
+引用外部资源文件
+
+```java
+// java api
+ResourceBundle bundle=ResourceBundle.getBundle("jdbc");
+// getObject("properties配置文件的key值");
+user=bundle.getString("jdbc.user");
+password=bundle.getString("jdbc.password");
+className=bundle.getString("jdbc.className");
+url=bundle.getString("jdbc.url");
+
+// jdbc.properties
+/**
+  jdbc.driver = com.mysql.jdbc.Driver
+  jdbc.url = jdbc:mysql://localhost:3306/test?useUnicode=true&characterEncoding=utf8
+  jdbc.username=root  //可换成你自己的mysql用户名和密码
+  jdbc.password=123456
+**/
+```
+
+### maven 配置
+
+```xml
+<dependency>
+    <groupId>org.mybatis</groupId>
+    <artifactId>mybatis</artifactId>
+    <version>3.3.0</version>
+</dependency>
+<dependency>
+	<groupId>mysql</groupId>
+	<artifactId>mysql-connector-java</artifactId>
+	<version>5.1.37</version>
+</dependency>
+```
+
+### mybatis-config.xml
+
+```xml
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <environments default="test"><!--表示使用默认环境 下面id表示唯一环境-->
+        <environment id="test">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED"> <!--数据库连接池-->
+                <property name="driver" value="com.mysql.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://localhost/mybatisDemo?characterEncoding=UTF8"/>
+                <property name="username" value="root"/>
+                <property name="password" value="root"/>
+            </dataSource>
+        </environment>
+    </environments>
+</configuration>
+```
+
+### 基本语法
+
+```xml
+<environments>
+管理环境
+	<enviroment>
+  	事务管理器和数据源管理器
+		<transactionManager type="JDBC"/>
+    事务管理 type = JDBC,MANAGED
+    JDBC 指由开发人员手动管理commit rollback 可在.openSession()时传入true设置自动提交
+    MANAGED 指由容器去管理 整合SSM时需要制定MANAGED
+```
+
+### 数据源管理
+
+```xml
+    <dataSource type="POOLED">
+    数据源管理 type = UNPOOLED,POOLED,JNDI
+    UNPOOLED 不使用数据库连接池
+    POOLED 使用数据库连接池
+    JNDI 由上下文管理 在spring中进行管理维护  
+      <property name="driver" value="com.mysql.jdbc.Driver" />
+			<property name="url" value="jdbc:mysql://localhost/mybatisDemo?characterEncoding=UTF8" />
+      <property name="username" value="root" />
+      <property name="password" value="root" />
+      指定基本连接参数,多数据源后续
+    </dataSource>
+```
+### 起别名
+```xml
+    <typeAliases>
+      typeAliases 用于给类起别名
+    	<package name='com.dao'/> 
+      <!--指定给这个包下所有类起别名 默认别名是pojo 普通类的全小写-->
+      <typeAlias type='com.dao.Pojo' alias='POJO'/> 
+      <!--com.dao.pojo 的别名是 POJO -->
+    </typeAliases>
+```
+
+### 设置\<settings\>
+
+```xml
+<settings>
+	<!--全局地开启或关闭配置文件中的所有映射器已经配置的任何缓存-->
+	<setting name="cacheEnabled" value="true"/>
+	<!--延迟加载的全局开关。当开启时，所有关联对象都会延迟加载。特定关联关系中可通过设置fetchType属性来覆盖该项的开关状态-->
+	<setting name="lazyLoadingEnabled" value="true"/>
+	<!--是否允许单一语句返回多结果集（需要兼容驱动）-->
+	<setting name="multipleResultSetsEnabled" value="true"/>
+	<!--使用列标签代替列名，不同的驱动在这方面会有不同的表现-->
+	<setting name="useColumnLabel" value="true"/>
+	<!--允许 JDBC 支持自动生成主键，需要驱动兼容-->
+	<setting name="useGeneratedKeys" value="false"/>
+	<!--指定 MyBatis 应如何自动映射列到字段或属性-->
+	<setting name="autoMappingBehavior" value="PARTIAL"/>
+	<!--指定发现自动映射目标未知列（或者未知属性类型）的行为-->
+	<setting name="autoMappingUnknownColumnBehavior" value="WARNING"/>
+	<!--配置默认的执行器-->
+	<setting name="defaultExecutorType" value="SIMPLE"/>
+	<!--设置超时时间，它决定驱动等待数据库响应的秒数-->
+	<setting name="defaultStatementTimeout" value="25"/>
+	<!--为驱动的结果集获取数量（fetchSize）设置一个提示值。此参数只可以在查询设置中被覆盖-->
+  <setting name="defaultFetchSize" value="100"/>
+	<!--允许在嵌套语句中使用分页，如果允许使用则设置为false-->
+	<setting name="safeRowBoundsEnabled" value="false"/>
+	<!--是否开启自动驼峰命名规则映射，即从经典数据库列名A_COLUMN到经典Java属性名aColumn的类似映射-->
+	<setting name="mapUnderscoreToCamelCase" value="false"/>
+	<!--利用本地缓存机制防止循环引用和加速重复嵌套查询-->
+	<setting name="localCacheScope" value="SESSION"/>
+	<!--当没有为参数提供特定的JDBC类型时，为空值指定哪种JDBC类型-->
+	<setting name="jdbcTypeForNull" value="OTHER"/>
+	<!--指定哪个对象的方法触发一次延迟加载，用逗号分隔的方法列表-->
+	<setting name="lazyLoadTriggerMethods" value="equals,clone,hashCode,toString"/>
+</settings>
+```
+
+### 配置Mapper.xml的信息到mybatis-config.xml
+
+```xml
+    <mappers>
+      管理映射文件配置 (指定配置文件路径或者指定包的路径)
+    	<mapper resource='com/dao/pojo/PojoMapper.xml'/>
+      <package name='com.dao'/> <!--指定包下所有的配置文件都会被加载-->
+      <!--这个路径可以通过.这种方法来 这个是资源路径并不是java代码路径-->
+    </mappers>
+```
+
+### 配置Mapper.xml
+
+一般以PojoMapper.xml的方式命名
+
+sql语句封装的方法由配置方法 动态创建绑定方法
+
+但需要注意的是定义接口方法名要与id一致
+
+-   demo
+
+    1.配置好mybatis-config.xml
+
+    2.配置UserMapper.xml
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="org.mapper.UserMapper">
+    	<cache></cache>
+      <insert id="insertUser" parameterType="User"> <!--顺着继承链找到-->
+        insert into Users(name,age) values(#{name},#{age})
+      </insert>
+    </mapper>
+    ```
+
+    3.配置Mapper接口(UserMapper.java)
+
+    ```java
+    public interface UserImpl{
+      public int insertUser(User usr);
+    }
+    ```
+
+    4.配置Pojo
+
+    ```java
+    @ToString
+    @Data // 自动生辰get/set/toString方法
+    class User implements UserImpl{
+      int age;
+      String name;
+    }
+    ```
+
+    
+
+-   Mapper详细配置信息
+
+  ```xml
+  <!--UserMapper.xml基本结构-->
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  <mapper namespace="org.mapper.UserMapper">
+      <!--这个写的是接口并不是类 因为要注入方法-->
+    <!-- 
+    parameterType 用于标识接口方法参数类型 实际上可以不写 sql用SpEL表达式引用属性
+    类似 public void insertUser(User usr);
+    -->
+    <insert id='insertUser' parameterType='User'>
+      insert into Users(name,age) values(#{name},#{age})
+    </insert>
+    <update></update>
+    <delete></delete>
+    <!--上面的方法返回值都是int Long之类类型的 而select语句则需要设置返回值了-->
+    <select></select>
+  </mapper>
+  
+  <!-----------------------不同参数的插入---------------------->
+  <insert id="insertByName" parameterType="string">
+  	insert into springdemo(name) values(#{name})
+  </insert>
+  <insert id="insertByMap" parameterType="Map">
+  	insert into springdemo values(#{id},#{name})
+  </insert>
+  <!--
+  	insertByMap对应的Map由下面代码生成的数据结构
+  	Map<String,Integer> map = new HashMap();
+  	map.put("id",1);
+  	map.put("name","spring");
+  	多个参数的情况可以用 #{0},#{1} 去代替位置上的引用
+  	list/array的迭代
+    <foreach item="item" index="index" separator="," collection="arrayName" open="(" close=")">
+    	#{item}
+    </foreach>
+  	拼接成的sql
+  	(item1,item2,item3...);
+  -->
+  ```
+
+### java api
+
+```java
+public class MyBatisTest{
+  private SqlSessionFactory ssf; // 全局变量
+  
+  // Junit test
+  @Before
+  public void init(){
+  	InputStream ins = MyBatisTest.class.getResourceAsStream("/mybatis-config.xml");
+    SqlSessionFactoryBuilder ssfb = new SqlSessionFactoryBuilder();
+    ssf = ssfb.build(ins);
+  }
+  @Test
+  public void test(){
+    SqlSession ss = ssf.openSession();
+    UserMapper userMapper = ss.getMapper(UserMapper.class);
+    List<User> userList = userMapper.selectAll();
+    // ss.commit()
+    ss.close();
+  }
+}
+
+```
+
+### Factory 构建对象流程
+
+```java
+// get config or others
+InputStream ins = clz.getResourceAsInputStream("/xxx.xml");
+SqlSessionFactoryBuilder ssfb = new SqlSessionFactoryBuilder();
+SqlSessionFactory ssf = ssfb.build(ins); // build with config
+SqlSession ss = ssf.openSession();
+
+// data operate
+UserMapper userMapper = ss.getMapper(UserMapper.class);
+userMapper.selectAll(); // invoke selectAll or other method
+```
+
+### mapper.xml  <select>
+
+-   selectById
+
+  ```xml
+  <select id="selectById" resultType="org,pojo.DemoPojo">
+    select  * from springdemo where id=#{id}
+  </select>
+  ```
+
+-   selectAll
+
+  ```xml
+  <resultMap id="allPojo" type="org.pojo.DemoPojo"> 
+    <!--autoMapping="true" 当字段名和列名一样时可以自动匹配-->
+          <result column="id" property="version"/>
+          <result column="name" property="name"/>
+  </resultMap>
+  <select id="selectAll" resultMap="allPojo"> <!--resultType 属性-->
+    select * from springdemo
+  </select>
+  ```
+-    Java
+
+  ```java
+  - pojo.java
+  public class DemoPojo implements Serializable { // 实现序列化接口
+      String name;
+      Integer version;
+      public DemoPojo(String name, Integer version) {
+          this.name = name;
+          this.version = version;
+      }
+      public DemoPojo(){} // 空参数构造函数必要 否则报错
+      // getter setter
+  }
+  - mapper.java
+  public interface PojoMapper{
+    public List<DemoPojo> selectAll(); // return type
+  }
+  ```
+
+### 维护表之间的关系
+
+表之间的关系有三种 一对多,一对一,多对多 可以被表述为以下两种
+
+-   has-a  <association>
+-   has-many <collection>
+
+设有Pojo类Answer和Question 属性如下
+
+Question=>{id,title,content,answers}
+
+Answer=>{id,content,question}
+
+AnswerMapper.xml
+
+```xml
+<resultMap id="resmap" type="org.pojo.Answer">
+  <result property="id" column="aid"/>
+  <result property="content" column="content"/>
+  <association property="question" javaType="org.pojo.Question">
+    <result property="id" column="qid"/>
+    <result property="content" column="description"/>
+    <result property="title" column="title"/>
+  </association>
+  </resultMap>
+  <select id="selectById" resultMap="resmap" parameterType="integer">
+    select a.id aid,q.id qid,a.content content,q.content description,title
+    from Question q left join Answer a on a.question_id = q.id where a.id=#{id}
+  </select>
+```
+
+QuestionMapper.xml
+
+```xml
+<resultMap id="resmap" type="org.pojo.Question">
+  <result property="id" column="qid"/>
+  <result property="content" column="description"/>
+  <result property="title" column="title"/>\
+  <collection property="answers" ofType="org.pojo.Answer">
+    <result property="id" column="aid"/>
+    <result property="content" column="content"/>
+  </collection>
+</resultMap>
+
+<select id="selectById" parameterType="integer" resultMap="resmap">
+  select q.id qid,a.id aid,a.content content,q.content description,q.title title
+  from Question q left join Answer a on q.id=a.question_id where q.id=#{id}
+</select>
+```
+
+其实我们只是针对数据集进行sql的规划 
+
+然后has-may用collection标签 has-a用associate标签就可
+
+### 可重用sql和动态sql
+
+```xml
+<sql id="all">
+    select * from
+</sql>
+<select id="selectAll" resultType="User">
+    <include refid="all"></include> from Users
+</select>
+
+<select id="select" resultType="User">
+    select id,name,age
+    from Users
+    <where>
+        <if test="id!=null"> id=#{id} </if>
+        <if test="name!=null"> and name=#{name} </if>
+        <if test="age!=null"> and age=#{age} </if>
+    </where>
+</select>
+```
+
+### PageHelper(应该是用了limit 实现)
+
+maven依赖
+
+```xml
+<dependency>
+    <groupId>com.github.pagehelper</groupId>
+    <artifactId>pagehelper</artifactId>
+    <version>4.1.6</version>
+</dependency>
+```
+
+```xml
+<plugins>
+	<plugin interceptor="com.github.pagehelper.PageHelper"></plugin>
+</plugins>
+```
+
+```java
+PageHelper.startPage(2, 10); // 从第10条数据开始到第20条数据
+PageHelper.orderBy("id desc");
+List<User> userList = userMapper.selectList("selectAll");
+```
+
+实现原理
+
+```sql
+select * from tableDemo 
+limit begin_page + records_per_page * (end_page-begin_page)
+order by column desc
+
+# from begin_page=0 records_per_page=10  to end_page=5 for example
+# it use begin_page + records_per_page * (end_page-begin_page)
+```
+
+### mybatis缓存
+
+mybatis有两种缓存机制称一级缓存和二级缓存,一级缓存默认开启
+
+一级缓存在同一个sqlSession里面Mapper的方法一次只会执行一次SQL,但sqlSession中执行了写操作就会清空缓存类似volitate的机制,其本质上是通过关闭sqlSession来实现的,其内部代码是用了一个代理类代理了sqlSession,在sqlSession非事务就用commit提交并且提交之后关闭连接.只有写操作才会触发清空缓存的操作.
+
+一样的查询(SQL和传入Preparestatement的参数相同)则会利用一级缓存,一级缓存通过Client-CachingExcutor-Excutor-DB的形式作为主要机制,Excutor是用于保存一级缓存的也叫Local Cache,其cache对象保存在sqlSession的对象里面,
+
+二级缓存需要开启<cache>
+
+二级缓存解决的问题是跨会话共享缓存共享问题(尤其是在分布式系统中),其生命周期比起一级缓存要更长.如果配置了二级缓存就先从二级缓存中先读取.即这个二级缓存和L2L1缓存的顺序恰好反过来.其结构如下,二级缓存处于更外面的区域.
+
+![](https://img2018.cnblogs.com/blog/1383365/201906/1383365-20190628180149776-546074458.png)
+
+默认使用LRU算法作为替换机制,CachingExcutor-Configuration(存放二级缓存),需要Pojo实现可序列化接口Serilizable(可能存在网络传输到第三方缓存),二级缓存存在的意义就是为了让大量的查询操作可以存在的一个缓存结构.
+
+```xml
+<cache eviction="LRU" flushInterval="100000" readOnly="true" size="1024"/>
+<!--
+  eviction = (LRU,FIFO,SOFT,WEAK) 
+  SOFT是基于gc状态和软引用规则实现的 WEAK 更强的gc和弱引用规则实现
+  flushInterval 内存刷新时间 单位ms 这里100s刷新内存
+  size 存储对象最大数
+  readOnly 只读属性 默认为false 只读控制
+-->
+<select useCache="false" flushCache="true"></select>
+<!--规定单独不能使用缓存 而且使用之后要立即刷新二级缓存-->
+
+<!--type可以指定为第三方缓存或者是我们自己实现缓存-->
+<cache type="org.apache.ibatis.cache.impl.PerpetualCache"
+    size="1024"
+eviction="LRU"
+flushInterval="120000"
+readOnly="false"/>
+```
+
+利用二级缓存解决跨域问题
+
+引用别的命名空间的cache即操作的是同一份cache
+
+```xml
+<!--要让多个namespace共享一个二级缓存可以用下面的标签-->
+<cache-ref namespace="com.test.dao.DepartmentMapper" />
+```
+
+
+
+
+
+二级缓存特性
+
+-   所有读(select)的语句全部被缓存
+-   在写语句的时候刷新缓存
+-   缓存被存储成列表集合
+-   二级缓存有可能不存到对象而存到memcache等第三方缓存系统中
+
+```xml
+<setting name="cacheEnabled" value="true" /> 
+<!--还要在mybatis-config.xml中开启缓存-->
+```
+
+
+
+
+
+### 整合spring和mybatis
+
+主要就是把
+
+数据库连接池、事务交给spring管理 mybatis 没有environment和配置数据库连接池的标签
+
+并且把SqlSessionFactory、mapper接口配置成bean
+
+#### pom.xml
+
+```xml
+<!-- mybatis和spring整合 -->
+<dependency>
+  <groupId>org.mybatis</groupId>
+  <artifactId>mybatis-spring</artifactId>
+  <version>1.2.3</version>
+</dependency>
+```
+
+#### beans.xml/ApplicationContext.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xmlns:mvc="http://www.springframework.org/schema/mvc"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop" 
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+                        http://www.springframework.org/schema/beans/spring-beans.xsd  
+                        http://www.springframework.org/schema/mvc 
+                        http://www.springframework.org/schema/mvc/spring-mvc.xsd 
+                        http://www.springframework.org/schema/context 
+                        http://www.springframework.org/schema/context/spring-context.xsd 
+                        http://www.springframework.org/schema/aop 
+                        http://www.springframework.org/schema/aop/spring-aop.xsd 
+                        http://www.springframework.org/schema/tx 
+                        http://www.springframework.org/schema/tx/spring-tx.xsd">
+    
+    <!-- 数据库连接池 -->
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="com.mysql.jdbc.Driver"/>  
+        <property name="jdbcUrl" value="jdbc:mysql://localhost:3306/mybatisDemo?characterEncoding=UTF8"/>  
+        <property name="user" value="root"/>
+        <property name="password" value="root"/>
+    </bean>
+    
+    <!-- mybatis 的 sqlSessionFactory -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"/> <!--封装连接池-->
+		<property name="configLocation" value="classpath:mybatis-config.xml"></property>
+	</bean>
+	
+	<!-- mybatis mapper接口自动扫描、自动代理 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+	   <property name="basePackage" value="com.mapper" />
+	</bean>
+	
+    <!-- 事务管理器 -->
+    <bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource" />
+    </bean>
+
+    <!-- 事务传播行为 -->
+    <tx:advice id="txAdvice" transaction-manager="txManager">
+        <tx:attributes>
+            <tx:method name="select*" propagation="SUPPORTS" read-only="true"/>
+            <tx:method name="page*" propagation="SUPPORTS" read-only="true"/>
+            <tx:method name="is*" propagation="SUPPORTS" read-only="true"/>
+            <tx:method name="*" propagation="REQUIRED" read-only="false"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- 织入事务增强功能 -->
+    <aop:config>
+        <aop:pointcut id="txPointcut" expression="execution(* com.service..*.*(..))" />
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut" />
+    </aop:config>
+
+    <context:component-scan base-package="com.service"></context:component-scan></context:component-scan>
+</beans>
+```
+

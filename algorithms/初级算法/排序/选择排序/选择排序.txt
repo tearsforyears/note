@@ -1,0 +1,18 @@
+#coding=utf-8
+def swap(lis,index1,index2):
+    if index2==index1:
+        return
+    lis[index1] = lis[index1] ^ lis[index2]
+    lis[index2] = lis[index2] ^ lis[index1]
+    lis[index1] = lis[index1] ^ lis[index2]
+
+def f(lis,cur): #Ñ¡ÔñÅÅÐòµÄµÝ¹éÐ´·¨
+    if cur==len(lis):
+        print lis
+        return
+    for i in range(cur+1,len(lis)):
+        if lis[cur]>lis[i]:
+            swap(lis,cur,i)
+    f(lis,cur+1)
+
+f([1,3,66,6,8,9,52],0)

@@ -1,0 +1,30 @@
+#coding=utf-8
+def swap(lis,index1,index2):
+    if index2==index1:
+        return
+    lis[index1] = lis[index1] ^ lis[index2]
+    lis[index2] = lis[index2] ^ lis[index1]
+    lis[index1] = lis[index1] ^ lis[index2]
+
+def f(lis,begin,end): #选择排序的递归写法
+    i=begin
+    j=end
+    if i-j==1 or j-i==1:
+        #这个>号很精髓主要是因为如果前一次递归是相同数值的两个值在第二十四行调用的时候会因为其中一个i-1从而会产生不寻常的数值
+        #同理25行也可能会产生那种数值(这个算法不会产生但是由于指针在这里是偏左的)，所以这种出口更加常用
+	#后面修改了代码
+        return lis
+    key=lis[i] #选取第一个值作为标准
+    while i<j:
+        while i<j and lis[i]<key:#此处ij为了防止在加的时候越界了
+            i+=1
+        while i<j and lis[j]>key:
+            j-=1
+        if i!=j:
+            swap(lis,i,j)
+        else:
+            lis[i]=key   #此处ij已经相等 写i和写j一样
+    f(lis,begin,i-1)
+    f(lis,i+1,end)
+    return lis
+print f([44,8,5,6,22,36,1,2,0,252],0,9)

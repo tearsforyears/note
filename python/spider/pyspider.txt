@@ -1,0 +1,139 @@
+﻿cmd:pyspider all
+官方文档:http://docs.pyspider.org/en/latest/
+
+api基本框架
+def on_start(self)#程序入口用cwarl的callback调index_page
+def index_page(self,response)#获取url 通过callback调用detail_page或者index_page
+def detail_page(self,response)#return dict 这个dict作为 on_result 的result参数可以往下传
+def on_result(self,result)#处理数据进一步处理
+EXAMPLE
+from pyspider.libs.base_handler import *
+class Handler(BaseHandler):
+    crawl_config = {
+    }
+
+    @every(minutes=24 * 60)#通知调度器每天运行一次
+    def on_start(self):
+        self.crawl('http://scrapy.org/', callback=self.index_page)
+
+    @config(age=10 * 24 * 60 * 60)#设置任务的有效期限，在这个期限内目标爬取的网页被认为不会进行修改
+    def index_page(self, response):
+        for each in response.doc('a[href^="http"]').items():
+            self.crawl(each.attr.href, callback=self.detail_page)
+
+    @config(priority=2)#设定任务优先级
+    def detail_page(self, response):
+        return {
+            "url": response.url,
+            "title": response.doc('title').text(),
+        }
+on_start(self)#程序的入口
+self.crawl(url,callback)#创建爬取任务
+index_page(self,response)#用于被crawl函数回调,后边接resp作为参数
+detail_page(self,response)#用于被crawl函数回调,后边接resp作为参数
+#detail_return返回一个 dict 对象作为结果，结果会自动保存到默认的 resultdb 中
+
+response.doc('css')#这其实是一个pyquery对象
+response.url
+response.attr.href#response.attrs['href']应该也行
+
+API
+
+1.self.crawl相关
+exetime:设置爬取时间延后
+retries:default=3
+self.crawl(url,callback=,exetime=time.time()+30*60)#30min之后爬
+
+ITAG:增量爬取,如果某个元素不变,该链接不会被重新爬取
+def index_page(self, response):
+    for item in response.doc('.item').items():
+        self.crawl(item.find('a').attr.url, callback=self.detail_page,
+                   itag=item.find('.update-time').text())
+In the sample, .update-time is used as itag. If it's not changed, the request would be discarded.
+
+AUTO_RECRAWL:bool, AGE:每隔age时间重新爬取
+self.crawl(url,callback=,age=5*60*60,auto_recrawl=True)
+
+METHOD:post get等
+PARAMS,DATA:dict
+self.crawl(url,callback=,params={'a': 123, 'b': 'c'})
+self.crawl(url,callback=,method='POST', data={'a': 123, 'b': 'c'})
+
+FILES
+dictionary of {field: {filename: 'content'}} files to multipart upload.
+
+USER_AGENT
+HEADERS
+COOKIES
+CONNECT_TIMEOUT
+TIMEOUT
+(*)ALLOW_REDIRECTS:bool 允许重定向
+(*)validate_cert:验证证书
+PROXY:username:password@hostname:port
+    crawl_config = {
+        'proxy': 'localhost:8080'
+    }
+
+FETCH_TYPE:default:None enable:js#设置phantomjs 或者默认
+JS_SCRIPT:#执行js代码
+JS_RUN_AT:#执行js代码的时间 document-start document-end
+self.crawl(url,callback=,fetch_type='js',js_run_at='document-end',
+        js_script='''
+               function() {
+                   window.scrollTo(0,document.body.scrollHeight);
+                   return 123;
+               }
+               ''')
+
+SAVE:#保存全局变量 save=dict{} response.save['a']#保存和调用
+def on_start(self):
+    self.crawl('http://www.example.org/', callback=self.callback,
+               save={'a': 123})
+def callback(self, response):
+    return response.save['a']
+123 would be returned in callback
+
+TASKID
+taskid 可以通过以下方法重写
+import json
+from pyspider.libs.utils import md5string
+def get_taskid(self, task):
+    return md5string(task['url']+json.dumps(task['fetch'].get('data', '')))
+Only url is md5 -ed as taskid by default, the code above add data of POST request as part of taskid.
+
+全局配置
+crawl_config = {
+    'headers': {
+        'User-Agent': 'GoogleBot',
+    }
+}
+
+2.Response
+.url
+.text
+.content
+.status_code
+.headers
+.cookies
+.error#当遇到异常时捕获异常信息
+#以上为requests库
+
+.doc#pyquery对象
+.save['a']#获得a的值 上面已经有例子了
+.orig_url#原始url 302重定向之前
+.etree#lxml对象
+
+.json
+#The JSON-encoded content of the response, if any.
+.time
+#Time used during fetching.
+
+Data flow
+The data flow in pyspider is just as your seen in diagram above:
+
+Each script has a callback named **on_start**, when you press the Run button on WebUI. A new task of on_start is submitted to Scheduler as the entries of project.
+Scheduler dispatches this on_start task with a Data URI as a normal task to Fetcher.
+Fetcher makes a request and a response to it (for Data URI, it's a fake request and response, but has no difference with other normal tasks), then feeds to Processor.
+Processor calls the on_start method and generated some new URL to crawl. Processor send a message to Scheduler that this task is finished and new tasks via message queue to Scheduler (here is no results for on_start in most case. If has results, Processor send them to result_queue).
+Scheduler receives the new tasks, looking up in the database, determine whether the task is new or requires re-crawl, if so, put them into task queue. Dispatch tasks in order.
+The process repeats (from step 3) and wouldn't stop till WWW is dead ;-). Scheduler will check periodic tasks to crawl latest data.

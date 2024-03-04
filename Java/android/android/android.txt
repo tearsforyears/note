@@ -1,0 +1,1276 @@
+android和javaweb一样是极其具有商业价值的javaEE技术
+0.前期准备
+	临时参考
+		https://blog.csdn.net/billy_chen_2013/article/details/81231083
+		https://www.cnblogs.com/whoislcj/p/5708778.html
+		https://www.jianshu.com/p/c4cfe38a91ed
+
+	大部分无法加载项目的问题无非就是SDK,Gradle和网络问题下面
+	javaSE-JDK1.8
+	SDK mirrors.neusoft.edu.cn:80
+	ADB或者真机Usb Service
+	maven{ url 'http://maven.aliyun.com/nexus/content/groups/public/'}
+	
+	//开启java1.8要不智障了
+	compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+	Android.util.Log//用该类代替sysout
+		Log.d(class_name,msg) //debug
+		verbose debug importance warning error
+		//对应的首字符都可以用来打印
+1.android项目简介
+	//按照android项目的的虚拟路径来
+	app_name
+		-manifests
+			AndroidManifest.xml//4大组件需要在此进行注册
+		-java
+			-com.....//包
+			-com.....//androidTest
+			-com.....//android
+		-res
+			-drawable
+			-layout
+				-layout.xml
+			-mipmap
+			-values
+				-colors.xml
+				-strings.xml
+				-styles.xml
+	//android内4大组件
+		Activity
+		Service
+		Broadcast Receiver
+		Content Provider
+	//android内数据库
+		轻量级的SQLite
+		速度极快,文件形式,django也采用了相同的架构
+	//一些其他的文件目录结构
+		-libs //第三方jar包 自动添加到构建路径
+	1、android应用安装涉及到如下几个目录
+		system/app 这系统自带的应用程序，无法删除
+		data/app 用户程序安装的目录，有删除权限。
+		data/data 存放应用程序的数据
+		Data/dalvik-cache 将apk中的dex文件安装到dalvik-cache目录下
+	2.卸载过程就是把安装过程的东西全部删除
+		除非是保存到sd卡上的
+2.Manifest.xml
+	<activity 
+		android:name=".MainActivity"//android:name 用来指定具体哪一个活动类
+		android:label="test title"//活动中title的名字也会变成启动器的名字
+	>
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
+    <!--注册活动,使得活动成为主活动-->
+    <activity android:theme="@style/Theme.AppCompat.dialog"></activity> //可以指定活动的属性
+    <!--这样指定的话就默认出来dialog而不是layout,我们可以用来重构旧方法ProgressDialog-->
+3.layout
+	布局文件:android框架通过封装成R类里面的内部类进行资源访问
+	用xml格式进行布局属性的控制,对应java的方法
+	xml内引用资源的语法
+		@string/bt_calc //bt_calc队形 strings.xml的标签的name属性
+		@id/id_name //引用id
+		@+id/id_name //定义id
+	几个常用的值
+		match_parent
+		wrap_content //包裹内容
+		fill_parent //和match_parent意义相同
+		//可以用|去写多个值
+	layout_... //带layout是相对于父对象的布局
+	使用布局管理器的时候理解好这种嵌套的递归关系
+	可以直接让某些操作变得非常简单
+	引入其他布局<include layout="@layout/title"/> title.xml
+	0.基本组件
+		TextView 
+			text textSize textColor
+		Button 
+			textAllCaps="false" 默认选用大写,禁用转换
+		EditText 
+			hint="prompt"默认出现文字 maxLines=""最大行数但不删减内容
+		ImageView
+			src="@drawable/_1" //资源名字不能以大写字母和数字开头,不用写后缀
+			// setImageResource(R.drawable.pic_name) 可以动态改变image信息
+		CheckBox
+			android:checked="true"
+			android:text="checkedBoxName"
+			@Override
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked)
+
+		RadioButton/RadioGroup
+			<RadioGroup>
+	            <RadioButton/>
+	            <RadioButton/>
+          	</RadioGroup>
+          	RadioGroup同样只能注册onCheckedChanged而不是onClick
+          	onCheckedChanged(RadioGroup rg,int checkId)
+        ScrollView
+        	<ScrollView>
+        		<LinearLayout>
+        		<LinearLayout/>
+        	</ScrollView>
+        	//要注意的一点 和下面的RecycleView一样
+        	//如果出现下面这样想让标题栏置底的情况
+        	//只要给scrollview或者recycleView制定下layout_weight属性即可
+        	<com.example.hasse.test.Bottonayout
+	            android:layout_width="match_parent"
+	            android:layout_height="wrap_content"
+	            android:layout_gravity="bottom"
+    		/>
+		ProgressBar //圆形转圈圈
+			android:visibility="visible" //visible默认 invisible组件透明 gone组件消失
+			//setVisibility(View.GONE); 设置组件消失
+		AlertDialog //dialog意味着在所有元素之上
+			//下面是dialog的使用方法
+			AlertDialog.Builder dialog = new AlertDialog.Builder(MainActivity.this);
+			dialog.setTitle("Title");
+			dialog.setMessage("msg");
+			dialog.setCancelable(false);
+			dialog.setPositiveButton("OK",(DialogInterface dialog,int which)->{});
+			dialog.setNegativeButton("Cancel",(DialogInterface dialog,int which)->{});
+			dialog.show();
+		ProgressDialog //类似于上面 已经被废弃 用ProgressBar去模拟代替
+			ProgressDialog dialog = new ProgressDialog(MainActivity.this);
+			dialog.setTitle("Title");
+			dialog.setMessage("Loading");
+			dialog.setCancelable(true); //如果不设置的话用dimiss()手动关闭
+			dialog.show();
+		ActionBar
+			if(getSupportActionBar()!=null)getSupportActionBar().hide();//隐藏标题
+
+
+		自定义简单控件/布局
+			1.自定义布局
+				1.继承内建布局
+				2.手动加载(如下),手动注册
+					public class TitleLayout extends LinearLayout {
+					    TitleLayout(Context ctx, AttributeSet abs) {
+					        super(ctx, abs);
+					        LayoutInflater.from(ctx).inflate(R.layout.title, this);
+					        //需要动态加载LayoutInflate可以完成加载
+					        //inflate函数 接受布局文件的id 第二个参数是要加载到父元素的位置
+					        //this指针指到TitleLayout的位置上
+
+					        //然后在加载类的时候注册函数
+					        ((Button) findViewById(R.id.title_back)).setOnClickListener((v) -> {
+					            ((Activity) getContext()).finish();
+					        });
+					    }
+					}
+				3.使用加载
+					<com.example.hasse.test.TitleLayout
+			            android:layout_width="match_parent"
+			            android:layout_height="wrap_content"/>
+			        写成双标签里面的元素不会产生任何效果
+			2.自定义组件
+				pass
+		ListView/RecycleView
+			ListView
+				xml定义时候只要简单定义即可
+				程序中使用填充数据的时候相对复杂
+				简单例子
+					String [] data;
+					ArrayAdapter<String> a = new ArrayAdapter<String>(
+						Activity.this,android.R.layout.simple_list_item_1,data
+					);//调用android本身定义的资源
+					((ListView)findViewById(R.id.list_view)).setAdapter(a);
+					//传入适配器
+				//自定义数据结构实现item
+				0.自己实现对应的list_view
+					实现时注意按照组件的写法去写
+					可以填充假数据做初期渲染确认
+					不可当成布局去写
+				1.重写DTO类(一个item所要展示的数据)
+					Fruit.class->{resourceId,name}					
+				2.先看如何调用(Activity)
+					private List<Fruit> list_fruit = new ArrayList<>();
+
+				    private void setFruitView() {
+				        //init list_fruit
+				        for (int i = 0; i < 20; i++) {
+				            list_fruit.add(new Fruit("this is " + i, R.drawable._3));
+				        }
+				        //set adapter
+				        FruitAdapter fa = new FruitAdapter(Main4Activity.this, R.layout.fruit_item, list_fruit);
+				        ((ListView) findViewById(R.id.list_view)).setAdapter(fa);
+				    }
+				    可以看到调用的时候只是把Adapter进行初始化并传送数据过去而已
+				3.重写DTO对应的Adapter
+					1.构造函数需要使用使用父类super()//三个参数分别是渲染上下文 list_view的id 数据结构
+					2.调用父类构造函数完成初始化之后Override getView函数
+					
+					public class FruitAdapter extends ArrayAdapter<Fruit> {
+					    private int resourceId;
+
+					    public FruitAdapter(Context ctx, int textViewResourceId, List<Fruit> obj) {
+					        super(ctx, textViewResourceId, obj);
+					        resourceId = textViewResourceId;
+					    }
+					    //getView 只是帮助绘制而已
+					    //每显示一次View就要调用一次这个方法
+					    //convertView是缓存机制
+					    //parent参数是只加入到的父元素就是listView
+					    @Override
+					    public View getView(int position, View convertView, ViewGroup parent) {
+					        Fruit f = getItem(position);//adapter 内方法
+					        View view = LayoutInflater.from(getContext()).inflate(resourceId, parent, false);
+					        //这行代码为关键
+					        ImageView fruit_image = (ImageView) view.findViewById(R.id.fruit_image);
+					        TextView fruit_name = (TextView) view.findViewById(R.id.fruit_name);
+					        fruit_image.setImageResource(f.getImgId());
+					        fruit_name.setText(f.getName());
+					        return view;
+					    }
+					}
+				4.对该程序进行优化
+					//利用convertView 进行缓存 不用每次都渲染一遍
+					View view;
+					if (convertView != null){
+			            view = convertView;
+			            //Log.d("**************", "getView use cache with position" + position);
+			        }else{
+			            view = LayoutInflater.from(getContext()).inflate(resourceId, parent, false);
+			            //Log.d("**************", "getView inflate with position" + position);
+			        }
+			        //利用ViewHolder内部类对findViewById进行优化
+			        public View getView(int position, View convertView, ViewGroup parent) {
+				        View view;
+				        ViewHolder vh;
+				        Fruit f = getItem(position);//adapter 内方法
+				        if (convertView != null) {
+				            view = convertView;
+				            vh = (ViewHolder) view.getTag();
+				        } else {
+				            view = LayoutInflater.from(getContext()).inflate(resourceId, parent, false);
+				            vh = new ViewHolder();
+				            vh.fruitImage = (ImageView) view.findViewById(R.id.fruit_image);
+				            vh.fruitName = (TextView) view.findViewById(R.id.fruit_name);
+				            view.setTag(vh);
+				        }
+
+				        vh.fruitImage.setImageResource(f.getImgId());
+				        vh.fruitName.setText(f.getName());
+				        return view;
+				    }
+				5.ListView注册事件
+					listview.setOnClickListener((parent,view,position,id)->{
+						Fruit f = list_fruit.get(position); //这就可以定位了
+					});
+			RecyclerView
+				implementation 'com.android.support:recyclerview-v7:26.1.0'
+				0.重写DTO
+				1.重写FruitAdapter
+					public class FruitAdapterRec extends RecyclerView.Adapter<FruitAdapterRec.ViewHolder> {
+					    private List<Fruit> fruits;
+
+					    static class ViewHolder extends RecyclerView.ViewHolder {
+					        ImageView fruitImage;
+					        TextView fruitName;
+
+					        public ViewHolder(View view) {
+					            super(view);
+					            this.fruitImage = (ImageView) view.findViewById(R.id.fruit_image);
+					            this.fruitName = (TextView) view.findViewById(R.id.fruit_name);
+					        }
+					    }
+
+					    public FruitAdapterRec(List<Fruit> f) {
+					        this.fruits = f;
+					    }
+
+					    @Override
+					    public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+					        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.fruit_item, parent, false);
+					        ViewHolder holder = new ViewHolder(view);
+					        return holder;
+					    }
+
+					    @Override
+					    public void onBindViewHolder(ViewHolder holder, int position) {
+					        Fruit f = fruits.get(position);
+					        holder.fruitImage.setImageResource(f.getImgId());
+					        holder.fruitName.setText(f.getName());
+					    }
+
+					    @Override
+					    public int getItemCount() {
+					        return fruits.size();
+					    }
+					}
+				2.调用如下
+					private void setFruitViewRec() {
+				        //init list_fruit
+				        for (int i = 0; i < 10000; i++) {
+				            list_fruit.add(new Fruit("this is " + i, R.drawable._3));
+				        }
+				        RecyclerView recView = (RecyclerView) findViewById(R.id.recycle_view);
+				        LinearLayoutManager lm = new LinearLayoutManager(this);
+				        recView.setLayoutManager(lm);
+				        //上面两行实现LinearLayout效果,也可以用来实现其他
+				        FruitAdapterRec far = new FruitAdapterRec(list_fruit);
+				        recView.setAdapter(far);
+				    }
+				3.实现其他效果
+					1.修改fruit_item.xml //由纵向改横向
+					2.修改LinearManage
+						RecyclerView recView = (RecyclerView) findViewById(R.id.recycle_view_hor);
+				        LinearLayoutManager lm = new LinearLayoutManager(this);
+				        lm.setOrientation(LinearLayout.HORIZONTAL); //横向布局
+				        recView.setLayoutManager(lm);
+
+				        FruitAdapterRec far = new FruitAdapterRec(list_fruit, R.layout.fruit_item_horizontal, R.id.fruit_image_hor, R.id.fruit_name_hor);
+				        recView.setAdapter(far);
+				        //略微修改了下Adapter类使其能适应horizonta
+		Spinner
+			下拉列表(dropdown)/或者对话框(dialog)和RecycleView类似
+			Spinner
+	1.LinearLayout
+		//线性管理器可以用于构造一行
+		<LinearLayout
+			android:orientation="vertical" //horizontal
+			//组件的排列方式 自然垂直布局能调整左右
+			//水平布局能调整上下
+			>
+			<EditText
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:hint="nothing"
+                android:maxLines="1"
+                android:layout_weight="1"
+        	/>
+		</LinearLayout>
+		android:gravity="center" //类似于float
+		layout_width属性需要注意是同行内剩余的,比如两个button那就两个
+	2.RelativeLayout
+		控件属性
+			alignParentRight //align对齐
+			alignParentLeft
+			alignParentTop
+			alignParentBottom
+			centerInParent
+		相对控件定位的属性
+			layout_above="@id/view_name"
+			layout_toLeftof="@id/.." //相应的还有其他
+			这种定义要注意就是id为view_name的要定义在前面要不会找不到id
+			layout_alignRight="@id/view_name"
+	3.FrameLayout
+		帧布局(所有控件默认在左上角开始)
+		以下两种场景用的比较多
+		1.碎片
+		2.index-z的效果
+			设已经完成布局的linearlayout
+			<LinearLayout>
+				//相关布局
+			</LinearLayout>
+			修改为
+			<FrameLayout>
+				<LinearLayout>
+				//相关布局
+				</LinearLayout>
+				<ProgressBar>
+				</progressBar>
+			</FrameLayout>
+	//还有一些组件没写到基本都是延伸,绝对布局基本不会使用
+4.Activity
+	R类可以访问到所有资源包括id,layout等
+	R.id.id_name //xml全部封装成类里面的内部成员变量(反射)
+	findViewById();//可以直接获得对象
+	
+	//活动状态与生命周期
+		运行状态	//可见处于最顶层
+		暂停状态 //可见不处于最顶层
+		停止状态 //不可见
+		销毁状态
+		完整生存期 onCreate onDestroy
+		可见生存期 onStart onStop
+		前台生存期 onResume onPause
+	//活动的启动模式
+		<activity android:launchMode="">
+		standard //默认 每次都会建立新的实例
+		singleTop //如果启动的时候发现已经是栈顶就不用创建新的实例,否则依然创建实例
+		singleTask //检查返回栈中是否有实例,有的话就直接使用,其他实例统统出栈,否则就创建新实例
+		singleInstance //启动一个新的返回栈来管理活动
+			//应用场景是多个应用程序共用一个栈,要使用独立的栈去管理
+			getTaskId()//可以得到当前返回栈的id
+
+	//设置监听事件
+		bt_clac.setOnClickListener(new View.OnClickListener(){
+	        @Override
+	        public void onClick(View v) {//View v 是被click的对象
+	            Toast.makeText(MainActivity.this,"you click btn1",Toast.LENGTH_LONG).show();
+	        }
+	    });
+	    //与下面写法等价
+		bt_clac.setOnClickListener((v)->{
+	        Toast.makeText(MainActivity.this,"you click btn1",Toast.LENGTH_LONG).show();
+	    });
+	    //还可以在xml中设置
+	    <View
+	    	android:clickable="true"
+	    	android:onClick="function_name" <!--function写在相应的function里面-->
+	    />
+	    //设置全局监听对象
+
+	//事件
+		onCreate
+		onStart //不可见变可见时调用
+		onResume //活动准备和用户交互的时候调用
+		onPause	
+		onStop //完全不可见时调用
+		onDestroy 
+		onRestart //由停止状态变为运行状态之前调用
+		onBackPressed //按下退出键发生的情况
+		onActivityResult 
+		onCreateOptionsMenu onOptionsItemSelected
+		onSaveInstanceState //在活动被系统回收之前调用 携带Bundle //bundle捆
+			@Override
+			protected void onSaveInstanceState(Bundle o){
+				super.onSaveInstanceState(o);
+				o.putString("key","value") //putInt等
+			} //然后在onCreate可以调用,调用方法为getString等
+	//toast->tips
+	    Toast函数就是设置小提示的信息,
+	    makeText(activity,msg,time) //返回Toast对象
+	    //封装成以下方法
+	    public void toast(String text){
+        	Toast.makeText(MainActivity.this,text,Toast.LENGTH_LONG).show();
+    	}
+    //退出活动
+    	finish();
+    //menu
+    	menu/main.xml
+    	<menu xmlns:android="http://schemas.android.com/apk/res/android">
+		    <item
+		        android:id="@+id/add_item"
+		        android:title="Add"
+		    />
+		    <item
+		        android:id="@+id/remove_item"
+		        android:title="Remove"
+		    />
+		</menu>
+		//用xml对item进行布局
+    	
+    	activity中override两个方法
+    	onCreateOptionsMenu//创建菜单事件
+    	onOptionsItemSelected//选择item响应事件
+
+    	@Override
+	    public boolean onCreateOptionsMenu(Menu menu) {
+	        getMenuInflater().inflate(R.menu.main,menu);
+	        //创建该活动菜单
+	        return true;//允许菜单显示
+	    }
+	    @Override
+	    public boolean onOptionsItemSelected(MenuItem item) {
+	        int id=item.getItemId();
+	        if(id==R.id.add_item){
+	            toast("you click add");
+	        } else if(id==R.id.remove_item){
+	            toast("you click remove");
+	        }
+	        return true;//返回false不显示
+	    }
+	//intent
+		1.显示切换
+			创建新的Activity类和layout文件
+				new Intent(context,class) //context to class
+				Intent i = new Intent(Main2Activity.this,MainActivity.class);
+	            //change Main2Activity to MainActivity
+	            startActivity(i);
+	            finish();
+			//第一个参数指定上下文,第二个参数指定启动活动
+				startActivity(intent)//执行intent
+				finish();//结束当前活动
+		2.隐式切换
+			<intent-filter>
+				<action> //指定响应的动作 name
+				<category>	//指定响应的Intent中还可能带有caregory name
+				<data>	//指定能响应的数据 scheme host port path mimeType(可处理数据类型)
+			</intent-filter>
+				<action android:name="com.example.activitytest.ACTION_START" />
+	            <category android:name="android.intent.category.DEFAULT" /> //默认
+				只有action和category同时匹配上intent中才响应
+				startActivity()默认把android.intent.category.DEFAULT传入
+			//指定category
+				Intent i=new Intent("com.example.activitytest.ACTION_START");
+				i.addCategory("com.example.activitytest.MY_CATEGORY");
+				//相应filter得添加<category android:name="com.example.activitytest.MY_CATEGORY">
+				startActivity(i);
+		//Intent调用其他程序
+			1.Intent.ACTION_VIEW
+				Intent i = new Intent(Intent.ACTION_VIEW);
+				i.setData(Uri.parse("http://www.baidu.com"));//传入uri对象
+				//等同于
+				Intent i = new Intent(Intent.ACTION_VIEW,Uri.parse("http://www.baidu.com"));
+				Uri还可以parse其他一些东西
+				拨号程序 tel:1232333
+				定位程序 geo:39.899533,116.036476
+				播放视频 file:///sdcard/media.mp4
+					setDataAndType(uri,"video/*")
+				发短信(没有定位手机号)
+					i.putExtra("sms_body","context")
+					i.setType("vnd.android-dir/mms-sms")
+			2.Intent.ACTION_SENDTO
+				//发短信
+					Uri uri = Uri.parse("smsto:13200100001");    
+					Intent it = new Intent(Intent.ACTION_SENDTO, uri);    
+					it.putExtra("sms_body", "信息内容...");    
+					startActivity(it); 
+					Intent intent=new Intent(Intent.ACTION_SEND); 
+				//发Email     
+					String[] tos={"android1@163.com"};      
+					String[] ccs={"you@yahoo.com"};      
+					intent.putExtra(Intent.EXTRA_EMAIL, tos);      
+					intent.putExtra(Intent.EXTRA_CC, ccs);      
+					intent.putExtra(Intent.EXTRA_TEXT, "The email body text");      
+					intent.putExtra(Intent.EXTRA_SUBJECT, "The email subject text");      
+					intent.setType("message/rfc822");      
+					startActivity(Intent.createChooser(intent, "Choose Email Client"));  
+			3.使用Intent传递数据
+				//放入数据
+				i.putExtra("key",string_data);
+				//取出数据
+				i = getIntent();
+				i.getStringExtra("key");
+			4.传递参数
+				//1里设置
+				startActivityForResult(intent,1)接受返回活动参数,第二参数为返回码
+				@Override
+				protected void onActivityResult(int requestCode,int resultCode,Intent data){
+					if(requestCode==1){
+						if(resultCode==RESULT_OK){
+							data.getStringExtra("data_return");
+						}
+					}
+				}
+				//2里设置
+				intent.putExtra("data_return",string_data);
+				setResult(RESULT_OK,intent);
+				//并没有使用startActivity方法
+				finsh();
+			5.Bundle
+				Bundle相当于自己封装的数据结构
+				putString getString
+				@Override
+				protect void onCreate(Bundle b){
+					if(b!=null){
+						b.getString("key")
+					}
+				}
+	//活动使用技巧
+		1.debug技巧
+			改变继承链获取类名,和中间件的实现思路类似
+			public class BaseActivity extends AppCompatActivity{
+				@Override
+				onCreate(Bundle b){
+					super.onCreate(b);
+					logd(getClass().getSimpleName());
+				}
+			}
+			public class MainActivity extends BaseActivity
+		2.活动管理器
+			public class ActivityCollector{
+				public static List<Activity> list=new ArrayList<>();
+				/**
+				 *在onCreate方法里添加
+				 **/
+				public static void addActivity(Activity act){
+					list.add(act);
+				}
+				/**
+				 *在onDestory方法里添加
+				 **/
+				public static void removeActivity(Activity act){
+					list.remove(act);
+				}
+				/**
+				 *finshAll方法完成所有活动,就是销毁内存中的活动
+				 **/
+				public static void finishAll(){
+					for(Activity act:list){
+						if(!act.isFinishing()){
+							act.finsh();
+						}
+					}
+				}
+			}
+		3.启动活动的最佳写法
+			//为了方便接口的编写,应该在内部添加相应intent假数据接口
+			Main2Activity.java
+				//这个方法是数据接口方便其他类去调用调试
+				//称此方法为类的启动方法
+				public static void actionStart(Context ctx,String str1,String str2){
+					Intent i = new Intent(Context,SecondActivity.class);
+					i.putExtra("key1","value1");
+					i.putExtra("key2","value2");	
+				}
+			MainActivity.java
+				.setOnClickListener((v)->{
+					Main2Activity.actionStart(MainActivity.this,"data1","data2");
+					//其他类在调用的时候数据接口就会变得非常重要
+				});
+5.广播机制
+	基本
+		BroadcastReceiver		
+		Normal broadcasts 普通广播
+			异步广播无法被截断
+		Ordered boradcasts 有序广播
+			同步广播同一时间只有一个接收器能接收到
+		广播有两种注册方式 在manifest.xml中注册(静态注册)或者在代码中注册
+	动态注册
+		继承BroadcastReciver @override onReceive()
+		//下面是个简单的例子
+			private IntentFilter intentFilter;
+		    private NetworkChangeReceiver nwcr;
+
+		    class NetworkChangeReceiver extends BroadcastReceiver {
+		        @Override
+		        public void onReceive(Context ctx, Intent intent) {
+		            Toast.makeText(ctx, "network changes", Toast.LENGTH_SHORT).show();
+		        }
+		    }
+
+		    @Override
+		    protected void onCreate(Bundle savedInstanceState) {
+		        super.onCreate(savedInstanceState);
+		        setContentView(R.layout.activity_demo0);
+
+		        //注册接受广播方法
+		        intentFilter = new IntentFilter();
+		        intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+		        //过滤器请求
+		        nwcr = new NetworkChangeReceiver();
+		        registerReceiver(nwcr,intentFilter);//注册Receiver
+
+		    }
+		//其他技术暂时用不到鸽了
+6.持久化
+	File
+	SharedPreferences
+	database
+	
+	1.File :/data/data/<packagename>/files/
+		FileOutputStream("path"); //可以带项目路径 
+		自己读写的话,得获取root权限才能进行更为详细的操作这里不细说
+
+		openFileOutput("file_name",Context.MODE_);//文件名和操作模式
+		openFileInput("file_name");
+		//返回OutputStream/InputStream
+		//Context.MODE_PRIVATE(默认)和Context.MODE_APPEND
+		// MODE_PRIVATE会覆盖源文件,MODE_APPEND则会往文件名上追加
+		//也是打开文件流但是不能带项目路径,直接写的文件
+	
+	2.SharedPreferences :/data/data/<packagename>/shared_prefs/
+		key-value 的形式持久化数据
+		Context.getSharePreferences("file_name",0);//MODE_PRIVATE=0
+		Activity.getPreferences(0); //类名作为文件名
+		static PreferenceManager.getDefaultSharedPreferences()
+
+		1.存数据
+			SharedPreferences.Editor editor = getSharedPreferences("data", MODE_PRIVATE).edit();
+            editor.putString("key","value");
+            editor.putInt("k",'v');
+            ...
+            editor.apply();
+			//其本质是拿xml来存数据 <map><string></string><map> 这种格式存取
+		2.取数据
+			SharedPreferences spfs = getSharedPreferences("data", MODE_PRIVATE);
+            spfs.getString("key");
+            spfs.getInt("k");
+            ....
+		3.利用持久化进行缓存
+			private CheckBox ckb = null;
+		    private SharedPreferences pref = null;
+		    private SharedPreferences.Editor e = null;
+		    private EditText user_name = null;
+		    private EditText psw = null;
+
+		    private void pswR() {
+		        if (pref.getBoolean("checked", false)) {
+		            ckb.setChecked(true);
+		            user_name.setText(pref.getString("usn", null));
+		            psw.setText(pref.getString("psw", null));
+		        }
+		    }
+
+		    private void login() {
+		        Button login = findViewById(R.id.login);
+		        login.setOnClickListener((v) -> {
+		            if ("root".equals(user_name.getText().toString().trim()) && "123".equals(psw.getText().toString().trim())) {
+		                Toast.makeText(this, "welcome", Toast.LENGTH_SHORT).show();
+		                startActivity(new Intent(demo0.this,demo1.class));
+		                this.finish();
+		            } else {
+		                Toast.makeText(this, "password or username error", Toast.LENGTH_SHORT).show();
+		                return;
+		            }
+		            if (ckb.isChecked()) {
+		                //save data to preference
+		                e.putBoolean("checked", true);
+		                e.putString("usn", user_name.getText().toString());
+		                e.putString("psw", psw.getText().toString());
+		                e.apply();
+		            } else {
+		                e.clear();
+		            }
+
+		        });
+		    }
+	3.SQLite:/data/data/<package name>/databases/
+
+		同django框架一样采用轻量级数据库进行核心数据的传递和开发
+		SQLiteOpenHelper is an abc,extends it
+			@override onCreate() onUpgrade()
+			
+			//下面这两个方法都可以创建或者打开一个现有的数据库
+			getReadableDatabase() //当数据库不可写的时候以可读形式打开数据库
+			getWritableDatabase() //当数据库不可写的时候抛出异常
+		1.实例与数据库调试
+			public class databaseHelper1 extends SQLiteOpenHelper {
+			    private Context ctx;
+
+			    public databaseHelper1(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
+			        super(context, name, factory, version);
+			        //Context database_name cursor version
+			        this.ctx=context;
+			    }
+
+			    @Override
+			    public void onCreate(SQLiteDatabase db) {
+			        //this function only execute on the first time to create a database
+			        db.execSQL("create table sql");
+			        Toast.makeText(ctx, "successed", Toast.LENGTH_SHORT).show();
+			    }
+			    //onCreate在new databaseHelper01().getWriteableDatabase();方法调用时创建
+			    @Override
+			    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+			    	db.execSQL("drop table if exists table_name");
+			    	onCreate(db);
+			    }
+			    //onUpgrade在修改表和改变版本号的时候都会调用
+			}
+			//通过android-debug-database调试
+				https://github.com/amitshekhariitbhu/Android-Debug-Database
+
+				在build.gradle中添加依赖 
+				debugImplementation 'com.amitshekhar.android:debug-db:1.0.6'
+				//该项目把数据库封装成可调试界面
+				usb连接时 使用abd froward tcp:8080 tcp:8000 
+				//把主机的8080的请求 转发到android tcp:8080端口上
+
+				adb reverse tcp:8080 tcp:8000
+				//把android的8000的请求 转发到本地tcp:8080端口上
+				SDK/sdk-platfrom/adb工具
+		2.CRUD
+			databaseHelper1 dbh=new databaseHelper1();
+			SQLiteDatabase db = dbh.getWriteableDatabase();
+			//Create
+				db.execSQL("insert into table_name(...) values(...)");
+				db.execSQL("insert into table_name values(...)");
+				db.insert("table_name",null,content_values)
+				//构建content_values
+					ContentValues vs = new ContentValues();
+					vs.put("column_name",value); 
+					...
+					vs.clear() //清空缓存
+					//vs 无需对主键进行赋值
+			//Retrieve
+				db.query()//该方法参数过多 还是拼接原生语法吧
+				db.rawQuery("sql",String[] parameters) //可以执行原生sql 妈的找了老子好久
+				//其参数按顺序为
+				//table,columns,selection,selectionArgs,groupBy,having,orderBy
+				这个操作返回一个Cursor对象从中去除数据即可
+				//一个例子
+					Cursor cs = db.query(); //相当于ResultSet
+					//cs.getCount()
+					//cs.moveToFirst()
+					//cs.moveToLast()
+					//cs.move(offset)
+					//cs.moveToNext()
+					while(cs.moveToNext()){
+						cs.getString(cs.getColumnIndex("column_name"));
+						//cs.getString(0) 获取id
+						//cs.getString(1) 获取第一列的值
+					}
+			//Update
+				db.execSQL("Updata table_name set column=value,... where ..")
+				db.update("table_name",content_values,String where_condtion,String[] parameters)
+				举个例子
+				db.update("Book",ctn_v,"price>? and price<?",{"3","5"})
+				//改动价格大于3而小于5的图书的价格
+			//Delete
+				db.execSQL("delete from table_name where ..")
+				db.delete("table_name",where_condition,parameters)
+				//其理解和Update大致相同
+		3.Litepal
+			https://github.com/LitePalFramework/LitePal
+			//第三方orm框架
+			app/build.gradle
+			dependencies{
+				complie 'org.litepal.android:core:1.4.1'
+			}
+			dependencies {
+    			implementation 'org.litepal.android:java:3.0.0'
+			}
+			配置litepal.xml文件
+				app/src/main/assets/litepal.xml
+				<?xml version="1.0" encoding="utf-8">		
+				<litepal>
+					<dbname value="BookStore"></dbname> //指定数据库名
+					<version value="1"></version> //指定数据库版本号
+					<list>
+						<mapping class="com.example.hasse.DTO.Book"></mapping> 
+						//需要映射的pojo类
+					</list> // 指定所有映射模型
+				</litepal>
+			配置AndroidManifest.xml
+				<application>里配置 android:name="org.litepal.LitePalApplication"
+			创建和升级数据库
+				定义pojo类
+				public class Book extends LitePalSupport{
+					//不用指定id
+					private String author;
+					private double price;
+					private int pages;
+					private String name;
+					//...get set
+					@Column(nullable=false)
+					@Column(ignore = true) ..
+					@Column(unique = true,defaultValue="unknow")
+				}
+				1.获取数据库
+					LitePal.initialize(this);
+					SQLiteDatabase db = LitePal.getDatabase();
+				2.ORM框架下的增删改查
+					public class Book extends LitePalSupport{}
+					//增加
+						//填充实体类的属性
+						.save()
+					//修改
+						//同一对象修改值之后
+						.save()
+						//更高级的用法
+						book.setPress("Anchor");
+						book.updateAll("name=? and author=?",...);//也可以不带参数
+						book.setToDefault() //设置默认值
+					//删除
+						LitePal.delete(Book.class,id);
+						LitePal.deleteAll(Book.class,"price < ?",...);
+					//查询
+						LitePal.find(Book.class,1);
+						List<Book> books = LitePal.findAll(Book.class);
+						LitePal其他一些api
+						.findFirst(Book.class);
+						.findLast(Book.class);
+						.select("column_name").find(Book.class);
+						.where("page > ?","400").find()
+						.order("column_name desc").find()
+						.limit(3).offset(1).find() //limit 3,1
+						满足链式编程
+						//定制查询
+						Cursor c = LitePal.findBySQL(); //然而这个遍历贼恶心想想算了
+7.内容提供器Content Provider
+	0.Android权限机制
+		在manifest.xml中声明
+		<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE">
+		普通权限
+		危险权限 //获取联系人信息,定位地理位置(必须手动授权才行)
+		特殊权限
+		//授权逻辑
+			if(
+			ContextCompat.checkSelfPermission(context.this,Manifest.permission.CALL_PHONE)!=
+			PackageManager.PERMISSION_GRANTED){
+				ActivityCompat.requestPermissions(context.this,{Manifest.permission.CALL_PHONE},1);
+				//向用户申请权限 context 权限列表String[] 请求码
+			}else{
+				call(); // call the phone
+			}
+			@Override
+			public void onRequestPermissionsResult(int reqCode,String[] permissions,int[] grantRes){
+				// 申请结果触发函数
+				if(reqCode==1){ //申请码
+					if(grantRes.length>0&& grantRes[0] == PackageManager.PERMISSION_GRANTED){
+						call();
+					}else{
+						logd("get permission failed");
+					}
+				}
+			}
+	1.访问其他程序的数据
+		Content Provider 类似于接口 可以让其他程序访问该程序的数据
+		//ContentResolver
+			.getContentResolver() //获取该类的instance
+			
+			//CRUD不接受表名 接受内容URI
+			//标准写法 URI uri=URI.parse("content://com.example.app.provider/table_name")
+			//其中authority->content://com.example.app.provider,path->table_name
+			.insert()
+			.update()
+			.delete()
+			.query(uri,projection,selection,selectionArgs,sortOrder)
+	2.为其他程序编写接口内容提供器
+		pass
+8.调用多媒体
+	1.通知Notification
+		//旧版本
+			NotificationManager m =
+			(NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE)
+			Notification n = new NotificationCompat.Builder(this);
+			n.setContentTitle(""); //以下支持链式编程
+			n.setContentText("");
+			.setWhen(System.currentTimeMillis());
+			.setSmallIcon(); //左上角
+			.setLargeIcon(); //下拉图片 纯alpha图层进行设置
+			.build(); //创建NotificationCompat对象
+			m.notify(1,n);
+		//8.0版本
+			NotificationChannel
+			NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE); //获得系统应用权限
+			NotificationChannel channel = new NotificationChannel("channel_id", "channel_name",
+            	NotificationManager.IMPORTANCE_DEFAULT);
+            //IMPORTANCE_LOW IMPORTANCE_MIN IMPORTANCE_DEFAULT IMPORTANCE_HIGH 四种等级提示
+
+            nm.createNotificationChannel(channel); //需要给NotificationManager设置通道
+            NotificationCompat.Builder notification = new NotificationCompat.Builder(this, "channel_id");
+	        notification.setContentTitle("新消息来了");
+	        notification.setContentText("周末到了，不用上班了");
+	        notification.setSmallIcon(R.mipmap.ic_launcher);
+	        nm.notify(1, notification.build());
+	    //PendingIntent
+	    	处理进入活动,可理解成延迟执行的Intent,可以用以下方法通知活动广播或服务
+	    	getActivity()
+	    	getBroadcast()
+	    	getService()
+	    	//上述方法的参数列表 context->this , 一般传入0很少使用 , Intent_instance ,
+	    	//第四个参数可选 FLAG_ONE_SHOT|FLAG_NO_CREATE|FLAG_CANCEL_CURRENT|FLAG_UPDATE_CURRENT
+	    	用NotificationCompat.Builder对象的setContentIntent()可以接受一个PendingIntent
+	    	PendingIntent pi = PendingIntent.getActivity(this,0,new Intent(...),0)
+	    	notification_instance.setContentIntent(pi);
+	    //除此之外还可以对通知进行其他设置
+	    	//notification
+		    	.setSound(Uri_instance)
+		    	.setVibrate(new long[]{0,1000,1000,1000}) //震动1秒静止1秒震动1秒
+		    	.setLights(color,light_up=1000,light_down=1000)
+		    	.setDefaults(NotificationCompat.DEFAULT_ALL)
+		    //notification.builder
+		    	.setStyle()
+		    	.setStyle(new NotificationCompat.BigTextStyle().bigText("..."))//长文本
+				.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(BitmapFactory.decodeResource(getResources(),R.drawable.big_image)));//通知插入图片
+			//重要程度
+				//8.0版本似乎没用
+				.setPriority(NotificationCompat.PRIORITY_MAX) 
+				// PRIORITY_MIN,PRIORITY_LOW,PRIORITY_HIGH,PRIORITY_MAX
+	2.调用摄像头和相册
+		动态获取权限
+			if (ContextCompat.checkSelfPermission(demo2.this,
+	                android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+	            ActivityCompat.requestPermissions(demo2.this,
+	                    new String[]{android.Manifest.permission.CAMERA}, 2);
+	        } else {
+	        	//已经获取了权限,之后要调用
+	            Intent intent = new Intent(demo2.this, CaptureActivity.class);
+	            startActivityForResult(intent, Constant.REQ_QR_CODE);
+	        }
+	   	override onRequestPermissionsResult方法 处理动态获取权限失败或成功的响应
+	        @Override
+	        public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+		        switch (requestCode) {
+		            case 2:
+		                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+		                    //这里已经获取到了摄像头的权限，想干嘛干嘛了可以
+		                } else {
+		                    //这里是拒绝给APP摄像头权限，给个提示什么的说明一下都可以。
+		                    Toast.makeText(demo2.this, "请手动打开相机权限", Toast.LENGTH_SHORT).show();
+		                }
+		                break;
+		            default:
+		                break;
+		        }
+		    }
+		manifest.xml
+			<uses-permission android:name="android.permission.CAMERA" />
+			//真机调试的时候因为上述申请权限程序一直崩溃
+			
+			<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+			//file provider配置
+			<provider
+	                android:authorities="com.example.demo.fileprovider"	//一个标志值
+	                android:name="android.support.v4.content.FileProvider" //包名
+	                android:exported="false"
+	                android:grantUriPermissions="true">//临时访问权限
+	            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+	                       android:resource="@xml/file_paths"/>
+	        </provider>
+        xml/file_paths.xml
+        	<?xml version="1.0" encoding="utf-8"?>
+			<paths>
+			    <external-path name="image" path=""/>
+			    //指定转换规则,真实路径的path转换成image,仅在uri上进行转化
+			</paths>
+		调用摄像头
+			1.捕捉照片
+		        Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
+		        intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+		        startActivityForResult(intent, 1);  // this send a result code
+		        @Override onActivityResult 这个函数用于处理返回的请求结果
+		        
+		        Uri imageUri; // file://...-> content://... 
+		        //这种uri 已经被android屏蔽了 所以要用fileProvier.getUriForFile方法
+
+		        //一个使用的例子
+		        	private Uri imageUri;
+				    private ImageView iv;
+				    public static final int TAKE_PHOTO = 1;
+
+				    public void pictured(View v) {
+				        iv = (ImageView) findViewById(R.id.image_view1);
+				        File outputImage = new File(getExternalCacheDir(), "output_image.jpg");
+				        //getExternalCacheDir() 会存到路径 sdcard/Android/data/<package name>/cache上
+				        try {
+				            if (outputImage.exists()) {
+				                outputImage.delete();
+				            }
+				            outputImage.createNewFile();
+				        } catch (IOException e) {
+				            e.printStackTrace();
+				        }
+				        if (Build.VERSION.SDK_INT >= 24) {
+				            imageUri = FileProvider.getUriForFile(this, "com.example.demo.fileprovider", outputImage);
+
+				        } else {
+				            imageUri = Uri.fromFile(outputImage);
+				        }
+
+				        //启动相机
+				        Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
+				        intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+				        startActivityForResult(intent, TAKE_PHOTO);  // this send a result code
+				    }
+
+				    @Override
+				    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+				        // this is a function to get data
+				        // get the from the result
+				        // get a result code to judge which intent
+				        if (requestCode == TAKE_PHOTO) {
+				            if (resultCode == RESULT_OK) {
+				                try {
+				                    Bitmap bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
+				                    iv.setImageBitmap(bitmap);
+				                } catch (FileNotFoundException e) {
+				                    e.printStackTrace();
+				                }
+				            }
+				        }
+
+				    }
+		    2.捕捉视频
+		    	pass
+		调用相册
+			调用相册和获取摄像头大同小异
+			Intent intent = new Intent("android.intent.action.GET_CONTENT");
+	        intent.setType("image/*");
+	        startActivityForResult(intent, 2); // 2 means the pictures	
+	        //这中间有个问题就是Uri如何获得真实路径	
+	        Uri uri = data.getData();
+            Cursor c = getContentResolver().query(uri, null, null, null, null);
+            String path = c.getString(c.getColumnIndex("_data"));	
+	3.播放音频和视频
+		音频由MediaPlayer来实现
+			.setDataSource()
+			.prepare()
+			.start()
+			.pause()
+			.reset()
+			.seekTo() //从指定位置开始播放音频
+			.stop()
+			.release() //释放资源
+			.isPlaying()
+			.getDuration() //获得音平市场
+		//使用例子
+			private MediaPlayer mediaPlayer = new MediaPlayer();
+			File file=new File(Environment.getExternalStorageDirectory(),"music.mp3");
+			mediaPlayer.setDataSource(file.getPath());
+			mediaPlayer.prepare();
+			//然后利用按钮控制即可
+		视频由VideoView来实现
+			<VideoView/> 用于放视频
+			.setVideoPath()
+			.start()
+			.pause()
+			.resume()
+			.seekTo()
+			.isPlaying()
+			.getDuration()		
+9.Service
+	0.web初步
+		首先简述 WebView、WebViewClient、WebChromeClient 之间的区别:
+		在 WebView 的设计中,不是什么事都要 WebView类干的,有些杂事是分给其他人的,这样 WebView 专心干好 自己的解析、渲染工作就行了.WebViewClient 就是帮助 WebView 处理各种通知、请求事件等 ,WebChromeClient 是辅助 WebView 处理 Javascript 的对话框,网站图标,网站 title.
+
+		webView加载网页
+			WebView wbv = (WebView) findViewById(R.id.web_view);
+	        wbv.getSettings().setJavaScriptEnabled(true); //支持js脚本
+	        wbv.setWebViewClient(new WebViewClient());
+	        wbv.loadUrl("http://www.baidu.com");
+		    getSettings() 方法可以设置浏览器的属性
+		    wbv.setWebViewClient() 方法表示需要从一个网页跳转到另一个网页的时候
+		    我们希望网页仍在webview中打开而不是打开系统浏览器
+		webView加载本地html
+			webView.loadData(htmlText,"text/html", "utf-8"); //htmlText为String形式
+		webView对Session的操作
+			CookieManager cm = CookieManager.getInstance(); 
+			cm.removeAllCookie();
+			cm.getCookie(url);
+			cm.setCookie(url, cookie);
+	1.HttpURLConnection
+		// HttpClient 已经在6.0版本被移除
+		URL url = new URL("http://www.baidu.com");
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		conn.setRequestMethod("GET");//POST
+		conn.getInpurStream(); //可以得到输入流
+		conn.disconnect();
+		//写入post参数
+			DataOutputStream dos = new DataOutputStream(conn.getOutputStream());
+			dos.writeBytes("kw=python&password=null");
+		// ps: runOnUiThread(Runnable interface) 方法
+		// 因为 android 不允许在线程中对UI进行操作 所以此方法可以代替在线程中开启的UI操作
+		runOnUiThread(()->{
+			//在这里进行UI操作
+		});	
+	2.OKHttp
+		Square公司开发 轻量级网络库
+		优势
+			允许连接到同一个主机地址的所有请求,提高请求效率 
+			共享Socket,减少对服务器的请求次数 
+			通过连接池,减少了请求延迟  
+			缓存响应数据来减少重复的网络请求  
+			减少了对数据流量的消耗  
+			自动处理GZip压缩  
+		功能
+			get post 请求
+			文件的上传下载
+			加载图片
+			支持请求回调,直接返回对象,对象集合
+			支持session
+		使用方法
+			implementation("com.squareup.okhttp3:okhttp:3.14.1")
+    		testImplementation("com.squareup.okhttp3:mockwebserver:3.14.1")		
+    3.Service
+    	和web一样Service是在后台长期执行的任务,可以通过一些方式去创建
+    	在此忽略
+    	pass
+10.异步处理与多线程
+	0.基础
+		android不允许在线程中更新请求
+		android不允许在进程中发起网络请求
+		(可以使用Callable强行获取结果(未试验))
+		android 提供了一套异步处理机制
+		
+		//demo
+			public static final int UPDATE_TEXT = 1;
+			private Handler handler = new Handler(){
+				//handler是在主进程中执行的
+				@Override
+				public void handleMessage(Message msg){
+					switch(msg.what){
+						case UPDATE_TEXT:
+							//进行UI操作
+							break;
+						default:
+							break;
+					}
+				}
+			};
+
+			@Override
+			public void onClick(View v){
+				new Thread(()->{
+					Message message = new Message();
+					message.what = UPDATE_TEXT;
+					handler.sendMessage(message); //发送异步处理信号
+				}).start();
+			}	
+	1.异步消息处理机制
+		1.handler sendMessage
+			Message //发送信号
+			Handler //处理
+			MessageQueue //存放handler消息 每个线程独有
+			Looper.loop() // 当有消息队列消息时,把消息取出
+		2.AsyncTask
+			//继承AsyncTask类 需要指定三个泛型参数
+			//Params,Progress,Result
+			class task extends AsyncTask<Void,Integer,Boolean>{
+				@Override
+				onPreExecute()
+				
+				@Override
+				doInBackground(Params...)->publishProgress(Progress..)
+				//执行异步逻辑代码 可返回值 但此方法在线程中执行无法更新UI
+				//可选择调用publishProgress 告诉线程更新进度 onProgressUpdate 具体处理
+				
+				@Override
+				onPostExecute(Result) //该方法可以在其中跟新UI,其参数为上一方法的返回值
+				
+				@Override
+				onProgressUpdate(Progress...) //程序更新时,有publishProgress传入更新参数
+			}
+		3.深入handler
+			public static final int UPDATE_TEXT = 1;
+			private Handler handler = new Handler(){
+				//handler是在主进程中执行的
+				@Override
+				public void handleMessage(Message msg){
+					switch(msg.what){
+						case UPDATE_TEXT:
+							//进行UI操作
+							Toast.makeText(this,(String)msg.obj,Toast.LENGTH_SHORT).show();
+							break;
+						default:
+							break;
+					}
+				}
+			};
+
+			@Override
+			public void onClick(View v){
+				new Thread(()->{
+					Message message = handler.obtainMessage(UPDATE_TEXT);
+					handler.obj = "this is an string object for sending the msg";
+					handler.sendMessage(message); //发送异步处理信号
+				}).start();
+			}
+		4.Looper.loop() | Looper.prepare()
+			在子线程创建handler的时候得调用
+			new Thread(()->{
+				Looper.prepare();
+				new Handler((Message msg)->{
+
+				});
+				Looper.loop();
+			}).start();
+11.Utils
+	Bitmap位图包括像素的长宽颜色等
+	ARGB_8888：四个通道都是8位，每个像素占用4个字节，图片质量是最高的，但是占用的内存也是最大的
+	ARGB_4444：四个通道都是4位，每个像素占用2个字节，图片的失真比较严重
+	RGB_565：没有A通道，每个像素占用2个字节，图片失真小，但是没有透明度
+	ALPHA_8：只有A通道，每个像素占用1个字节大大小，只有透明度，没有颜色值
+	//一般选用RGB_565
+	Bitmap.CompressFormat.JEPG
+	Bitmap.CompressFormat.PNG
+	Bitmap.CompressFormat.WEBP
+	//BitmapFactory API
+		.decodeFile("path")
+		.decodeResource(getContext().getResources(),R.drawable.sample)
+		.decodeStream(inputstream)
+		.decodeByteArray(array,0,array.length
+		//返回bitmap对象
+11.相关技术
+	QR-Code
+
+
+

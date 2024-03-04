@@ -1,0 +1,709 @@
++---.gradle
+|   \---2.14.1
+|       +---taskArtifacts
+|       \---tasks
+|           \---_app_compileDebugJavaWithJavac
+|               +---localClassSetAnalysis
+|               \---localJarClasspathSnapshot
++---.idea
+|   +---caches
+|   +---copyright
+|   \---libraries
++---app
+|   +---build
+|   |   +---generated
+|   |   |   +---assets
+|   |   |   |   \---shaders
+|   |   |   |       \---debug
+|   |   |   +---res
+|   |   |   |   +---resValues
+|   |   |   |   |   +---androidTest
+|   |   |   |   |   |   \---debug
+|   |   |   |   |   \---debug
+|   |   |   |   \---rs
+|   |   |   |       +---androidTest
+|   |   |   |       |   \---debug
+|   |   |   |       \---debug
+|   |   |   \---source
+|   |   |       +---aidl
+|   |   |       |   +---androidTest
+|   |   |       |   |   \---debug
+|   |   |       |   \---debug
+|   |   |       +---apt
+|   |   |       |   +---androidTest
+|   |   |       |   |   \---debug
+|   |   |       |   +---debug
+|   |   |       |   \---test
+|   |   |       |       \---debug
+|   |   |       +---buildConfig
+|   |   |       |   +---androidTest
+|   |   |       |   |   \---debug
+|   |   |       |   |       \---com
+|   |   |       |   |           \---example
+|   |   |       |   |               \---demo
+|   |   |       |   |                   \---demo
+|   |   |       |   |                       \---test
+|   |   |       |   \---debug
+|   |   |       |       \---com
+|   |   |       |           \---example
+|   |   |       |               \---demo
+|   |   |       |                   \---demo
+|   |   |       +---r
+|   |   |       |   +---androidTest
+|   |   |       |   |   \---debug
+|   |   |       |   |       +---android
+|   |   |       |   |       |   \---support
+|   |   |       |   |       |       \---test
+|   |   |       |   |       |           +---espresso
+|   |   |       |   |       |           \---rule
+|   |   |       |   |       \---com
+|   |   |       |   |           \---example
+|   |   |       |   |               \---demo
+|   |   |       |   |                   \---demo
+|   |   |       |   |                       \---test
+|   |   |       |   \---debug
+|   |   |       |       +---android
+|   |   |       |       |   \---support
+|   |   |       |       |       \---v7
+|   |   |       |       |           \---appcompat
+|   |   |       |       \---com
+|   |   |       |           \---example
+|   |   |       |               \---demo
+|   |   |       |                   \---demo
+|   |   |       \---rs
+|   |   |           +---androidTest
+|   |   |           |   \---debug
+|   |   |           \---debug
+|   |   +---intermediates
+|   |   |   +---assets
+|   |   |   |   \---debug
+|   |   |   +---blame
+|   |   |   |   \---res
+|   |   |   |       +---androidTest
+|   |   |   |       |   \---debug
+|   |   |   |       |       \---multi
+|   |   |   |       \---debug
+|   |   |   |           +---multi
+|   |   |   |           \---single
+|   |   |   +---classes
+|   |   |   |   +---androidTest
+|   |   |   |   |   \---debug
+|   |   |   |   |       +---android
+|   |   |   |   |       |   \---support
+|   |   |   |   |       |       \---test
+|   |   |   |   |       |           +---espresso
+|   |   |   |   |       |           \---rule
+|   |   |   |   |       \---com
+|   |   |   |   |           \---example
+|   |   |   |   |               \---demo
+|   |   |   |   |                   \---demo
+|   |   |   |   |                       \---test
+|   |   |   |   +---debug
+|   |   |   |   |   +---android
+|   |   |   |   |   |   \---support
+|   |   |   |   |   |       \---v7
+|   |   |   |   |   |           \---appcompat
+|   |   |   |   |   \---com
+|   |   |   |   |       \---example
+|   |   |   |   |           \---demo
+|   |   |   |   |               \---demo
+|   |   |   |   \---test
+|   |   |   |       \---debug
+|   |   |   |           \---com
+|   |   |   |               \---example
+|   |   |   |                   \---demo
+|   |   |   |                       \---demo
+|   |   |   +---dependency-cache
+|   |   |   |   +---androidTest
+|   |   |   |   |   \---debug
+|   |   |   |   +---debug
+|   |   |   |   \---test
+|   |   |   |       \---debug
+|   |   |   +---exploded-aar
+|   |   |   |   +---com.android.support
+|   |   |   |   |   +---animated-vector-drawable
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---appcompat-v7
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   |           +---anim
+|   |   |   |   |   |           +---color
+|   |   |   |   |   |           +---color-v11
+|   |   |   |   |   |           +---color-v23
+|   |   |   |   |   |           +---drawable
+|   |   |   |   |   |           +---drawable-hdpi-v4
+|   |   |   |   |   |           +---drawable-ldrtl-hdpi-v17
+|   |   |   |   |   |           +---drawable-ldrtl-mdpi-v17
+|   |   |   |   |   |           +---drawable-ldrtl-xhdpi-v17
+|   |   |   |   |   |           +---drawable-ldrtl-xxhdpi-v17
+|   |   |   |   |   |           +---drawable-ldrtl-xxxhdpi-v17
+|   |   |   |   |   |           +---drawable-mdpi-v4
+|   |   |   |   |   |           +---drawable-v21
+|   |   |   |   |   |           +---drawable-v23
+|   |   |   |   |   |           +---drawable-xhdpi-v4
+|   |   |   |   |   |           +---drawable-xxhdpi-v4
+|   |   |   |   |   |           +---drawable-xxxhdpi-v4
+|   |   |   |   |   |           +---layout
+|   |   |   |   |   |           +---layout-v11
+|   |   |   |   |   |           +---layout-v16
+|   |   |   |   |   |           +---layout-v21
+|   |   |   |   |   |           +---values
+|   |   |   |   |   |           +---values-af
+|   |   |   |   |   |           +---values-am
+|   |   |   |   |   |           +---values-ar
+|   |   |   |   |   |           +---values-az
+|   |   |   |   |   |           +---values-b+sr+Latn
+|   |   |   |   |   |           +---values-be
+|   |   |   |   |   |           +---values-bg
+|   |   |   |   |   |           +---values-bn
+|   |   |   |   |   |           +---values-bs
+|   |   |   |   |   |           +---values-ca
+|   |   |   |   |   |           +---values-cs
+|   |   |   |   |   |           +---values-da
+|   |   |   |   |   |           +---values-de
+|   |   |   |   |   |           +---values-el
+|   |   |   |   |   |           +---values-en-rAU
+|   |   |   |   |   |           +---values-en-rGB
+|   |   |   |   |   |           +---values-en-rIN
+|   |   |   |   |   |           +---values-es
+|   |   |   |   |   |           +---values-es-rUS
+|   |   |   |   |   |           +---values-et
+|   |   |   |   |   |           +---values-eu
+|   |   |   |   |   |           +---values-fa
+|   |   |   |   |   |           +---values-fi
+|   |   |   |   |   |           +---values-fr
+|   |   |   |   |   |           +---values-fr-rCA
+|   |   |   |   |   |           +---values-gl
+|   |   |   |   |   |           +---values-gu
+|   |   |   |   |   |           +---values-h720dp-v13
+|   |   |   |   |   |           +---values-hdpi-v4
+|   |   |   |   |   |           +---values-hi
+|   |   |   |   |   |           +---values-hr
+|   |   |   |   |   |           +---values-hu
+|   |   |   |   |   |           +---values-hy
+|   |   |   |   |   |           +---values-in
+|   |   |   |   |   |           +---values-is
+|   |   |   |   |   |           +---values-it
+|   |   |   |   |   |           +---values-iw
+|   |   |   |   |   |           +---values-ja
+|   |   |   |   |   |           +---values-ka
+|   |   |   |   |   |           +---values-kk
+|   |   |   |   |   |           +---values-km
+|   |   |   |   |   |           +---values-kn
+|   |   |   |   |   |           +---values-ko
+|   |   |   |   |   |           +---values-ky
+|   |   |   |   |   |           +---values-land
+|   |   |   |   |   |           +---values-large-v4
+|   |   |   |   |   |           +---values-ldltr-v21
+|   |   |   |   |   |           +---values-lo
+|   |   |   |   |   |           +---values-lt
+|   |   |   |   |   |           +---values-lv
+|   |   |   |   |   |           +---values-mk
+|   |   |   |   |   |           +---values-ml
+|   |   |   |   |   |           +---values-mn
+|   |   |   |   |   |           +---values-mr
+|   |   |   |   |   |           +---values-ms
+|   |   |   |   |   |           +---values-my
+|   |   |   |   |   |           +---values-nb
+|   |   |   |   |   |           +---values-ne
+|   |   |   |   |   |           +---values-night-v8
+|   |   |   |   |   |           +---values-nl
+|   |   |   |   |   |           +---values-pa
+|   |   |   |   |   |           +---values-pl
+|   |   |   |   |   |           +---values-port
+|   |   |   |   |   |           +---values-pt
+|   |   |   |   |   |           +---values-pt-rBR
+|   |   |   |   |   |           +---values-pt-rPT
+|   |   |   |   |   |           +---values-ro
+|   |   |   |   |   |           +---values-ru
+|   |   |   |   |   |           +---values-si
+|   |   |   |   |   |           +---values-sk
+|   |   |   |   |   |           +---values-sl
+|   |   |   |   |   |           +---values-sq
+|   |   |   |   |   |           +---values-sr
+|   |   |   |   |   |           +---values-sv
+|   |   |   |   |   |           +---values-sw
+|   |   |   |   |   |           +---values-sw600dp-v13
+|   |   |   |   |   |           +---values-ta
+|   |   |   |   |   |           +---values-te
+|   |   |   |   |   |           +---values-th
+|   |   |   |   |   |           +---values-tl
+|   |   |   |   |   |           +---values-tr
+|   |   |   |   |   |           +---values-uk
+|   |   |   |   |   |           +---values-ur
+|   |   |   |   |   |           +---values-uz
+|   |   |   |   |   |           +---values-v11
+|   |   |   |   |   |           +---values-v12
+|   |   |   |   |   |           +---values-v13
+|   |   |   |   |   |           +---values-v14
+|   |   |   |   |   |           +---values-v16
+|   |   |   |   |   |           +---values-v17
+|   |   |   |   |   |           +---values-v18
+|   |   |   |   |   |           +---values-v21
+|   |   |   |   |   |           +---values-v22
+|   |   |   |   |   |           +---values-v23
+|   |   |   |   |   |           +---values-v24
+|   |   |   |   |   |           +---values-v25
+|   |   |   |   |   |           +---values-vi
+|   |   |   |   |   |           +---values-xlarge-v4
+|   |   |   |   |   |           +---values-zh-rCN
+|   |   |   |   |   |           +---values-zh-rHK
+|   |   |   |   |   |           +---values-zh-rTW
+|   |   |   |   |   |           \---values-zu
+|   |   |   |   |   +---support-compat
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       |   \---android
+|   |   |   |   |   |       |       \---support
+|   |   |   |   |   |       |           \---v4
+|   |   |   |   |   |       |               \---os
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---support-core-ui
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---support-core-utils
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---support-fragment
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---support-media-compat
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       |   \---android
+|   |   |   |   |   |       |       \---support
+|   |   |   |   |   |       |           \---v4
+|   |   |   |   |   |       |               \---media
+|   |   |   |   |   |       |                   \---session
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---support-v4
+|   |   |   |   |   |   \---26.0.0-alpha1
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       +---jni
+|   |   |   |   |   |       +---libs
+|   |   |   |   |   |       \---res
+|   |   |   |   |   \---support-vector-drawable
+|   |   |   |   |       \---26.0.0-alpha1
+|   |   |   |   |           +---aidl
+|   |   |   |   |           +---assets
+|   |   |   |   |           +---jars
+|   |   |   |   |           +---jni
+|   |   |   |   |           +---libs
+|   |   |   |   |           \---res
+|   |   |   |   +---com.android.support.test
+|   |   |   |   |   +---exposed-instrumentation-api-publish
+|   |   |   |   |   |   \---0.5
+|   |   |   |   |   |       +---aapt
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       \---res
+|   |   |   |   |   +---rules
+|   |   |   |   |   |   \---0.5
+|   |   |   |   |   |       +---aapt
+|   |   |   |   |   |       +---aidl
+|   |   |   |   |   |       +---assets
+|   |   |   |   |   |       +---jars
+|   |   |   |   |   |       \---res
+|   |   |   |   |   |           \---values
+|   |   |   |   |   \---runner
+|   |   |   |   |       \---0.5
+|   |   |   |   |           +---aapt
+|   |   |   |   |           +---aidl
+|   |   |   |   |           +---assets
+|   |   |   |   |           +---jars
+|   |   |   |   |           \---res
+|   |   |   |   \---com.android.support.test.espresso
+|   |   |   |       +---espresso-core
+|   |   |   |       |   \---2.2.2
+|   |   |   |       |       +---aapt
+|   |   |   |       |       +---aidl
+|   |   |   |       |       +---assets
+|   |   |   |       |       +---jars
+|   |   |   |       |       \---res
+|   |   |   |       \---espresso-idling-resource
+|   |   |   |           \---2.2.2
+|   |   |   |               +---aapt
+|   |   |   |               +---aidl
+|   |   |   |               +---assets
+|   |   |   |               +---jars
+|   |   |   |               \---res
+|   |   |   +---incremental
+|   |   |   |   +---compileDebugAidl
+|   |   |   |   +---compileDebugAndroidTestAidl
+|   |   |   |   +---mergeDebugAndroidTestResources
+|   |   |   |   |   +---aapt-temp
+|   |   |   |   |   \---merged.dir
+|   |   |   |   |       \---values
+|   |   |   |   +---mergeDebugAssets
+|   |   |   |   +---mergeDebugJniLibFolders
+|   |   |   |   +---mergeDebugResources
+|   |   |   |   |   +---aapt-temp
+|   |   |   |   |   \---merged.dir
+|   |   |   |   +---mergeDebugShaders
+|   |   |   |   +---packageDebug
+|   |   |   |   |   \---zip-cache
+|   |   |   |   +---packageDebugAndroidTest
+|   |   |   |   |   \---zip-cache
+|   |   |   |   +---packageRelease
+|   |   |   |   |   \---zip-cache
+|   |   |   |   +---processDebugAndroidTestResources
+|   |   |   |   |   \---aapt-temp
+|   |   |   |   \---processDebugResources
+|   |   |   |       \---aapt-temp
+|   |   |   +---incremental-safeguard
+|   |   |   |   +---androidTest
+|   |   |   |   |   \---debug
+|   |   |   |   \---debug
+|   |   |   +---jniLibs
+|   |   |   |   \---debug
+|   |   |   +---manifest
+|   |   |   |   +---androidTest
+|   |   |   |   |   \---debug
+|   |   |   |   \---tmp
+|   |   |   +---manifests
+|   |   |   |   +---full
+|   |   |   |   |   \---debug
+|   |   |   |   \---instant-run
+|   |   |   |       \---debug
+|   |   |   +---pre-dexed
+|   |   |   |   \---debug
+|   |   |   +---res
+|   |   |   |   \---merged
+|   |   |   |       +---androidTest
+|   |   |   |       |   \---debug
+|   |   |   |       |       \---values
+|   |   |   |       \---debug
+|   |   |   |           +---anim
+|   |   |   |           +---color
+|   |   |   |           +---color-v11
+|   |   |   |           +---color-v23
+|   |   |   |           +---drawable
+|   |   |   |           +---drawable-hdpi-v4
+|   |   |   |           +---drawable-ldrtl-hdpi-v17
+|   |   |   |           +---drawable-ldrtl-mdpi-v17
+|   |   |   |           +---drawable-ldrtl-xhdpi-v17
+|   |   |   |           +---drawable-ldrtl-xxhdpi-v17
+|   |   |   |           +---drawable-ldrtl-xxxhdpi-v17
+|   |   |   |           +---drawable-mdpi-v4
+|   |   |   |           +---drawable-v21
+|   |   |   |           +---drawable-v23
+|   |   |   |           +---drawable-xhdpi-v4
+|   |   |   |           +---drawable-xxhdpi-v4
+|   |   |   |           +---drawable-xxxhdpi-v4
+|   |   |   |           +---layout
+|   |   |   |           +---layout-v11
+|   |   |   |           +---layout-v21
+|   |   |   |           +---mipmap-hdpi
+|   |   |   |           +---mipmap-mdpi
+|   |   |   |           +---mipmap-xhdpi
+|   |   |   |           +---mipmap-xxhdpi
+|   |   |   |           +---mipmap-xxxhdpi
+|   |   |   |           +---values
+|   |   |   |           +---values-af
+|   |   |   |           +---values-am
+|   |   |   |           +---values-ar
+|   |   |   |           +---values-az
+|   |   |   |           +---values-b+sr+Latn
+|   |   |   |           +---values-be
+|   |   |   |           +---values-bg
+|   |   |   |           +---values-bn
+|   |   |   |           +---values-bs
+|   |   |   |           +---values-ca
+|   |   |   |           +---values-cs
+|   |   |   |           +---values-da
+|   |   |   |           +---values-de
+|   |   |   |           +---values-el
+|   |   |   |           +---values-en-rAU
+|   |   |   |           +---values-en-rGB
+|   |   |   |           +---values-en-rIN
+|   |   |   |           +---values-es
+|   |   |   |           +---values-es-rUS
+|   |   |   |           +---values-et
+|   |   |   |           +---values-eu
+|   |   |   |           +---values-fa
+|   |   |   |           +---values-fi
+|   |   |   |           +---values-fr
+|   |   |   |           +---values-fr-rCA
+|   |   |   |           +---values-gl
+|   |   |   |           +---values-gu
+|   |   |   |           +---values-h720dp-v13
+|   |   |   |           +---values-hdpi-v4
+|   |   |   |           +---values-hi
+|   |   |   |           +---values-hr
+|   |   |   |           +---values-hu
+|   |   |   |           +---values-hy
+|   |   |   |           +---values-in
+|   |   |   |           +---values-is
+|   |   |   |           +---values-it
+|   |   |   |           +---values-iw
+|   |   |   |           +---values-ja
+|   |   |   |           +---values-ka
+|   |   |   |           +---values-kk
+|   |   |   |           +---values-km
+|   |   |   |           +---values-kn
+|   |   |   |           +---values-ko
+|   |   |   |           +---values-ky
+|   |   |   |           +---values-land
+|   |   |   |           +---values-large-v4
+|   |   |   |           +---values-ldltr-v21
+|   |   |   |           +---values-lo
+|   |   |   |           +---values-lt
+|   |   |   |           +---values-lv
+|   |   |   |           +---values-mk
+|   |   |   |           +---values-ml
+|   |   |   |           +---values-mn
+|   |   |   |           +---values-mr
+|   |   |   |           +---values-ms
+|   |   |   |           +---values-my
+|   |   |   |           +---values-nb
+|   |   |   |           +---values-ne
+|   |   |   |           +---values-night-v8
+|   |   |   |           +---values-nl
+|   |   |   |           +---values-pa
+|   |   |   |           +---values-pl
+|   |   |   |           +---values-port
+|   |   |   |           +---values-pt
+|   |   |   |           +---values-pt-rBR
+|   |   |   |           +---values-pt-rPT
+|   |   |   |           +---values-ro
+|   |   |   |           +---values-ru
+|   |   |   |           +---values-si
+|   |   |   |           +---values-sk
+|   |   |   |           +---values-sl
+|   |   |   |           +---values-sq
+|   |   |   |           +---values-sr
+|   |   |   |           +---values-sv
+|   |   |   |           +---values-sw
+|   |   |   |           +---values-sw600dp-v13
+|   |   |   |           +---values-ta
+|   |   |   |           +---values-te
+|   |   |   |           +---values-th
+|   |   |   |           +---values-tl
+|   |   |   |           +---values-tr
+|   |   |   |           +---values-uk
+|   |   |   |           +---values-ur
+|   |   |   |           +---values-uz
+|   |   |   |           +---values-v11
+|   |   |   |           +---values-v12
+|   |   |   |           +---values-v13
+|   |   |   |           +---values-v14
+|   |   |   |           +---values-v16
+|   |   |   |           +---values-v17
+|   |   |   |           +---values-v18
+|   |   |   |           +---values-v21
+|   |   |   |           +---values-v22
+|   |   |   |           +---values-v23
+|   |   |   |           +---values-v24
+|   |   |   |           +---values-v25
+|   |   |   |           +---values-vi
+|   |   |   |           +---values-w820dp-v13
+|   |   |   |           +---values-xlarge-v4
+|   |   |   |           +---values-zh-rCN
+|   |   |   |           +---values-zh-rHK
+|   |   |   |           +---values-zh-rTW
+|   |   |   |           \---values-zu
+|   |   |   +---rs
+|   |   |   |   +---androidTest
+|   |   |   |   |   \---debug
+|   |   |   |   |       +---lib
+|   |   |   |   |       \---obj
+|   |   |   |   \---debug
+|   |   |   |       +---lib
+|   |   |   |       \---obj
+|   |   |   +---shaders
+|   |   |   |   \---debug
+|   |   |   +---symbols
+|   |   |   |   +---androidTest
+|   |   |   |   |   \---debug
+|   |   |   |   \---debug
+|   |   |   \---transforms
+|   |   |       +---dex
+|   |   |       |   \---debug
+|   |   |       |       \---folders
+|   |   |       |           \---1000
+|   |   |       |               \---1f
+|   |   |       |                   \---main
+|   |   |       +---mergeJavaRes
+|   |   |       |   \---debug
+|   |   |       \---mergeJniLibs
+|   |   |           \---debug
+|   |   +---outputs
+|   |   |   +---apk
+|   |   |   \---logs
+|   |   \---tmp
+|   |       +---compileDebugAndroidTestJavaWithJavac
+|   |       |   \---emptySourcePathRef
+|   |       +---compileDebugJavaWithJavac
+|   |       |   \---emptySourcePathRef
+|   |       +---compileDebugUnitTestJavaWithJavac
+|   |       |   \---emptySourcePathRef
+|   |       \---expandedArchives
+|   |           +---classes.jar_4278jlzev4fgg4p92tgrjq3wr
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           +---compat
+|   |           |           \---v4
+|   |           |               +---accessibilityservice
+|   |           |               +---app
+|   |           |               +---content
+|   |           |               |   +---pm
+|   |           |               |   \---res
+|   |           |               +---database
+|   |           |               +---graphics
+|   |           |               |   \---drawable
+|   |           |               +---hardware
+|   |           |               |   +---display
+|   |           |               |   \---fingerprint
+|   |           |               +---internal
+|   |           |               |   \---view
+|   |           |               +---net
+|   |           |               +---os
+|   |           |               +---text
+|   |           |               |   \---util
+|   |           |               +---util
+|   |           |               +---view
+|   |           |               |   +---accessibility
+|   |           |               |   \---animation
+|   |           |               \---widget
+|   |           +---classes.jar_6vsoot9ss0aiv99ict8dh61af
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           +---mediacompat
+|   |           |           \---v4
+|   |           |               \---media
+|   |           |                   \---session
+|   |           +---classes.jar_8ewfo4vec3j6igzq0rlnihtlb
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           \---graphics
+|   |           |               \---drawable
+|   |           +---classes.jar_8j5xabe8sxz0ggtghtfzav9d3
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           \---graphics
+|   |           |               \---drawable
+|   |           |                   \---animated
+|   |           +---classes.jar_8m9espbp7cqhaqexglwr2ff8v
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           +---coreui
+|   |           |           \---v4
+|   |           |               +---app
+|   |           |               +---view
+|   |           |               |   \---animation
+|   |           |               \---widget
+|   |           +---classes.jar_bvuary4bf7l1cuq4evrbis5hr
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           +---fragment
+|   |           |           \---v4
+|   |           |               \---app
+|   |           +---classes.jar_d8gvam9a96bml4x9o0ze0tnq0
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           \---v4
+|   |           +---classes.jar_dvww9xlm0dn23vtgxgupt9r3q
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           +---coreutils
+|   |           |           \---v4
+|   |           |               +---app
+|   |           |               +---content
+|   |           |               +---graphics
+|   |           |               |   \---drawable
+|   |           |               +---math
+|   |           |               +---print
+|   |           |               +---provider
+|   |           |               \---text
+|   |           +---classes.jar_ex1xpfg0wqmt5al4yhk1bzfi6
+|   |           |   \---android
+|   |           |       \---support
+|   |           |           \---v7
+|   |           |               +---app
+|   |           |               +---appcompat
+|   |           |               +---content
+|   |           |               |   \---res
+|   |           |               +---graphics
+|   |           |               |   \---drawable
+|   |           |               +---text
+|   |           |               +---transition
+|   |           |               +---view
+|   |           |               |   \---menu
+|   |           |               \---widget
+|   |           \---support-annotations-26.0.0-alpha1.jar_d74w8lyo42xthakrqf55i8mcf
+|   |               \---android
+|   |                   \---support
+|   |                       \---annotation
+|   +---libs
+|   \---src
+|       +---androidTest
+|       |   \---java
+|       |       \---com
+|       |           \---example
+|       |               \---demo
+|       |                   \---demo
+|       +---main
+|       |   +---java
+|       |   |   \---com
+|       |   |       \---example
+|       |   |           \---demo
+|       |   |               \---demo
+|       |   \---res
+|       |       +---drawable
+|       |       +---layout
+|       |       +---mipmap-hdpi
+|       |       +---mipmap-mdpi
+|       |       +---mipmap-xhdpi
+|       |       +---mipmap-xxhdpi
+|       |       +---mipmap-xxxhdpi
+|       |       +---values
+|       |       \---values-w820dp
+|       \---test
+|           \---java
+|               \---com
+|                   \---example
+|                       \---demo
+|                           \---demo
++---build
+|   +---generated
+|   \---intermediates
+|       \---dex-cache
+\---gradle
+    \---wrapper

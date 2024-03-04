@@ -1,0 +1,63 @@
+﻿io socket web 等等 目前这就是主要的领域
+IO操作
+1.文件打开方式
+2.文件读写操作
+3.文件指针
+4.文件属性
+
+读文件
+f=open(filePath)
+f=file(filePath)
+//两种读文件的方式
+
+f.read() //读所有内容
+lines=f.readlines()//返回一个list
+f.close() //关闭资源
+
+删除文件
+import os
+os.remove(filePath)
+
+写文件
+f=open('filepath','w')//这个是文件不存在就创建
+//文件存在就会覆盖所有内容然后在写
+//这个w可以换成a attach 追加
+//也可以指定成w+，读写模式
+f.write('')
+f.close()
+//写文件一定要关闭 要不会存在内容没有完全写入文件的情况
+
+f.seek(6) //文件指针移动到第六个字符处
+f.read()
+
+try/except/finally  //try/catch/finally
+//////////////////////////////////////////////
+f = open('newfile.txt','w')
+try:
+    for i in range(3000):
+        x = 1.0 / (i - 1000)
+        f.write('hello world: ' + str(i) + '\n')
+except Exception:
+    print "something bad happened"
+finally:
+    f.close()
+////////////////////////////////////////////////
+python中提供了更安全的方法
+with方法:当with块内容结束会调用close方法确保读写安全
+////////////////////////////////////////////////
+with open('newfile.txt','w') as f:
+    for i in range(3000):
+        x = 1.0 / (i - 1000)
+        f.write('hello world: ' + str(i) + '\n')
+/////////////////////////////////////////////////
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+在上面的操作中open的第二个参数可以有多种值
+w
+a
+w+
+r
+wb //二进制读文件
+rb //二进制写
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

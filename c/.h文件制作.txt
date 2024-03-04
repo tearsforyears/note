@@ -1,0 +1,13 @@
+一个.h文件要 对应有一个.c文件，这样写助于查看和修改程序。比如a.h 和 a.c;：
+在.h文件中
+#ifndef __A_H_
+#define __A_H_
+#include<stdio.h>
+void trans2(double B) ；
+double trans1() ；
+#endif
+在.c文件中
+#include "a.h"
+把相应的函数定义写在.c文件中
+再在main.c文件中
+#include "a.h"

@@ -1,0 +1,23 @@
+hashmap/dict
+	这两个东西基本操作可以相同
+	主要是get和set方法
+	hashmap采用的是头插入的连接法
+	dict采用的是开放寻址法
+	两者的不同在于处理hash函数的冲突上
+# 基本数据结构
+	# hashable方法
+		1.开散列(哈希桶,链地址法)存取头插链表节点 hashmap # 适合动态
+		2.闭散列(开放寻址)存取线性探测下一个位置 dict # 易序列化,效率略低
+	# basic element
+		init null
+		Entry (key-value) 
+		Hashmap <String,String> map = new Hashmap<>();
+		map.set("key","value");
+		# array[hash_function("key")].head_insert("value");
+		# array表示存储map的数据空间,head_insert表示头插入
+		# head_insert是解决hash函数冲突的方法
+		# 当key不对的时候需要.next()查找
+		# 用头插法的原因是因为发明者认为后插入的优先级更高
+		# hashmap初始长度为16 只能初始为2的幂
+		index = HashCode（Key） % Length # 此种做法虽然可以确定index但效率低下
+		index = HashCode (Key) & (Length-1) # 

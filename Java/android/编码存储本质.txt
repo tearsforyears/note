@@ -1,0 +1,36 @@
+编码与存储
+	java 中有字节流(Bytes)和字符流(Chars)去描述此问题
+	因为用英文描述该架构会更好所以此处用英文去描述部分词语
+	python 中屏蔽了部分处理痕迹
+	但总的来说 从二进制到字符串这一过程相对重要
+	利用java和python去说明白问题
+架构
+	字符层 chars/string
+	           |
+	二进制层  bytes
+	Stream打开二进制流 是位于bytes层
+	StreamReader是位于字符层和二进制层之间充当沟通桥梁
+	String和Chars相当于字符层的结构 String对 char[] 进行了封装
+
+```python
+>>> bytes("雨女无瓜","utf-8")
+b'\xe9\x9b\xa8\xe5\xa5\xb3\xe6\x97\xa0\xe7\x93\x9c'
+```
+
+可以看出来 bytes本质就是用二进制去存储的
+而char和bytes之间要进行一层encode
+只有encode之后才能把char变成二进制 熟悉的编码例如utf8等
+就是在字符层转换到二进制层的过程中进行了二进制编码
+同样我们要把二进制数据进行解码得到人类能够识别的字符串
+
+编码的操控还有一层Buffered
+	BufferedReader/BufferedWriter
+	两者原理相对原始的最大不同是利用了缓冲
+	BufferedReader是线程去读缓冲区而显示
+	为了解决bytes调入内存和调入cpu之间的速度不匹配问题
+	Writer则是需要我们利用java等去申请内存 利用内存去充当缓冲区数组 bytes[]
+
+
+
+
+

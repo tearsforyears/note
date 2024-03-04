@@ -1,0 +1,9 @@
+#登陆之后爬取
+0-480
+电影介绍页
+https://movie.douban.com/subject/1292052/
+评论页
+https://movie.douban.com/subject/1292052/comments?start=480&limit=20&sort=new_score&status=P
+无登陆情况
+start=200是极限
+豆瓣封ip是封1个小时左右 但是ip异常处理时间有点长
